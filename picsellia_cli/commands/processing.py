@@ -1,77 +1,87 @@
-import click
-
+import typer
 from picsellia_cli.utils.collect_params import collect_parameters
 from picsellia_cli.utils.session_manager import session_manager
 
+app = typer.Typer(help="Manage processing configurations.")
 
-@click.command()
-def add_processing():
-    """Add or update a processing configuration."""
-    processing_name = input("Processing name: ")
+
+@app.command()
+def add():
+    """
+    Add a new pipeline configuration (processing or training).
+    """
+    processing_name: str = typer.prompt("Processing name")
 
     processing_data = {
-        "processing_type": input("Processing type [default=DATASET_VERSION_CREATION]: ")
-        or "DATASET_VERSION_CREATION",
-        "picsellia_pipeline_script_path": input(
-            "Picsellia pipeline script path [default=examples/processing/augmentation/augmentations_pipeline.py]: "
-        )
-        or "examples/processing/augmentation/augmentations_pipeline.py",
-        "local_pipeline_script_path": input(
-            "Local pipeline script path [default=examples/processing/augmentation/local_augmentations_pipeline.py]: "
-        )
-        or "examples/processing/augmentation/local_augmentations_pipeline.py",
-        "requirements_path": input(
-            "Requirements file path [default=examples/processing/augmentation/requirements.txt]: "
-        )
-        or "examples/processing/augmentation/requirements.txt",
-        "image_name": input("Docker image name: "),
-        "image_tag": input("Docker image tag [default=latest]: ") or "latest",
+        "processing_type": typer.prompt(
+            "Processing type", default="DATASET_VERSION_CREATION"
+        ),
+        "picsellia_pipeline_script_path": typer.prompt(
+            "Picsellia pipeline script path",
+            default="examples/processing/augmentation/augmentations_pipeline.py",
+        ),
+        "local_pipeline_script_path": typer.prompt(
+            "Local pipeline script path",
+            default="examples/processing/augmentation/local_augmentations_pipeline.py",
+        ),
+        "requirements_path": typer.prompt(
+            "Requirements file path",
+            default="examples/processing/augmentation/requirements.txt",
+        ),
+        "image_name": typer.prompt("Docker image name"),
+        "image_tag": typer.prompt("Docker image tag", default="latest"),
         "parameters": {},
     }
 
     # Collect parameters
-    parameters_mode = (
-        input("Enter 'manual', 'file', or 'none' for parameters [default=none]: ")
-        or "none"
+    parameters_mode = typer.prompt(
+        "Enter 'manual', 'file', or 'none' for parameters", default="none"
     )
+
     if parameters_mode == "manual":
         parameters: dict[str, str] = {}
         while True:
-            key = input("Parameter key (leave empty to stop): ")
+            key = typer.prompt("Parameter key (leave empty to stop)", default="")
             if not key:
                 break
-            value = input(f"Value for '{key}': ")
+            value = typer.prompt(f"Value for '{key}'")
             parameters[key] = value
         processing_data["parameters"] = parameters
+
     elif parameters_mode == "file":
-        json_path = input("Path to JSON file: ")
+        json_path = typer.prompt("Path to JSON file")
         processing_data["parameters"] = collect_parameters("file", json_path)
-    else:
-        processing_data["parameters"] = {}
 
     # Save processing
     session_manager.add_processing(processing_name, processing_data)
-    print(f"Processing '{processing_name}' added or updated successfully!")
+    typer.echo(f"✅ Processing '{processing_name}' added or updated successfully!")
 
 
-@click.command()
-@click.argument("name")
-def remove_processing(name):
-    """Delete a processing configuration."""
+@app.command()
+def remove(name: str):
+    """
+    Remove an existing pipeline configuration.
+    """
     try:
         session_manager.remove_processing(name)
-        click.echo(f"Processing '{name}' deleted successfully!")
+        typer.echo(f"✅ Processing '{name}' deleted successfully!")
     except KeyError as e:
-        click.echo(str(e))
+        typer.echo(f"⚠️ {e}")
 
 
-@click.command()
-def list_processings():
-    """List all registered processings."""
+@app.command(name="list")
+def list_():
+    """
+    List all registered pipelines.
+    """
     processings = session_manager.list_processings()
     if not processings:
-        click.echo("No processings registered.")
+        typer.echo("⚠️ No processings registered.")
     else:
-        click.echo("Registered processings:")
+        typer.echo("📋 Registered processings:")
         for processing in processings:
-            click.echo(f"  - {processing}")
+            typer.echo(f"  - {processing}")
+
+
+if __name__ == "__main__":
+    app()

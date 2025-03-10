@@ -1,5 +1,4 @@
-import click
-
+import typer
 from picsellia_cli.utils.prompt import fetch_processing_name
 from picsellia_cli.utils.validation import validate_and_update_processing
 from picsellia_cli.utils.session_manager import session_manager
@@ -7,24 +6,28 @@ from picsellia_cli.utils.session_manager import session_manager
 from picsellia import Client
 from picsellia.types.enums import ProcessingType
 
+app = typer.Typer(help="Push processing pipeline to Picsellia.")
 
-@click.command()
-def push_processing_on_picsellia():
+
+@app.command()
+def picsellia_push():
     """
-    Push a processing pipeline to Picsellia.
+    Push the pipeline to Picsellia.
     """
     session_manager.ensure_session_initialized()
 
     processing_name = fetch_processing_name()
     if not processing_name:
+        typer.echo("❌ No processing name provided.")
         return
 
     processing = validate_and_update_processing(processing_name)
     if not processing:
+        typer.echo("❌ Invalid processing configuration.")
         return
 
-    default_cpu = click.prompt("Default CPU", default=4, type=int, show_default=True)
-    default_gpu = click.prompt("Default GPU", default=0, type=int, show_default=True)
+    default_cpu: int = typer.prompt("Default CPU", default=4)
+    default_gpu: int = typer.prompt("Default GPU", default=0)
 
     global_data = session_manager.get_global()
 
@@ -44,6 +47,14 @@ def push_processing_on_picsellia():
             docker_tag=processing["image_tag"],
             docker_flags=None,
         )
-        click.echo(f"Processing '{processing_name}' pushed successfully!")
+
+        typer.echo(
+            f"✅ Processing '{processing_name}' pushed successfully to Picsellia!"
+        )
+
     except Exception as e:
-        click.echo(f"Error pushing processing to Picsellia: {e}")
+        typer.echo(f"❌ Error pushing processing to Picsellia: {e}")
+
+
+if __name__ == "__main__":
+    app()

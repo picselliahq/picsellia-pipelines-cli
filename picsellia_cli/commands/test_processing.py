@@ -1,19 +1,19 @@
 import os
 import subprocess
-
+import typer
 from picsellia_cli.utils.prompt import fetch_processing_name
 from picsellia_cli.utils.validation import validate_and_update_processing
 from picsellia_cli.utils.collect_params import update_processing_parameters
 from picsellia_cli.utils.session_manager import session_manager
-import click
-
 from picsellia_cli.utils.dockerfile_generation import get_repository_root
 
+app = typer.Typer(help="Processing testing utilities.")
 
-@click.command()
-def test_processing():
+
+@app.command()
+def test():
     """
-    Test the local processing pipeline script with specified arguments.
+    Run a local test of a pipeline.
     """
     session_manager.ensure_session_initialized()
 
@@ -25,20 +25,20 @@ def test_processing():
     if not processing:
         return
 
-    results_dir = click.prompt("Results directory", type=click.Path())
+    results_dir: str = typer.prompt("Results directory", type=str)
+
     if os.path.exists(results_dir):
-        override = click.confirm(
-            f"Directory {results_dir} already exists. Do you want to override it?"
+        override = typer.confirm(
+            f"⚠️ Directory '{results_dir}' already exists. Do you want to override it?"
         )
         if not override:
-            results_dir = click.prompt("Results directory", type=click.Path())
+            results_dir = typer.prompt("Enter a new results directory", type=str)
         else:
             os.system(f"rm -rf {results_dir}")
             os.makedirs(results_dir, exist_ok=True)
-    input_dataset_version_id = click.prompt("Input dataset version ID", type=str)
-    output_dataset_version_name = click.prompt(
-        "Output dataset version name that will be created", type=str
-    )
+
+    input_dataset_version_id: str = typer.prompt("Input dataset version ID")
+    output_dataset_version_name: str = typer.prompt("Output dataset version name")
 
     global_data = session_manager.get_global()
 
@@ -49,7 +49,7 @@ def test_processing():
             repo_root, processing["local_pipeline_script_path"]
         )
         if not os.path.exists(pipeline_script):
-            raise FileNotFoundError(f"Pipeline script not found: {pipeline_script}")
+            raise FileNotFoundError(f"❌ Pipeline script not found: {pipeline_script}")
 
         update_processing_parameters(
             os.path.join(repo_root, processing["local_pipeline_script_path"]),
@@ -76,12 +76,19 @@ def test_processing():
         env = os.environ.copy()
         env["PYTHONPATH"] = str(repo_root)
 
-        click.echo(f"Running the local pipeline script with PYTHONPATH={repo_root}...")
+        typer.echo(
+            f"🚀 Running the local pipeline script with PYTHONPATH={repo_root}..."
+        )
         subprocess.run(command, check=True, env=env)
-        click.echo(f"Processing '{processing_name}' tested successfully!")
+        typer.echo(f"✅ Processing '{processing_name}' tested successfully!")
+
     except FileNotFoundError as e:
-        click.echo(f"File error: {e}")
+        typer.echo(f"❌ File error: {e}")
     except subprocess.CalledProcessError as e:
-        click.echo(f"Error running the pipeline script: {e}")
+        typer.echo(f"❌ Error running the pipeline script: {e}")
     except Exception as e:
-        click.echo(f"Unexpected error: {e}")
+        typer.echo(f"❌ Unexpected error: {e}")
+
+
+if __name__ == "__main__":
+    app()
