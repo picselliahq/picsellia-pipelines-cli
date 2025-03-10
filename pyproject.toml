@@ -9,7 +9,7 @@ readme = "README.md"
 requires-python = ">=3.10,<4.0"
 dependencies = [
     "picsellia (>=6.20.0,<7.0.0)",
-    "click (>=8.1.8,<9.0.0)"
+    "typer (>=0.15.2,<0.16.0)"
 ]
 
 
@@ -21,3 +21,6 @@ build-backend = "poetry.core.masonry.api"
 packages = [
     { include = "picsellia_cli"},
 ]
+
+[tool.poetry.scripts]
+pipeline-cli = "picsellia_cli.main:app"

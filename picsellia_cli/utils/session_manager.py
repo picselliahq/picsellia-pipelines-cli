@@ -3,7 +3,7 @@ import os
 
 
 class SessionManager:
-    SESSION_FILE = os.path.join("cli", ".session.json")
+    SESSION_FILE = os.path.join(".session.json")
 
     def __init__(self):
         self.session: dict = {"global": {}, "processings": {}}

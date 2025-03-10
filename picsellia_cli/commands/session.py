@@ -1,10 +1,17 @@
-import click
-
+import typer
 from picsellia_cli.utils.session_manager import session_manager
 
+app = typer.Typer(help="Session management commands.")
 
-@click.command()
-def initialize_session():
-    """Initialize global session data."""
+
+@app.command()
+def session_init():
+    """
+    Initialize a session for managing pipelines.
+    """
     session_manager.ensure_session_initialized()
-    print("Global session initialized successfully!")
+    typer.echo("✅ Global session initialized successfully!")
+
+
+if __name__ == "__main__":
+    app()

@@ -1,5 +1,5 @@
 import os
-import click
+import typer
 from picsellia_cli.utils.prompt import fetch_processing_name
 from picsellia_cli.utils.validation import validate_and_update_processing
 from picsellia_cli.utils.collect_params import update_processing_parameters
@@ -9,21 +9,25 @@ from picsellia_cli.utils.dockerfile_generation import (
     get_repository_root,
 )
 
+app = typer.Typer(help="Dockerized pipeline setup utilities.")
 
-@click.command()
-def setup_dockerized_pipeline():
+
+@app.command()
+def setup_docker():
     """
-    Use session values to set up a dockerized pipeline.
+    Generate a Dockerized environment for the pipeline.
     """
     processing_name = fetch_processing_name()
     if not processing_name:
+        typer.echo("❌ No processing name provided.")
         return
 
     processing = validate_and_update_processing(processing_name)
     if not processing:
+        typer.echo("❌ Invalid processing configuration.")
         return
 
-    base_docker_image = click.prompt(
+    base_docker_image: str = typer.prompt(
         "Base Docker image",
         default="picsellia/cpu:python3.10",
         show_default=True,
@@ -39,7 +43,7 @@ def setup_dockerized_pipeline():
             processing["parameters"],
         )
 
-        # Copy files
+        # Copy required files
         copy_file(
             source=os.path.join(
                 repo_root, processing["picsellia_pipeline_script_path"]
@@ -54,8 +58,13 @@ def setup_dockerized_pipeline():
         # Generate Dockerfile
         generate_dockerfile(processing_name, base_docker_image, pipeline_dir)
 
-        click.echo(
-            f"Dockerized pipeline '{processing_name}' setup in '{pipeline_dir}'."
+        typer.echo(
+            f"✅ Dockerized pipeline '{processing_name}' setup successfully in '{pipeline_dir}'."
         )
+
     except Exception as e:
-        click.echo(f"Error setting up dockerized pipeline: {e}")
+        typer.echo(f"❌ Error setting up dockerized pipeline: {e}")
+
+
+if __name__ == "__main__":
+    app()
