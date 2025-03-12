@@ -71,14 +71,16 @@ def init_pipeline(pipeline_name: str):
 
     # Confirmation messages
     typer.echo(
-        f"✅ Pipeline '{pipeline_name}' successfully initialized and registered!"
+        f"\n ✅ Pipeline '{pipeline_name}' successfully initialized and registered!"
     )
     typer.echo(
         "📂 Navigate to the pipeline directory and modify your scripts as needed."
     )
-    typer.echo("🛠️ Modify `process_dataset.py` to customize dataset processing.")
-    typer.echo("🚀 Run the pipeline locally using `python local_pipeline.py --help`.")
-    typer.echo("📦 When ready, build and push the pipeline using Docker!")
+    typer.echo("🛠️ Modify the `process_images` function in `process_dataset.py`.")
+    typer.echo("🚀 Run the pipeline locally using `pipeline-cli test`.")
+    typer.echo(
+        "📦 When ready, deploy the pipeline to Picsellia using `pipeline-cli deploy`."
+    )
 
 
 if __name__ == "__main__":
