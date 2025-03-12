@@ -249,7 +249,7 @@ ENTRYPOINT ["run", "python3.10", "{pipeline_name}/picsellia_pipeline.py"]
 """
 
 TEMPLATE_REQUIREMENTS = """# Add your dependencies here
-git+https://github.com/picselliahq/picsellia-cv-engine.git@feat/add-mkdocs#egg=picsellia-cv-engine
+-e ../picsellia-cv-engine
 """
 
 
