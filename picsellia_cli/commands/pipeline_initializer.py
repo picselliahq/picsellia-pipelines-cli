@@ -7,6 +7,7 @@ from picsellia_cli.utils.templates import (
     get_dockerfile_template,
     get_requirements_template,
     get_process_dataset_template,
+    get_dockerignore_template,
 )
 from picsellia_cli.utils.session_manager import session_manager
 
@@ -24,6 +25,7 @@ def init_pipeline(pipeline_name: str):
     - `process_dataset.py`
     - `Dockerfile`
     - `requirements.txt`
+    - `.dockerignore`
 
     The pipeline is automatically registered in the session manager but does not yet have a Docker image assigned.
     """
@@ -46,6 +48,9 @@ def init_pipeline(pipeline_name: str):
 
     with open(os.path.join(pipeline_name, "requirements.txt"), "w") as f:
         f.write(get_requirements_template())
+
+    with open(os.path.join(pipeline_name, ".dockerignore"), "w") as f:
+        f.write(get_dockerignore_template())
 
     # Register pipeline in TinyDB (session manager)
     pipeline_data = {

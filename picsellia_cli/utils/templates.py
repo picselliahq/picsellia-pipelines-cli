@@ -116,7 +116,7 @@ def process_dataset(
 
     # Get processing parameters from the user-defined configuration
     context: PicselliaProcessingContext = Pipeline.get_active_context()
-    parameters = context.processing_parameters  # 🔹 Modify processing behavior here
+    parameters = context.processing_parameters.to_dict()
 
     # Initialize an empty COCO dataset
     output_coco = deepcopy(input_dataset.coco_data)
@@ -124,7 +124,7 @@ def process_dataset(
     output_coco["annotations"] = []  # Reset annotation metadata
 
     # Call the helper function to process images
-    output_images_dir, output_coco = process_images(
+    output_coco = process_images(
         input_images_dir=input_dataset.images_dir,
         input_coco=input_dataset.coco_data,
         parameters=parameters,
@@ -132,7 +132,6 @@ def process_dataset(
         output_coco=output_coco,
     )
     # Assign processed data to output dataset
-    output_dataset.images_dir = output_images_dir
     output_dataset.coco_data = output_coco
 
     print(f"✅ Dataset processing complete!")
@@ -144,7 +143,7 @@ def process_images(
     parameters: Dict[str, Any],
     output_images_dir: str,
     output_coco: Dict[str, Any],
-) -> Tuple[str, Dict[str, Any]]:
+) -> Dict[str, Any]:
     \"\"\"
     🚀 Modify this function to define how your dataset should be processed.
 
@@ -162,7 +161,6 @@ def process_images(
     - `output_coco`: Empty COCO dictionary where you should store processed metadata.
 
     🔹 **Returns:**
-    - `output_images_dir`: The directory containing processed images.
     - `output_coco`: Updated COCO dictionary with new image & annotation metadata.
     \"\"\"
 
@@ -209,7 +207,7 @@ def process_images(
             output_coco["annotations"].append(new_annotation)
 
     print(f"✅ Processed {len(image_paths)} images.")
-    return output_images_dir, output_coco
+    return output_coco
 
 def get_image_id_by_filename(coco_data: Dict[str, Any], filename: str) -> int:
     \"\"\"
@@ -251,6 +249,7 @@ ENTRYPOINT ["run", "python3.10", "{pipeline_name}/picsellia_pipeline.py"]
 """
 
 TEMPLATE_REQUIREMENTS = """# Add your dependencies here
+git+https://github.com/picselliahq/picsellia-cv-engine.git@feat/add-mkdocs#egg=picsellia-cv-engine
 """
 
 
@@ -272,3 +271,24 @@ def get_dockerfile_template(pipeline_name: str) -> str:
 
 def get_requirements_template() -> str:
     return TEMPLATE_REQUIREMENTS
+
+
+def get_dockerignore_template() -> str:
+    """
+    Returns a .dockerignore template to exclude unnecessary files from the Docker build.
+    """
+    return """# Exclude virtual environments
+            .venv/
+            venv/
+
+            # Ignore Python cache files
+            __pycache__/
+            *.pyc
+            *.pyo
+
+            # Ignore macOS system files
+            .DS_Store
+
+            # Ignore any temporary or log files
+            *.log
+            """
