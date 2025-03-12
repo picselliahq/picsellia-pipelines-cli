@@ -6,12 +6,6 @@ authors = [
     {name = "SoniaGrh",email = "sonia.garrouch@hotmail.fr"}
 ]
 readme = "README.md"
-requires-python = ">=3.10,<4.0"
-dependencies = [
-    "picsellia (>=6.20.0,<7.0.0)",
-    "typer (>=0.15.2,<0.16.0)"
-]
-
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -21,6 +15,12 @@ build-backend = "poetry.core.masonry.api"
 packages = [
     { include = "picsellia_cli"},
 ]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+picsellia = ">=6.20.0,<7.0.0"
+typer = ">=0.15.2,<0.16.0"
+tinydb = "^4.8.2"
 
 [tool.poetry.scripts]
 pipeline-cli = "picsellia_cli.main:app"
