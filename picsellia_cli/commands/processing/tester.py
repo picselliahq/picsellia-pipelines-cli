@@ -33,28 +33,24 @@ def get_global_session() -> Dict:
     return global_data
 
 
-def create_virtual_env(pipeline_name: str):
-    """Create a virtual environment (.env) for the pipeline test."""
+def create_virtual_env(pipeline_name: str) -> str:
     env_path = os.path.join(os.getcwd(), pipeline_name, ".venv")
+    pip_executable = (
+        os.path.join(env_path, "bin", "pip")
+        if os.name != "nt"
+        else os.path.join(env_path, "Scripts", "pip.exe")
+    )
 
     if not os.path.exists(env_path):
         typer.echo(f"⚙️ Creating virtual environment at {env_path}...")
         venv.create(env_path, with_pip=True)
 
-        # Install dependencies from requirements.txt
-        requirements_path = os.path.join(os.getcwd(), pipeline_name, "requirements.txt")
-        if os.path.exists(requirements_path):
-            typer.echo(f"📦 Installing dependencies from {requirements_path}...")
-            pip_executable = (
-                os.path.join(env_path, "bin", "pip")
-                if os.name != "nt"
-                else os.path.join(env_path, "Scripts", "pip.exe")
-            )
-            subprocess.run(
-                [pip_executable, "install", "-r", requirements_path], check=True
-            )
-        else:
-            typer.echo("⚠️ No requirements.txt found, skipping installation.")
+    requirements_path = os.path.join(os.getcwd(), pipeline_name, "requirements.txt")
+    if os.path.exists(requirements_path):
+        typer.echo(f"📦 Installing dependencies from {requirements_path}...")
+        subprocess.run([pip_executable, "install", "-r", requirements_path], check=True)
+    else:
+        typer.echo("⚠️ No requirements.txt found, skipping dependency installation.")
 
     return env_path
 
