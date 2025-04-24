@@ -98,7 +98,12 @@ def run_training_step(dataset_collection: DatasetCollection[YoloDataset]):
     
     data_yaml_path = generate_data_yaml(dataset_collection=dataset_collection)
 
-    model = YOLO("yolov8n.pt")
+    pretrained_weights_path = download_pretrained_weights(
+        experiment=context.experiment,
+        pretrained_weights_artifact_name="pretrained-weights",
+        target_path=os.path.join(context.experiment.name, "pretrained-weights"),
+    )
+    model = YOLO(pretrained_weights_path)
 
     model.train(
         data=data_yaml_path,
@@ -125,6 +130,18 @@ def generate_data_yaml(
         yaml.dump(data_yaml, f, default_flow_style=False)
 
     return os.path.join(dataset_collection.dataset_path, "data.yaml")
+
+
+def download_pretrained_weights(
+    experiment: Experiment,
+    pretrained_weights_artifact_name: str,
+    target_path: str,
+) -> str:
+    pretrained_weights_artifact = experiment.get_artifact(name=pretrained_weights_artifact_name)
+    if pretrained_weights_artifact:
+        pretrained_weights_artifact.download(target_path=target_path)
+        return os.path.join(target_path, pretrained_weights_artifact.filename)
+    return None
 """
 
 SIMPLE_PIPELINE_REQUIREMENTS = """picsellia>=6.10.0, <7.0.0
