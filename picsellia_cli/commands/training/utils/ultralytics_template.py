@@ -2,21 +2,24 @@
 # TEMPLATES - PIPELINES
 # ======================
 
+from picsellia_cli.utils.base_template import BaseTemplate
+
+
 TRAINING_TEMPLATE_PICSELLIA_PIPELINE = """from picsellia_cv_engine import pipeline
 from picsellia_cv_engine.services.base.utils.picsellia_context import (
     create_picsellia_training_context,
 )
 
-from {pipeline_name}.utils.augmentation_parameters import (
+from {pipeline_module}.utils.augmentation_parameters import (
     DefaultUltralyticsAugmentationParameters,
 )
-from {pipeline_name}.utils.export_parameters import DefaultExportParameters
-from {pipeline_name}.utils.hyperparameters import DefaultUltralyticsHyperParameters
-from utils.prepare_dataset import prepare_dataset
-from utils.load_model import load_model
-from utils.train_model import train_model
-from utils.export_model import export_model
-from utils.evaluate_model import evaluate_model
+from {pipeline_module}.utils.export_parameters import DefaultExportParameters
+from {pipeline_module}.utils.hyperparameters import DefaultUltralyticsHyperParameters
+from {pipeline_module}.utils.prepare_dataset import prepare_dataset
+from {pipeline_module}.utils.load_model import load_model
+from {pipeline_module}.utils.train_model import train_model
+from {pipeline_module}.utils.export_model import export_model
+from {pipeline_module}.utils.evaluate_model import evaluate_model
 
 context = create_picsellia_training_context(
     hyperparameters_cls=DefaultUltralyticsHyperParameters,
@@ -50,16 +53,16 @@ from picsellia_cv_engine.services.base.utils.local_context import (
     create_local_training_context,
 )
 
-from {pipeline_name}.utils.augmentation_parameters import (
+from {pipeline_module}.utils.augmentation_parameters import (
     DefaultUltralyticsAugmentationParameters,
 )
-from {pipeline_name}.utils.export_parameters import DefaultExportParameters
-from {pipeline_name}.utils.hyperparameters import DefaultUltralyticsHyperParameters
-from utils.prepare_dataset import prepare_dataset
-from utils.load_model import load_model
-from utils.train_model import train_model
-from utils.export_model import export_model
-from utils.evaluate_model import evaluate_model
+from {pipeline_module}.utils.export_parameters import DefaultExportParameters
+from {pipeline_module}.utils.hyperparameters import DefaultUltralyticsHyperParameters
+from {pipeline_module}.utils.prepare_dataset import prepare_dataset
+from {pipeline_module}.utils.load_model import load_model
+from {pipeline_module}.utils.train_model import train_model
+from {pipeline_module}.utils.export_model import export_model
+from {pipeline_module}.utils.evaluate_model import evaluate_model
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_token", type=str, required=True)
@@ -557,26 +560,23 @@ RUN apt-get update && apt-get install -y \\
     git \\
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/picselliahq/picsellia-cv-engine.git /picsellia-cv-engine
-RUN git clone https://github.com/picselliahq/picsellia-pipelines-cli.git /picsellia-pipelines-cli
-RUN uv pip install --python=$(which python3.10) -e /picsellia-cv-engine
+RUN uv pip install --python=$(which python3.10) git+https://github.com/picselliahq/picsellia-cv-engine.git@main
 
 WORKDIR /experiment
 
 ARG REBUILD_ALL
-COPY ./{pipeline_path} ./{pipeline_path}
+COPY ./{pipeline_dir} ./{pipeline_dir}
 ARG REBUILD_PICSELLIA
 
-RUN uv pip install --python=$(which python3.10) --no-cache -r ./{pipeline_path}/requirements.txt
+RUN uv pip install --python=$(which python3.10) --no-cache -r ./{pipeline_dir}/requirements.txt
 RUN uv pip install --python=$(which python3.10) --no-cache torch==2.2.1+cu118 torchaudio==2.2.1+cu118 torchvision==0.17.1+cu118 --find-links https://download.pytorch.org/whl/torch_stable.html
 
 ENV PYTHONPATH=":/experiment"
 
-ENTRYPOINT ["run", "python3.10", "{pipeline_path}/training_pipeline.py"]
+ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/training_pipeline.py"]
 """
 
 TRAINING_TEMPLATE_REQUIREMENTS = """# Add your dependencies here
--e ../picsellia-cv-engine
 picsellia>=6.10.0, <7.0.0
 numpy<2.0
 scikit-learn>=1.2.2, <2.0.0
@@ -598,58 +598,25 @@ __pycache__/
 *.log
 """
 
-# ======================
-# ACCESSORS
-# ======================
+class UltralyticsTrainingTemplate(BaseTemplate):
+    def get_main_files(self) -> dict[str, str]:
+        return {
+            "training_pipeline.py": TRAINING_TEMPLATE_PICSELLIA_PIPELINE.format(pipeline_module=self.pipeline_dir.replace("/", "."), pipeline_name=self.pipeline_name),
+            "local_training_pipeline.py": TRAINING_TEMPLATE_LOCAL_PIPELINE.format(pipeline_module=self.pipeline_dir.replace("/", "."), pipeline_name=self.pipeline_name),
+            "requirements.txt": TRAINING_TEMPLATE_REQUIREMENTS,
+            "Dockerfile": TRAINING_TEMPLATE_DOCKERFILE.format(pipeline_dir=self.pipeline_dir),
+            ".dockerignore": TRAINING_TEMPLATE_DOCKERIGNORE,
+        }
 
+    def get_utils_files(self) -> dict[str, str]:
+        return {
+            "prepare_dataset.py": TEMPLATE_PREPARE_DATASET,
+            "load_model.py": TEMPLATE_LOAD_MODEL,
+            "train_model.py": TEMPLATE_TRAIN_MODEL,
+            "export_model.py": TEMPLATE_EXPORT_MODEL,
+            "evaluate_model.py": TEMPLATE_EVALUATE_MODEL,
+            "hyperparameters.py": TEMPLATE_HYPERPARAMETERS,
+            "augmentation_parameters.py": TEMPLATE_AUGMENTATION_PARAMETERS,
+            "export_parameters.py": TEMPLATE_EXPORT_PARAMETERS,
+        }
 
-def get_training_picsellia_pipeline_template(pipeline_name: str) -> str:
-    return TRAINING_TEMPLATE_PICSELLIA_PIPELINE.format(pipeline_name=pipeline_name)
-
-
-def get_training_local_pipeline_template(pipeline_name: str) -> str:
-    return TRAINING_TEMPLATE_LOCAL_PIPELINE.format(pipeline_name=pipeline_name)
-
-
-def get_training_prepare_dataset_template() -> str:
-    return TEMPLATE_PREPARE_DATASET
-
-
-def get_training_load_model_template() -> str:
-    return TEMPLATE_LOAD_MODEL
-
-
-def get_training_train_model_template() -> str:
-    return TEMPLATE_TRAIN_MODEL
-
-
-def get_training_export_model_template() -> str:
-    return TEMPLATE_EXPORT_MODEL
-
-
-def get_training_evaluate_model_template() -> str:
-    return TEMPLATE_EVALUATE_MODEL
-
-
-def get_training_hyperparameters_template() -> str:
-    return TEMPLATE_HYPERPARAMETERS
-
-
-def get_training_augmentation_parameters_template() -> str:
-    return TEMPLATE_AUGMENTATION_PARAMETERS
-
-
-def get_training_export_parameters_template() -> str:
-    return TEMPLATE_EXPORT_PARAMETERS
-
-
-def get_training_dockerfile_template(pipeline_path: str) -> str:
-    return TRAINING_TEMPLATE_DOCKERFILE.format(pipeline_path=pipeline_path)
-
-
-def get_training_requirements_template() -> str:
-    return TRAINING_TEMPLATE_REQUIREMENTS
-
-
-def get_training_dockerignore_template() -> str:
-    return TRAINING_TEMPLATE_DOCKERIGNORE
