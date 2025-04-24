@@ -52,6 +52,17 @@ def create_virtual_env(pipeline_name: str) -> str:
     else:
         typer.echo("⚠️ No requirements.txt found, skipping dependency installation.")
 
+    # Toujours installer picsellia-cv-engine depuis GitHub
+    typer.echo("📦 Installing picsellia-cv-engine from GitHub...")
+    subprocess.run(
+        [
+            pip_executable,
+            "install",
+            "git+https://github.com/picselliahq/picsellia-cv-engine.git@feat/add-utils-for-training-template",
+        ],
+        check=True,
+    )
+
     return env_path
 
 
