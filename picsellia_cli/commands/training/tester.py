@@ -26,8 +26,8 @@ def get_global_session() -> Dict:
     return global_data
 
 
-def create_virtual_env(pipeline_name: str) -> str:
-    env_path = os.path.join(os.getcwd(), pipeline_name, ".venv")
+def create_virtual_env(requirements_path: str) -> str:
+    env_path = os.path.join(os.path.dirname(requirements_path), ".venv")
     pip_executable = (
         os.path.join(env_path, "bin", "pip")
         if os.name != "nt"
@@ -38,17 +38,26 @@ def create_virtual_env(pipeline_name: str) -> str:
         typer.echo(f"⚙️ Creating virtual environment at {env_path}...")
         venv.create(env_path, with_pip=True)
 
-    requirements_path = os.path.join(os.getcwd(), pipeline_name, "requirements.txt")
     if os.path.exists(requirements_path):
         typer.echo(f"📦 Installing dependencies from {requirements_path}...")
         subprocess.run([pip_executable, "install", "-r", requirements_path], check=True)
     else:
         typer.echo("⚠️ No requirements.txt found, skipping dependency installation.")
 
+    typer.echo("📦 Installing picsellia-cv-engine from GitHub...")
+    subprocess.run(
+        [
+            pip_executable,
+            "install",
+            "git+https://github.com/picselliahq/picsellia-cv-engine.git@feat/add-utils-for-training-template",
+        ],
+        check=True,
+    )
+
     return env_path
 
 
-def prompt_training_params(pipeline_name: str, stored_params: Dict) -> Dict:
+def prompt_training_params(stored_params: Dict) -> Dict:
     last_experiment_id = stored_params.get("experiment_id", "")
 
     if last_experiment_id:
@@ -95,7 +104,18 @@ def run_training_pipeline(
     env["PYTHONPATH"] = str(os.getcwd())
 
     typer.echo(f"🚀 Running training pipeline with PYTHONPATH={os.getcwd()}...")
-    subprocess.run(command, check=True, env=env)
+
+    try:
+        subprocess.run(command, check=True, env=env)
+    except subprocess.CalledProcessError as e:
+        typer.echo(
+            typer.style(
+                "\n❌ Pipeline execution failed.", fg=typer.colors.RED, bold=True
+            )
+        )
+        typer.echo("🔍 Most recent error output:\n")
+        typer.echo(typer.style(str(e), fg=typer.colors.RED))
+        raise typer.Exit(code=e.returncode)
 
     # Save params
     pipeline["last_test_params"] = params
@@ -112,8 +132,9 @@ def test(
     pipeline = get_pipeline_data(pipeline_name)
     global_data = get_global_session()
     stored_params = pipeline.get("last_test_params", {})
-    params = prompt_training_params(pipeline_name, stored_params)
-    env_path = create_virtual_env(pipeline_name)
+    params = prompt_training_params(stored_params)
+    env_path = create_virtual_env(requirements_path=pipeline["requirements_path"]
+    )
     run_training_pipeline(pipeline_name, pipeline, global_data, params, env_path)
 
 
