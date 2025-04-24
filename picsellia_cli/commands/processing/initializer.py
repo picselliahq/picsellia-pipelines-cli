@@ -71,14 +71,30 @@ def init_processing_pipeline(pipeline_name: str):
 
     session_manager.add_pipeline(pipeline_name, pipeline_data)
 
+    typer.echo("")
     typer.echo(
-        f"\n✅ Processing pipeline '{pipeline_name}' initialized and registered."
+        typer.style(
+            "✅ Processing pipeline initialized and registered",
+            fg=typer.colors.GREEN,
+            bold=True,
+        )
     )
-    typer.echo("📁 Files created in:")
-    typer.echo(f"   → {pipeline_name}/")
-    typer.echo("🛠️  You can now edit `process_dataset.py` to define your logic.")
-    typer.echo("🧪 Run it locally using `pipeline-cli processing test`.")
-    typer.echo("🚀 Deploy to Picsellia using `pipeline-cli processing deploy`.")
+    typer.echo(f"📁 Structure created at: ./{pipeline_name}/")
+    typer.echo("")
+    typer.echo("Next steps:")
+    typer.echo(
+        "- Edit your processing logic in: "
+        + typer.style("process_dataset.py", bold=True)
+    )
+    typer.echo(
+        "- Test locally with: "
+        + typer.style("pipeline-cli processing test", fg=typer.colors.GREEN)
+    )
+    typer.echo(
+        "- Deploy to Picsellia with: "
+        + typer.style("pipeline-cli processing deploy", fg=typer.colors.GREEN)
+    )
+    typer.echo("")
 
 
 if __name__ == "__main__":
