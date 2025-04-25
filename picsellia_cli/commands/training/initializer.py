@@ -1,6 +1,7 @@
 import typer
 
 from picsellia_cli.commands.training.utils.simple_template import SimpleTrainingTemplate
+from picsellia_cli.utils.initializer import get_picsellia_client_from_session
 from picsellia_cli.utils.session_manager import session_manager
 from picsellia_cli.commands.training.utils.ultralytics_template import (
     UltralyticsTrainingTemplate,
@@ -19,7 +20,8 @@ def init_training_pipeline(
         "simple", help="Template to use: 'simple' or 'ultralytics'"
     ),
 ):
-    session_manager.ensure_session_initialized()
+    
+    client, global_session = get_picsellia_client_from_session()
 
     # Initialize pipeline from template
     template_instance = get_template_instance(template, pipeline_name)
@@ -28,7 +30,7 @@ def init_training_pipeline(
     global_session = session_manager.get_global_session()
     client = Client(
         api_token=global_session["api_token"],
-        organization_id=global_session["organization_id"],
+        organization_name=global_session["organization_name"],
     )
 
     typer.echo("\nModel association")
@@ -40,7 +42,7 @@ def init_training_pipeline(
         model_version_id = typer.prompt("Enter the model version ID")
         try:
             model_version = client.get_model_version_by_id(model_version_id)
-            model_name = model_version.origin.name
+            model_name = model_version.origin_name
             typer.echo(
                 f"\n✅ Using model '{model_name}' (version ID: {model_version_id})\n"
             )
@@ -98,7 +100,7 @@ def init_training_pipeline(
         typer.echo(
             f"\n✅ Created model '{model_name}' with version '{version_name}' (ID: {model_version_id})"
         )
-        organization_id = global_session["organization_id"]
+        organization_id = client.connexion.organization_id
         typer.echo(
             "Model URL: "
             + typer.style(
