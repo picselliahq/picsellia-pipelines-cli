@@ -16,6 +16,23 @@ app = typer.Typer(
 )
 
 
+def ensure_docker_login():
+    typer.echo("🔐 Checking Docker authentication...")
+    try:
+        result = subprocess.run(
+            ["docker", "info"], capture_output=True, text=True, check=True
+        )
+        if "Username:" not in result.stdout:
+            raise RuntimeError("Not logged in to Docker.")
+    except Exception:
+        typer.echo("🔐 You are not logged in to Docker.")
+        if typer.confirm("Do you want to login now?", default=True):
+            subprocess.run(["docker", "login"], check=True)
+        else:
+            typer.echo("❌ Cannot push image without Docker login.")
+            raise typer.Exit()
+
+
 def build_and_push_docker_image(pipeline_name: str, image_name: str, image_tag: str):
     """
     Build and push the Docker image for a given pipeline, excluding virtual environments.
@@ -50,6 +67,9 @@ def build_and_push_docker_image(pipeline_name: str, image_name: str, image_tag: 
         check=True,
     )
 
+    # Ensure authenticated
+    ensure_docker_login()
+
     # Push Docker Image
     typer.echo(f"📤 Pushing Docker image '{full_image_name}'...")
     subprocess.run(["docker", "push", full_image_name], check=True)
@@ -57,7 +77,7 @@ def build_and_push_docker_image(pipeline_name: str, image_name: str, image_tag: 
     typer.echo(f"✅ Docker image '{full_image_name}' pushed successfully!")
 
 
-def find_hyperparameters_class(filepath: str) -> str:
+def find_hyperparameters_class(filepath: str, pipeline_name: str) -> str:
     """
     Scans the file to find the first class that inherits from HyperParameters.
     Returns its full dotted import path (e.g. utils.hyperparameters.MyClass).
@@ -69,12 +89,13 @@ def find_hyperparameters_class(filepath: str) -> str:
         if isinstance(node, ast.ClassDef):
             for base in node.bases:
                 if getattr(base, "id", "") == "HyperParameters":
-                    return f"utils.hyperparameters.{node.name}"
+                    return f"{pipeline_name}.utils.hyperparameters.{node.name}"
 
     raise ValueError("No class inheriting from HyperParameters found.")
 
 
 def resolve_class_from_string(path: str):
+    print(f"Resolving class from path: {path}")
     module_path, class_name = path.rsplit(".", 1)
     module = importlib.import_module(module_path)
     return getattr(module, class_name)
@@ -96,7 +117,7 @@ def register_training_pipeline_on_picsellia(pipeline_name: str, pipeline_data: d
     try:
         client = Client(
             api_token=global_data["api_token"],
-            organization_id=global_data["organization_id"],
+            organization_name=global_data["organization_name"],
         )
 
         # 1. Create or get model
@@ -115,7 +136,7 @@ def register_training_pipeline_on_picsellia(pipeline_name: str, pipeline_data: d
         ]
 
         framework_input = typer.prompt(
-            f"🧠 Select framework ({', '.join(framework_options)})", default="PYTORCH"
+            f"🧠 Select framework ({', '.join(framework_options)})", default="ONNX"
         )
         inference_type_input = typer.prompt(
             f"🧩 Select inference type ({', '.join(inference_options)})",
@@ -127,7 +148,9 @@ def register_training_pipeline_on_picsellia(pipeline_name: str, pipeline_data: d
             hyper_path = os.path.join(
                 os.getcwd(), pipeline_name, "utils", "hyperparameters.py"
             )
-            class_path = find_hyperparameters_class(hyper_path)
+            class_path = find_hyperparameters_class(
+                filepath=hyper_path, pipeline_name=pipeline_name
+            )
             typer.echo(f"🔍 Found hyperparameter class: {class_path}")
 
             HyperParamsCls = resolve_class_from_string(class_path)
