@@ -95,7 +95,6 @@ def find_hyperparameters_class(filepath: str, pipeline_name: str) -> str:
 
 
 def resolve_class_from_string(path: str):
-    print(f"Resolving class from path: {path}")
     module_path, class_name = path.rsplit(".", 1)
     module = importlib.import_module(module_path)
     return getattr(module, class_name)
