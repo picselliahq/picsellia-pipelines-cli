@@ -89,15 +89,24 @@ def run_training_pipeline(
         if os.name != "nt"
         else os.path.join(env_path, "Scripts", "python.exe")
     )
+    experiment_id = params["experiment_id"]
+    base_run_dir = os.path.join(
+        os.getcwd(), f"pipelines/{pipeline_name}/tests/"
+    )
+    os.makedirs(base_run_dir, exist_ok=True)
+    run_dir = os.path.join(base_run_dir, experiment_id)
+    os.makedirs(run_dir, exist_ok=True)
     command = [
         python_executable,
         pipeline_script,
         "--api_token",
         global_data["api_token"],
-        "--organization_id",
-        global_data["organization_id"],
+        "--organization_name",
+        global_data["organization_name"],
         "--experiment_id",
-        params["experiment_id"],
+        experiment_id,
+        "--working_dir",
+        run_dir,
     ]
 
     env = os.environ.copy()
