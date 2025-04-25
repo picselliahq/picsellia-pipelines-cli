@@ -66,13 +66,13 @@ from {pipeline_module}.utils.evaluate_model import evaluate_model
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_token", type=str, required=True)
-parser.add_argument("--organization_id", type=str, required=True)
+parser.add_argument("--organization_name", type=str, required=True)
 parser.add_argument("--experiment_id", type=str, required=True)
 args = parser.parse_args()
 
 context = create_local_training_context(
     api_token=args.api_token,
-    organization_id=args.organization_id,
+    organization_name=args.organization_name,
     experiment_id=args.experiment_id,
     hyperparameters_cls=DefaultUltralyticsHyperParameters,
     augmentation_parameters_cls=DefaultUltralyticsAugmentationParameters,
@@ -577,7 +577,6 @@ ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/training_pipeline.py"]
 """
 
 TRAINING_TEMPLATE_REQUIREMENTS = """# Add your dependencies here
-picsellia>=6.10.0, <7.0.0
 numpy<2.0
 scikit-learn>=1.2.2, <2.0.0
 pycocotools
@@ -596,6 +595,7 @@ __pycache__/
 *.pyo
 .DS_Store
 *.log
+tests/
 """
 
 class UltralyticsTrainingTemplate(BaseTemplate):

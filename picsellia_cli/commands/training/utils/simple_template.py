@@ -9,6 +9,8 @@ from picsellia_cv_engine.core.parameters import (
 from picsellia_cv_engine.steps.base.dataset.loader import (
     load_yolo_datasets
 )
+from picsellia_cv_engine.steps.base.model.builder import build_model
+from picsellia_cv_engine.core.models.base.model import Model
 
 from {pipeline_module}.utils.parameters import SimpleHyperParameters
 from {pipeline_module}.utils.pipeline_steps import run_training_step
@@ -21,8 +23,9 @@ context = create_picsellia_training_context(
 
 @pipeline(context=context, log_folder_path="logs/", remove_logs_on_completion=False)
 def {pipeline_name}_pipeline():
-    dataset_collection = load_yolo_datasets()
-    run_training_step(dataset_collection=dataset_collection)
+    picsellia_datasets = load_yolo_datasets()
+    picsellia_model = build_model(model_cls=Model, pretrained_weights_name="pretrained-weights")
+    run_training_step(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
 
 
 if __name__ == "__main__":
@@ -39,14 +42,17 @@ from picsellia_cv_engine.core.parameters import (
 from picsellia_cv_engine.steps.base.dataset.loader import (
     load_yolo_datasets
 )
+from picsellia_cv_engine.steps.base.model.builder import build_model
+from picsellia_cv_engine.core.models.base.model import Model
 
 from {pipeline_module}.utils.parameters import SimpleHyperParameters
 from {pipeline_module}.utils.pipeline_steps import run_training_step
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_token", type=str, required=True)
-parser.add_argument("--organization_id", type=str, required=True)
+parser.add_argument("--organization_name", type=str, required=True)
 parser.add_argument("--experiment_id", type=str, required=True)
+parser.add_argument("--working_dir", type=str, required=True)
 args = parser.parse_args()
 
 context = create_local_training_context(
@@ -54,14 +60,16 @@ context = create_local_training_context(
     augmentation_parameters_cls=AugmentationParameters,
     export_parameters_cls=ExportParameters,
     api_token=args.api_token,
-    organization_id=args.organization_id,
+    organization_name=args.organization_name,
     experiment_id=args.experiment_id,
+    working_dir=args.working_dir,
 )
 
 @pipeline(context=context, log_folder_path="logs/", remove_logs_on_completion=False)
 def {pipeline_name}_pipeline():
-    dataset_collection = load_yolo_datasets()
-    run_training_step(dataset_collection=dataset_collection)
+    picsellia_datasets = load_yolo_datasets()
+    picsellia_model = build_model(model_cls=Model, pretrained_weights_name="pretrained-weights")
+    run_training_step(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
 
 
 if __name__ == "__main__":
@@ -87,64 +95,59 @@ from picsellia_cv_engine.decorators import step
 
 from picsellia_cv_engine.core.data.dataset.dataset_collection import DatasetCollection
 from picsellia_cv_engine.core.data.dataset.yolo_dataset import YoloDataset
+from picsellia_cv_engine.core.models.base.model import Model
 
 import os
 import yaml
 
 
 @step()
-def run_training_step(dataset_collection: DatasetCollection[YoloDataset]):
+def run_training_step(picsellia_model: Model, picsellia_datasets: DatasetCollection[YoloDataset]):
     context = Pipeline.get_active_context()
     
-    data_yaml_path = generate_data_yaml(dataset_collection=dataset_collection)
+    data_yaml_path = generate_data_yaml(picsellia_datasets=picsellia_datasets)
 
-    pretrained_weights_path = download_pretrained_weights(
-        experiment=context.experiment,
-        pretrained_weights_artifact_name="pretrained-weights",
-        target_path=os.path.join(context.experiment.name, "pretrained-weights"),
-    )
-    model = YOLO(pretrained_weights_path)
+    ultralytics_model = YOLO(picsellia_model.pretrained_weights_path)
 
-    model.train(
+    ultralytics_model.train(
         data=data_yaml_path,
         epochs=context.hyperparameters.epochs,
         imgsz=context.hyperparameters.image_size,
         batch=context.hyperparameters.batch_size,
+        project=picsellia_model.results_dir,
+        name=picsellia_model.name,
+        )
+    
+    picsellia_model.save_artifact_to_experiment(
+        experiment=context.experiment,
+        artifact_name="best-model",
+        artifact_path=os.path.join(
+            picsellia_model.results_dir,
+            picsellia_model.name,
+            "weights",
+            "best.pt",
+        ),
     )
-
-    context.experiment.store(name="trained-model", path=model.ckpt_path)
 
 
 def generate_data_yaml(
-    dataset_collection: DatasetCollection[YoloDataset],
+    picsellia_datasets: DatasetCollection[YoloDataset],
 ) -> DatasetCollection[YoloDataset]:
     data_yaml = {
-        "train": os.path.join(dataset_collection.dataset_path, "images", "train"),
-        "val": os.path.join(dataset_collection.dataset_path, "images", "val"),
-        "test": os.path.join(dataset_collection.dataset_path, "images", "test"),
-        "nc": len(dataset_collection["train"].labelmap.keys()),
-        "names": list(dataset_collection["train"].labelmap.keys()),
+        "train": os.path.join(picsellia_datasets.dataset_path, "images", "train"),
+        "val": os.path.join(picsellia_datasets.dataset_path, "images", "val"),
+        "test": os.path.join(picsellia_datasets.dataset_path, "images", "test"),
+        "nc": len(picsellia_datasets["train"].labelmap.keys()),
+        "names": list(picsellia_datasets["train"].labelmap.keys()),
     }
 
-    with open(os.path.join(dataset_collection.dataset_path, "data.yaml"), "w") as f:
+    with open(os.path.join(picsellia_datasets.dataset_path, "data.yaml"), "w") as f:
         yaml.dump(data_yaml, f, default_flow_style=False)
 
-    return os.path.join(dataset_collection.dataset_path, "data.yaml")
-
-
-def download_pretrained_weights(
-    experiment: Experiment,
-    pretrained_weights_artifact_name: str,
-    target_path: str,
-) -> str:
-    pretrained_weights_artifact = experiment.get_artifact(name=pretrained_weights_artifact_name)
-    if pretrained_weights_artifact:
-        pretrained_weights_artifact.download(target_path=target_path)
-        return os.path.join(target_path, pretrained_weights_artifact.filename)
-    return None
+    return os.path.join(picsellia_datasets.dataset_path, "data.yaml")
 """
 
-SIMPLE_PIPELINE_REQUIREMENTS = """picsellia>=6.10.0, <7.0.0
+SIMPLE_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 ultralytics
 """
 
@@ -178,6 +181,7 @@ __pycache__/
 *.pyo
 .DS_Store
 *.log
+tests/
 """
 
 
