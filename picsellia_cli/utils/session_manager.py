@@ -27,11 +27,11 @@ class SessionManager:
             "🌍 Global session is not initialized. Please provide the required details:"
         )
         api_token: str = input("🔑 API Token: ")
-        organization_id: str = input("🏢 Organization ID: ")
+        organization_name: str = input("🏢 Organization Name: ")
 
         self.global_table.truncate()  # Clear previous session data
         self.global_table.insert(
-            {"api_token": api_token, "organization_id": organization_id}
+            {"api_token": api_token, "organization_name": organization_name}
         )
 
     def get_global_session(self) -> Optional[Dict[str, str]]:
