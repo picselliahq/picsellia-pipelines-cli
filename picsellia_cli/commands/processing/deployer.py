@@ -73,7 +73,7 @@ def register_pipeline_on_picsellia(
     try:
         client = Client(
             api_token=global_data["api_token"],
-            organization_id=global_data["organization_id"],
+            organization_name=global_data["organization_name"],
         )
 
         client.create_processing(

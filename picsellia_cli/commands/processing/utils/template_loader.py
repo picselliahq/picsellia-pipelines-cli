@@ -40,7 +40,7 @@ from {pipeline_name}.process_dataset import process_dataset
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
 parser.add_argument("--api_token", required=True, type=str, help="Picsellia API token")
-parser.add_argument("--organization_id", required=True, type=str, help="Picsellia Organization ID")
+parser.add_argument("--organization_name", required=True, type=str, help="Picsellia Organization ID")
 parser.add_argument("--results_dir", required=True, type=str, help="Results directory")
 parser.add_argument("--job_type", required=True, type=str, choices=["DATASET_VERSION_CREATION", "TRAINING"], help="Job type")
 parser.add_argument("--input_dataset_version_id", required=True, type=str, help="Input dataset version ID")
@@ -52,7 +52,7 @@ args = parser.parse_args()
 # Create local processing context
 processing_context = create_local_processing_context(
     api_token=args.api_token,
-    organization_id=args.organization_id,
+    organization_name=args.organization_name,
     job_id=args.results_dir,
     job_type=args.job_type,
     input_dataset_version_id=args.input_dataset_version_id,

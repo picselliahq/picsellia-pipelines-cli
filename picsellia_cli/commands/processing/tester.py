@@ -155,8 +155,8 @@ def run_pipeline_test(
         pipeline_script,
         "--api_token",
         global_data["api_token"],
-        "--organization_id",
-        global_data["organization_id"],
+        "--organization_name",
+        global_data["organization_name"],
         "--results_dir",
         params["results_dir"],
         "--job_type",
@@ -200,7 +200,7 @@ def test_pipeline(
 
     client = Client(
         api_token=global_data["api_token"],
-        organization_id=global_data["organization_id"],
+        organization_name=global_data["organization_name"],
     )
     params["output_dataset_version_name"] = check_output_dataset_version(
         client,
