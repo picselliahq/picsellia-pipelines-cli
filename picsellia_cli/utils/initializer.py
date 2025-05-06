@@ -1,25 +1,23 @@
-from typing import Tuple
 import os
-import subprocess
-from picsellia import Client, Framework, InferenceType
-from picsellia.exceptions import ResourceNotFoundError
-from picsellia_cli.utils.session_manager import session_manager
 
-def get_picsellia_client_from_session() -> Tuple[Client, dict]:
-    session_manager.ensure_session_initialized()
-    session = session_manager.get_global_session()
-    client = Client(
-        api_token=session["api_token"],
-        organization_name=session["organization_name"],
-    )
-    return client, session
+from picsellia import Client
+from picsellia.exceptions import ResourceNotFoundError
+from picsellia.types.enums import Framework, InferenceType
+
 
 def write_pipeline_file(path: str, content: str):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write(content)
 
-def create_or_get_model_version(client: Client, model_name: str, version_name: str, framework: str, inference_type: str):
+
+def create_or_get_model_version(
+    client: Client,
+    model_name: str,
+    version_name: str,
+    framework: str,
+    inference_type: str,
+):
     try:
         model = client.get_model(name=model_name)
     except ResourceNotFoundError:

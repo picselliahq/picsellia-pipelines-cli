@@ -4,8 +4,7 @@ import os
 
 class BaseTemplate(ABC):
     BASE_DIR = "pipelines"
-    
-    
+
     def __init__(self, pipeline_name: str):
         self.pipeline_name = pipeline_name
         self.pipeline_dir = os.path.join(self.BASE_DIR, pipeline_name)
