@@ -1,11 +1,11 @@
 from picsellia_cli.utils.base_template import BaseTemplate
 
 SIMPLE_PIPELINE_TRAINING = """from picsellia_cv_engine import pipeline
-from picsellia_cv_engine.services.base.utils.picsellia_context import create_picsellia_training_context
 from picsellia_cv_engine.core.parameters import (
     AugmentationParameters,
     ExportParameters,
 )
+from picsellia_cv_engine.core.services.utils.picsellia_context import create_picsellia_training_context
 from picsellia_cv_engine.steps.base.dataset.loader import (
     load_yolo_datasets
 )
@@ -32,12 +32,13 @@ if __name__ == "__main__":
 """
 
 SIMPLE_PIPELINE_LOCAL = """import argparse
+
 from picsellia_cv_engine import pipeline
-from picsellia_cv_engine.core.services.utils.local_context import create_local_training_context
 from picsellia_cv_engine.core.parameters import (
     AugmentationParameters,
     ExportParameters,
 )
+from picsellia_cv_engine.core.services.utils.local_context import create_local_training_context
 from picsellia_cv_engine.steps.base.dataset.loader import (
     load_yolo_datasets
 )
@@ -87,16 +88,15 @@ class SimpleHyperParameters(HyperParameters):
         self.image_size = self.extract_parameter(["image_size"], expected_type=int, default=640)
 """
 
-SIMPLE_PIPELINE_STEP = """from ultralytics import YOLO
-from picsellia_cv_engine import Pipeline
-from picsellia_cv_engine.decorators import step
+SIMPLE_PIPELINE_STEP = """import os
 
+import yaml
+from picsellia_cv_engine import Pipeline
+from picsellia_cv_engine.core import Model
 from picsellia_cv_engine.core.data.dataset.dataset_collection import DatasetCollection
 from picsellia_cv_engine.core.data.dataset.yolo_dataset import YoloDataset
-from picsellia_cv_engine.core.models.base.model import Model
-
-import os
-import yaml
+from picsellia_cv_engine.decorators import step
+from ultralytics import YOLO
 
 
 @step()
@@ -130,7 +130,7 @@ def run_training_step(picsellia_model: Model, picsellia_datasets: DatasetCollect
 
 def generate_data_yaml(
     picsellia_datasets: DatasetCollection[YoloDataset],
-) -> DatasetCollection[YoloDataset]:
+) -> str:
     data_yaml = {
         "train": os.path.join(picsellia_datasets.dataset_path, "images", "train"),
         "val": os.path.join(picsellia_datasets.dataset_path, "images", "val"),
