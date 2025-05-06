@@ -1,10 +1,7 @@
 import os
 import subprocess
-import tempfile
 
 import typer
-from docker import from_env
-from docker.errors import ImageNotFound
 
 from picsellia_cli.utils.session_manager import session_manager
 
@@ -43,6 +40,10 @@ def smoke_test(
     )
 
     global_data = session_manager.get_global_session()
+    if global_data is None:
+        typer.echo("❌ No global session found.")
+        raise typer.Exit()
+
     env_vars = {
         "api_token": global_data["api_token"],
         "organization_name": global_data["organization_name"],
@@ -57,7 +58,7 @@ def smoke_test(
     run_smoke_test_container(
         image=full_image_name, script=script_path, env_vars=env_vars
     )
-    
+
 
 def build_docker_image_only(pipeline_name: str, image_name: str, image_tag: str):
     full_image_name = f"{image_name}:{image_tag}"
@@ -97,8 +98,14 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
     )
 
     docker_command = [
-        "docker", "run", "--name", container_name, "--entrypoint", "bash",
-        "-v", f"{os.getcwd()}:/workspace",
+        "docker",
+        "run",
+        "--name",
+        container_name,
+        "--entrypoint",
+        "bash",
+        "-v",
+        f"{os.getcwd()}:/workspace",
     ]
 
     for key, value in env_vars.items():
@@ -116,18 +123,31 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
     )
 
     triggered = False
+    if proc.stdout is None:
+        typer.echo("❌ Failed to capture Docker logs.")
+        return
+
     try:
         for line in proc.stdout:
             print(line, end="")
             if "--ec-- 1" in line:
-                typer.echo("\n❌ '--ec-- 1' detected! Something went wrong during training.")
-                typer.echo("📥 Copying training logs before stopping the container...\n")
+                typer.echo(
+                    "\n❌ '--ec-- 1' detected! Something went wrong during training."
+                )
+                typer.echo(
+                    "📥 Copying training logs before stopping the container...\n"
+                )
                 triggered = True
 
                 # Copy from /experiment instead of /workspace
                 subprocess.run(
-                    ["docker", "cp", f"{container_name}:/experiment/training.log", "training.log"],
-                    check=True
+                    [
+                        "docker",
+                        "cp",
+                        f"{container_name}:/experiment/training.log",
+                        "training.log",
+                    ],
+                    check=True,
                 )
 
                 subprocess.run(["docker", "stop", container_name], check=False)
@@ -144,7 +164,7 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
     print(f"\n🚦 Docker container exited with code: {proc.returncode}")
 
     if triggered or proc.returncode != 0:
-        typer.echo("\n🧾 Captured training.log content:\n" + "-"*60)
+        typer.echo("\n🧾 Captured training.log content:\n" + "-" * 60)
         try:
             with open("training.log") as f:
                 print(f.read())

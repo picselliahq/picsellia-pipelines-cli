@@ -1,11 +1,14 @@
+from typing import Dict, Any
+
 import typer
 
-from picsellia_cli.commands.training.utils.simple_template import SimpleTrainingTemplate
-from picsellia_cli.utils.initializer import get_picsellia_client_from_session
-from picsellia_cli.utils.session_manager import session_manager
-from picsellia_cli.commands.training.utils.ultralytics_template import (
+from picsellia_cli.commands.training.templates.simple_template import (
+    SimpleTrainingTemplate,
+)
+from picsellia_cli.commands.training.templates.ultralytics_template import (
     UltralyticsTrainingTemplate,
 )
+from picsellia_cli.utils.session_manager import session_manager
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
@@ -13,112 +16,104 @@ from picsellia.types.enums import Framework, InferenceType
 app = typer.Typer(help="Initialize and register a new training pipeline.")
 
 
-@app.command(name="init")
-def init_training_pipeline(
-    pipeline_name: str,
-    template: str = typer.Option(
-        "simple", help="Template to use: 'simple' or 'ultralytics'"
-    ),
-):
-    
-    client, global_session = get_picsellia_client_from_session()
+def init_client() -> Client:
+    session_manager.ensure_session_initialized()
+    session = session_manager.get_global_session()
+    if session is None:
+        typer.echo("❌ No global session found. Please login first.")
+        raise typer.Exit()
 
-    # Initialize pipeline from template
-    template_instance = get_template_instance(template, pipeline_name)
-    template_instance.write_all_files()
-
-    global_session = session_manager.get_global_session()
-    client = Client(
-        api_token=global_session["api_token"],
-        organization_name=global_session["organization_name"],
+    return Client(
+        api_token=session["api_token"],
+        organization_name=session["organization_name"],
     )
 
-    typer.echo("\nModel association")
-    use_existing = typer.confirm(
-        "Do you want to use an existing model version?", default=False
-    )
 
-    if use_existing:
+def get_template_instance(template_name: str, pipeline_name: str):
+    match template_name:
+        case "ultralytics":
+            return UltralyticsTrainingTemplate(pipeline_name)
+        case "simple" | _:
+            return SimpleTrainingTemplate(pipeline_name)
+
+
+def choose_model_version(client: Client) -> tuple[str, str]:
+    if typer.confirm("Do you want to use an existing model version?", default=False):
         model_version_id = typer.prompt("Enter the model version ID")
         try:
             model_version = client.get_model_version_by_id(model_version_id)
-            model_name = model_version.origin_name
             typer.echo(
-                f"\n✅ Using model '{model_name}' (version ID: {model_version_id})\n"
+                f"\n✅ Using model '{model_version.origin_name}' (version ID: {model_version_id})\n"
             )
+            return model_version.origin_name, model_version_id
         except ResourceNotFoundError:
             typer.echo("❌ Could not find model version. Exiting.")
             raise typer.Exit()
-    else:
-        model_name = typer.prompt("Model name", default=pipeline_name)
-        version_name = typer.prompt("Version name", default="v1")
+    return create_model_version(client)
 
-        typer.echo("")
 
-        framework_options = [f.name for f in Framework if f != Framework.NOT_CONFIGURED]
-        inference_options = [
-            i.name for i in InferenceType if i != InferenceType.NOT_CONFIGURED
-        ]
+def create_model_version(client: Client) -> tuple[str, str]:
+    model_name = typer.prompt("Model name")
+    version_name = typer.prompt("Version name", default="v1")
 
-        framework_input = typer.prompt(
-            f"Select framework ({', '.join(framework_options)})", default="ONNX"
-        )
-        inference_type_input = typer.prompt(
-            f"Select inference type ({', '.join(inference_options)})",
-            default="OBJECT_DETECTION",
-        )
+    framework_options = [f.name for f in Framework if f != Framework.NOT_CONFIGURED]
+    inference_options = [
+        i.name for i in InferenceType if i != InferenceType.NOT_CONFIGURED
+    ]
 
-        typer.echo("")
+    framework_input = typer.prompt(
+        f"Select framework ({', '.join(framework_options)})", default="ONNX"
+    )
+    inference_type_input = typer.prompt(
+        f"Select inference type ({', '.join(inference_options)})",
+        default="OBJECT_DETECTION",
+    )
 
-        try:
-            model = client.get_model(name=model_name)
-            typer.echo(f"Model '{model_name}' already exists. Reusing.")
-        except ResourceNotFoundError:
-            model = client.create_model(name=model_name)
-            typer.echo(f"Created model '{model_name}'")
+    typer.echo("")
 
-        try:
-            _ = model.get_version(version_name)
-            typer.echo(
-                f"❌ Model version '{version_name}' already exists in model '{model_name}'."
-            )
-            raise typer.Exit()
-        except ResourceNotFoundError:
-            pass
+    try:
+        model = client.get_model(name=model_name)
+        typer.echo(f"Model '{model_name}' already exists. Reusing.")
+    except ResourceNotFoundError:
+        model = client.create_model(name=model_name)
+        typer.echo(f"Created model '{model_name}'")
 
-        model_version = model.create_version(
-            name=version_name,
-            framework=Framework(framework_input),
-            type=InferenceType(inference_type_input),
-            base_parameters={
-                "epochs": 2,
-                "batch_size": 8,
-                "image_size": 640,
-            },
-        )
-        model_version_id = model_version.id
+    try:
+        _ = model.get_version(version_name)
         typer.echo(
-            f"\n✅ Created model '{model_name}' with version '{version_name}' (ID: {model_version_id})"
+            f"❌ Model version '{version_name}' already exists in model '{model_name}'."
         )
-        organization_id = client.connexion.organization_id
-        typer.echo(
-            "Model URL: "
-            + typer.style(
-                f"https://app.picsellia.com/{organization_id}/model/{model.id}/version/{model_version_id}",
-                fg=typer.colors.BLUE,
-            )
-        )
-        typer.echo()
-        typer.echo(typer.style("Reminder:", fg=typer.colors.YELLOW, bold=True))
-        typer.echo(
-            "Upload a file named "
-            + typer.style("'pretrained-weights'", fg=typer.colors.CYAN, bold=True)
-            + " to this model version."
-        )
-        typer.echo("It's required for the training pipeline to find the weights.\n")
+        raise typer.Exit()
+    except ResourceNotFoundError:
+        pass
 
-    # Register in session
-    pipeline_data = {
+    model_version = model.create_version(
+        name=version_name,
+        framework=Framework(framework_input),
+        type=InferenceType(inference_type_input),
+        base_parameters={"epochs": 2, "batch_size": 8, "image_size": 640},
+    )
+
+    organization_id = client.connexion.organization_id
+    typer.echo(
+        f"\n✅ Created model '{model_name}' with version '{version_name}' (ID: {model_version.id})"
+    )
+    typer.echo(
+        "Model URL: "
+        + typer.style(
+            f"https://app.picsellia.com/{organization_id}/model/{model.id}/version/{model_version.id}",
+            fg=typer.colors.BLUE,
+        )
+    )
+    typer.echo(
+        "\nReminder: Upload a file named 'pretrained-weights' to this model version. It's required for training.\n"
+    )
+
+    return model_name, str(model_version.id)
+
+
+def register_pipeline(pipeline_name: str, template_instance, model_version_id: str):
+    pipeline_data: Dict[str, Any] = {
         "pipeline_name": pipeline_name,
         "pipeline_type": "TRAINING",
         "picsellia_pipeline_script_path": f"{template_instance.pipeline_dir}/training_pipeline.py",
@@ -132,18 +127,13 @@ def init_training_pipeline(
 
     session_manager.add_pipeline(pipeline_name, pipeline_data)
 
-    typer.echo("")
-    typer.echo(
-        typer.style(
-            "✅ Pipeline initialized and registered", fg=typer.colors.GREEN, bold=True
-        )
-    )
+
+def show_next_steps(template_instance, model_name, model_version_id):
+    typer.echo("\n✅ Pipeline initialized and registered.")
     typer.echo(f"Structure: {template_instance.pipeline_dir}")
     typer.echo(f"Linked to model '{model_name}' (version ID: {model_version_id})\n")
     typer.echo("Next steps:")
-    typer.echo(
-        f"- Edit your training steps in the '{template_instance.utils_dir}' folder."
-    )
+    typer.echo(f"- Edit your training steps in '{template_instance.utils_dir}' folder.")
     typer.echo(
         f"- Adjust context setup in '{template_instance.pipeline_dir}/training_pipeline.py' if needed."
     )
@@ -155,12 +145,20 @@ def init_training_pipeline(
         "- Deploy when ready with: "
         + typer.style("pipeline-cli training deploy", fg=typer.colors.GREEN)
     )
-    typer.echo("")
 
 
-def get_template_instance(template_name: str, pipeline_name: str):
-    match template_name:
-        case "ultralytics":
-            return UltralyticsTrainingTemplate(pipeline_name)
-        case "simple" | _:
-            return SimpleTrainingTemplate(pipeline_name)
+@app.command(name="init")
+def init_training_pipeline(
+    pipeline_name: str,
+    template: str = typer.Option(
+        "simple", help="Template to use: 'simple' or 'ultralytics'"
+    ),
+):
+    client = init_client()
+    template_instance = get_template_instance(template, pipeline_name)
+    template_instance.write_all_files()
+
+    model_name, model_version_id = choose_model_version(client)
+
+    register_pipeline(pipeline_name, template_instance, model_version_id)
+    show_next_steps(template_instance, model_name, model_version_id)
