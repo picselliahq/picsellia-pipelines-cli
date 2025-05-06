@@ -23,9 +23,7 @@ def ensure_docker_login():
             raise typer.Exit()
 
 
-def build_and_push_docker_image(
-    pipeline_dir: str, image_name: str, image_tag: str, force_login: bool = False
-):
+def build_docker_image_only(pipeline_dir: str, image_name: str, image_tag: str):
     full_image_name = f"{image_name}:{image_tag}"
 
     if not os.path.exists(pipeline_dir):
@@ -49,6 +47,13 @@ def build_and_push_docker_image(
         cwd=pipeline_dir,
         check=True,
     )
+    return full_image_name
+
+
+def build_and_push_docker_image(
+    pipeline_dir: str, image_name: str, image_tag: str, force_login: bool = False
+):
+    full_image_name = build_docker_image_only(pipeline_dir, image_name, image_tag)
 
     if force_login:
         ensure_docker_login()

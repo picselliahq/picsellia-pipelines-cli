@@ -3,6 +3,7 @@ import subprocess
 
 import typer
 
+from picsellia_cli.utils.deployer import build_docker_image_only
 from picsellia_cli.utils.session_manager import session_manager
 
 app = typer.Typer(help="Run a smoke test for a training pipeline using Docker.")
@@ -33,8 +34,11 @@ def smoke_test(
 
     full_image_name = f"{pipeline_data['image_name']}:{pipeline_data['image_tag']}"
 
+    repo_root = os.getcwd()
+    pipeline_dir = os.path.join(repo_root, "pipelines", pipeline_name)
+
     build_docker_image_only(
-        pipeline_name=pipeline_name,
+        pipeline_dir=pipeline_dir,
         image_name=pipeline_data["image_name"],
         image_tag=pipeline_data["image_tag"],
     )
@@ -52,38 +56,13 @@ def smoke_test(
     }
 
     script_path = pipeline_data.get(
-        "local_pipeline_script_path", f"{pipeline_name}/training_pipeline.py"
+        "picsellia_pipeline_script_path",
+        f"pipelines/{pipeline_name}/training_pipeline.py",
     )
 
     run_smoke_test_container(
         image=full_image_name, script=script_path, env_vars=env_vars
     )
-
-
-def build_docker_image_only(pipeline_name: str, image_name: str, image_tag: str):
-    full_image_name = f"{image_name}:{image_tag}"
-    repo_root = os.getcwd()
-    pipeline_dir = os.path.join(repo_root, pipeline_name)
-
-    dockerfile_path = os.path.join(pipeline_dir, "Dockerfile")
-    dockerignore_path = os.path.join(pipeline_dir, ".dockerignore")
-
-    if not os.path.exists(dockerfile_path):
-        typer.echo(f"⚠️ Missing Dockerfile in '{pipeline_dir}'.")
-        raise typer.Exit()
-
-    if not os.path.exists(dockerignore_path):
-        with open(dockerignore_path, "w") as f:
-            f.write(".venv/\nvenv/\n__pycache__/\n*.pyc\n*.pyo\n.DS_Store\n")
-
-    typer.echo(f"🛠️ Building Docker image '{full_image_name}' (local only)...")
-    subprocess.run(
-        ["docker", "build", "-t", full_image_name, "-f", dockerfile_path, "."],
-        cwd=repo_root,
-        check=True,
-    )
-
-    typer.echo(f"✅ Docker image '{full_image_name}' built successfully!")
 
 
 def run_smoke_test_container(image: str, script: str, env_vars: dict):
