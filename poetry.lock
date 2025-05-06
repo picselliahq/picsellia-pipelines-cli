@@ -1374,8 +1374,8 @@ ultralytics = "^8.3.113"
 [package.source]
 type = "git"
 url = "https://github.com/picselliahq/picsellia-cv-engine.git"
-reference = "feat/add-utils-for-training-template"
-resolved_reference = "a620c0d27f8ed54fc2238cd6c50ec01d04aae9ba"
+reference = "main"
+resolved_reference = "9fc8daab259b56daacdfd7381c58594c23c1d8b7"
 
 [[package]]
 name = "pillow"
@@ -2493,4 +2493,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "e47309e6b305cfda714667cd739a0fbae1f584e56980d06d9df18636ff0cd9e2"
+content-hash = "8f61e500c3d47c3729b22f288280043909dc644ddde09027d663879352baa336"
