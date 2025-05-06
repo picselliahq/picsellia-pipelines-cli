@@ -40,6 +40,7 @@ def update_model_version_on_picsellia(model_version_id: str, pipeline_data: dict
     model_version.update(
         docker_image_name=pipeline_data["image_name"],
         docker_tag=pipeline_data["image_tag"],
+        docker_flags=["--gpus all", "--name training", "--ipc host"],
     )
 
     typer.echo(
@@ -60,7 +61,7 @@ def deploy_pipeline(
     pipeline_data = prompt_docker_image_if_missing(pipeline_name, pipeline_data)
 
     repo_root = os.getcwd()
-    pipeline_dir = os.path.join(repo_root, pipeline_name)
+    pipeline_dir = os.path.join(repo_root, "pipelines", pipeline_name)
 
     # Build & Push
     build_and_push_docker_image(
