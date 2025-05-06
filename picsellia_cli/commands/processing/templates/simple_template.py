@@ -37,7 +37,7 @@ from picsellia_cv_engine.core.services.utils.local_context import create_local_p
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
-from pipelines.test_processing.utils.process_dataset import process_dataset
+from {pipeline_module}.utils.process_dataset import process_dataset
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
@@ -58,10 +58,10 @@ processing_context = create_local_processing_context(
     job_type=args.job_type,
     input_dataset_version_id=args.input_dataset_version_id,
     output_dataset_version_name=args.output_dataset_version_name,
-    processing_parameters={
+    processing_parameters={{
         "datalake": "default",
-        "data_tag": "processed"
-    },
+        "data_tag": "processed",
+    }},
     working_dir=args.working_dir,
 )
 
@@ -70,7 +70,7 @@ processing_context = create_local_processing_context(
     log_folder_path="logs/",
     remove_logs_on_completion=False,
 )
-def test_processing_pipeline():
+def {pipeline_name}_pipeline():
     dataset_collection = load_coco_datasets()
     dataset_collection["output"] = process_dataset(
         dataset_collection["input"], dataset_collection["output"]
@@ -79,7 +79,7 @@ def test_processing_pipeline():
     return dataset_collection
 
 if __name__ == "__main__":
-    test_processing_pipeline()
+    {pipeline_name}_pipeline()
 """
 
 PROCESSING_PIPELINE_PROCESS_DATASET = """import os
@@ -235,7 +235,7 @@ RUN uv pip install --python=$(which python3.10) git+https://github.com/picsellia
 WORKDIR /experiment
 
 ARG REBUILD_ALL
-COPY ./{pipeline_dir} ./{pipeline_dir}
+COPY ./ ./{pipeline_dir}
 ARG REBUILD_PICSELLIA
 
 RUN uv pip install --python=$(which python3.10) --no-cache -r ./{pipeline_dir}/requirements.txt

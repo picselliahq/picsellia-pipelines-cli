@@ -161,7 +161,7 @@ RUN uv pip install --python=$(which python3.10) git+https://github.com/picsellia
 WORKDIR /experiment
 
 ARG REBUILD_ALL
-COPY ./{pipeline_dir} ./{pipeline_dir}
+COPY ./ ./{pipeline_dir}
 ARG REBUILD_PICSELLIA
 
 RUN uv pip install --python=$(which python3.10) --no-cache -r ./{pipeline_dir}/requirements.txt
