@@ -57,7 +57,7 @@ def create_virtual_env(requirements_path: str) -> str:
         [
             pip_executable,
             "install",
-            "git+https://github.com/picselliahq/picsellia-cv-engine.git@feat/add-utils-for-training-template",
+            "git+https://github.com/picselliahq/picsellia-cv-engine.git@main",
         ],
         check=True,
     )
