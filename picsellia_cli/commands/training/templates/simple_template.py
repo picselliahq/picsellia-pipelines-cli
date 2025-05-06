@@ -10,7 +10,6 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
     load_yolo_datasets
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
-from picsellia_cv_engine.core.models.base.model import Model
 
 from {pipeline_module}.utils.parameters import SimpleHyperParameters
 from {pipeline_module}.utils.pipeline_steps import run_training_step
@@ -24,7 +23,7 @@ context = create_picsellia_training_context(
 @pipeline(context=context, log_folder_path="logs/", remove_logs_on_completion=False)
 def {pipeline_name}_pipeline():
     picsellia_datasets = load_yolo_datasets()
-    picsellia_model = build_model(model_cls=Model, pretrained_weights_name="pretrained-weights")
+    picsellia_model = build_model(pretrained_weights_name="pretrained-weights")
     run_training_step(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
 
 
@@ -34,7 +33,7 @@ if __name__ == "__main__":
 
 SIMPLE_PIPELINE_LOCAL = """import argparse
 from picsellia_cv_engine import pipeline
-from picsellia_cv_engine.services.base.utils.local_context import create_local_training_context
+from picsellia_cv_engine.core.services.utils.local_context import create_local_training_context
 from picsellia_cv_engine.core.parameters import (
     AugmentationParameters,
     ExportParameters,
@@ -43,7 +42,6 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
     load_yolo_datasets
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
-from picsellia_cv_engine.core.models.base.model import Model
 
 from {pipeline_module}.utils.parameters import SimpleHyperParameters
 from {pipeline_module}.utils.pipeline_steps import run_training_step
@@ -68,7 +66,7 @@ context = create_local_training_context(
 @pipeline(context=context, log_folder_path="logs/", remove_logs_on_completion=False)
 def {pipeline_name}_pipeline():
     picsellia_datasets = load_yolo_datasets()
-    picsellia_model = build_model(model_cls=Model, pretrained_weights_name="pretrained-weights")
+    picsellia_model = build_model(pretrained_weights_name="pretrained-weights")
     run_training_step(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
 
 
@@ -104,7 +102,7 @@ import yaml
 @step()
 def run_training_step(picsellia_model: Model, picsellia_datasets: DatasetCollection[YoloDataset]):
     context = Pipeline.get_active_context()
-    
+
     data_yaml_path = generate_data_yaml(picsellia_datasets=picsellia_datasets)
 
     ultralytics_model = YOLO(picsellia_model.pretrained_weights_path)
@@ -117,7 +115,7 @@ def run_training_step(picsellia_model: Model, picsellia_datasets: DatasetCollect
         project=picsellia_model.results_dir,
         name=picsellia_model.name,
         )
-    
+
     picsellia_model.save_artifact_to_experiment(
         experiment=context.experiment,
         artifact_name="best-model",
@@ -188,11 +186,19 @@ tests/
 class SimpleTrainingTemplate(BaseTemplate):
     def get_main_files(self) -> dict[str, str]:
         return {
-            "training_pipeline.py": SIMPLE_PIPELINE_TRAINING.format(pipeline_module=self.pipeline_dir.replace("/", "."), pipeline_name=self.pipeline_name),
-            "local_training_pipeline.py": SIMPLE_PIPELINE_LOCAL.format(pipeline_module=self.pipeline_dir.replace("/", "."), pipeline_name=self.pipeline_name),
+            "training_pipeline.py": SIMPLE_PIPELINE_TRAINING.format(
+                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_name=self.pipeline_name,
+            ),
+            "local_training_pipeline.py": SIMPLE_PIPELINE_LOCAL.format(
+                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_name=self.pipeline_name,
+            ),
             "requirements.txt": SIMPLE_PIPELINE_REQUIREMENTS,
-            "Dockerfile": SIMPLE_PIPELINE_DOCKERFILE.format(pipeline_dir=self.pipeline_dir),
-            ".dockerignore": SIMPLE_PIPELINE_DOCKERIGNORE
+            "Dockerfile": SIMPLE_PIPELINE_DOCKERFILE.format(
+                pipeline_dir=self.pipeline_dir
+            ),
+            ".dockerignore": SIMPLE_PIPELINE_DOCKERIGNORE,
         }
 
     def get_utils_files(self) -> dict[str, str]:

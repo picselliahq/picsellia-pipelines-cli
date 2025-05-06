@@ -598,13 +598,22 @@ __pycache__/
 tests/
 """
 
+
 class UltralyticsTrainingTemplate(BaseTemplate):
     def get_main_files(self) -> dict[str, str]:
         return {
-            "training_pipeline.py": TRAINING_TEMPLATE_PICSELLIA_PIPELINE.format(pipeline_module=self.pipeline_dir.replace("/", "."), pipeline_name=self.pipeline_name),
-            "local_training_pipeline.py": TRAINING_TEMPLATE_LOCAL_PIPELINE.format(pipeline_module=self.pipeline_dir.replace("/", "."), pipeline_name=self.pipeline_name),
+            "training_pipeline.py": TRAINING_TEMPLATE_PICSELLIA_PIPELINE.format(
+                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_name=self.pipeline_name,
+            ),
+            "local_training_pipeline.py": TRAINING_TEMPLATE_LOCAL_PIPELINE.format(
+                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_name=self.pipeline_name,
+            ),
             "requirements.txt": TRAINING_TEMPLATE_REQUIREMENTS,
-            "Dockerfile": TRAINING_TEMPLATE_DOCKERFILE.format(pipeline_dir=self.pipeline_dir),
+            "Dockerfile": TRAINING_TEMPLATE_DOCKERFILE.format(
+                pipeline_dir=self.pipeline_dir
+            ),
             ".dockerignore": TRAINING_TEMPLATE_DOCKERIGNORE,
         }
 
@@ -619,4 +628,3 @@ class UltralyticsTrainingTemplate(BaseTemplate):
             "augmentation_parameters.py": TEMPLATE_AUGMENTATION_PARAMETERS,
             "export_parameters.py": TEMPLATE_EXPORT_PARAMETERS,
         }
-
