@@ -5,7 +5,7 @@ from picsellia_cv_engine.core.services.utils.picsellia_context import create_pic
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
-from {pipeline_module}.utils.process_dataset import process_dataset
+from {pipeline_module}.steps import process
 
 processing_context = create_picsellia_processing_context(
     processing_parameters={{
@@ -21,7 +21,7 @@ processing_context = create_picsellia_processing_context(
 )
 def {pipeline_name}_pipeline():
     dataset_collection = load_coco_datasets()
-    dataset_collection["output"] = process_dataset(
+    dataset_collection["output"] = process(
         dataset_collection["input"], dataset_collection["output"]
     )
     upload_full_dataset(dataset_collection["output"], use_id=False)
@@ -37,7 +37,7 @@ from picsellia_cv_engine.core.services.utils.local_context import create_local_p
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
-from {pipeline_module}.utils.process_dataset import process_dataset
+from {pipeline_module}.steps import process
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
@@ -72,7 +72,7 @@ processing_context = create_local_processing_context(
 )
 def {pipeline_name}_pipeline():
     dataset_collection = load_coco_datasets()
-    dataset_collection["output"] = process_dataset(
+    dataset_collection["output"] = process(
         dataset_collection["input"], dataset_collection["output"]
     )
     upload_full_dataset(dataset_collection["output"], use_id=False)
@@ -82,19 +82,18 @@ if __name__ == "__main__":
     {pipeline_name}_pipeline()
 """
 
-PROCESSING_PIPELINE_PROCESS_DATASET = """import os
-from copy import deepcopy
-from glob import glob
-from typing import Dict, Any
+PROCESSING_PIPELINE_STEPS = """from copy import deepcopy
 
-from PIL import Image
 from picsellia_cv_engine.core import CocoDataset
 from picsellia_cv_engine.core.contexts import PicselliaProcessingContext
 from picsellia_cv_engine.decorators.pipeline_decorator import Pipeline
 from picsellia_cv_engine.decorators.step_decorator import step
 
+from {pipeline_module}.utils.processing import process_images
+
+
 @step
-def process_dataset(
+def process(
     input_dataset: CocoDataset, output_dataset: CocoDataset
 ):
     \"\"\"
@@ -134,6 +133,15 @@ def process_dataset(
 
     print(f"✅ Dataset processing complete!")
     return output_dataset
+"""
+
+PROCESSING_PIPELINE_PROCESSING = """import os
+from copy import deepcopy
+from glob import glob
+from typing import Dict, Any
+
+from PIL import Image
+
 
 def process_images(
     input_images_dir: str,
@@ -222,6 +230,7 @@ def get_image_id_by_filename(coco_data: Dict[str, Any], filename: str) -> int:
         if image["file_name"] == filename:
             return image["id"]
     raise ValueError(f"⚠️ Image with filename '{filename}' not found.")
+
 """
 
 PROCESSING_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10
@@ -272,6 +281,9 @@ class SimpleProcessingTemplate(BaseTemplate):
                 pipeline_module=self.pipeline_dir.replace("/", "."),
                 pipeline_name=self.pipeline_name,
             ),
+            "steps.py": PROCESSING_PIPELINE_STEPS.format(
+                pipeline_module=self.pipeline_dir.replace("/", "."),
+            ),
             "requirements.txt": PROCESSING_PIPELINE_REQUIREMENTS,
             "Dockerfile": PROCESSING_PIPELINE_DOCKERFILE.format(
                 pipeline_dir=self.pipeline_dir
@@ -281,5 +293,5 @@ class SimpleProcessingTemplate(BaseTemplate):
 
     def get_utils_files(self) -> dict[str, str]:
         return {
-            "process_dataset.py": PROCESSING_PIPELINE_PROCESS_DATASET,
+            "processing.py": PROCESSING_PIPELINE_PROCESSING,
         }

@@ -11,8 +11,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
+from {pipeline_module}.steps import train
 from {pipeline_module}.utils.parameters import SimpleHyperParameters
-from {pipeline_module}.utils.pipeline_steps import run_training_step
 
 context = create_picsellia_training_context(
     hyperparameters_cls=SimpleHyperParameters,
@@ -24,7 +24,7 @@ context = create_picsellia_training_context(
 def {pipeline_name}_pipeline():
     picsellia_datasets = load_yolo_datasets()
     picsellia_model = build_model(pretrained_weights_name="pretrained-weights")
-    run_training_step(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
+    train(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
 
 
 if __name__ == "__main__":
@@ -44,8 +44,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
+from {pipeline_module}.steps import train
 from {pipeline_module}.utils.parameters import SimpleHyperParameters
-from {pipeline_module}.utils.pipeline_steps import run_training_step
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_token", type=str, required=True)
@@ -68,39 +68,24 @@ context = create_local_training_context(
 def {pipeline_name}_pipeline():
     picsellia_datasets = load_yolo_datasets()
     picsellia_model = build_model(pretrained_weights_name="pretrained-weights")
-    run_training_step(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
+    train(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
 
 
 if __name__ == "__main__":
     {pipeline_name}_pipeline()
 """
 
-SIMPLE_PIPELINE_PARAMETERS = """from typing import Optional
-from picsellia.types.schemas import LogDataType
-from picsellia_cv_engine.core.parameters import HyperParameters
+SIMPLE_STEPS = """import os
 
-
-class SimpleHyperParameters(HyperParameters):
-    def __init__(self, log_data: LogDataType):
-        super().__init__(log_data=log_data)
-        self.epochs = self.extract_parameter(["epochs"], expected_type=int, default=3)
-        self.batch_size = self.extract_parameter(["batch_size"], expected_type=int, default=8)
-        self.image_size = self.extract_parameter(["image_size"], expected_type=int, default=640)
-"""
-
-SIMPLE_PIPELINE_STEP = """import os
-
-import yaml
-from picsellia_cv_engine import Pipeline
-from picsellia_cv_engine.core import Model
-from picsellia_cv_engine.core.data.dataset.dataset_collection import DatasetCollection
-from picsellia_cv_engine.core.data.dataset.yolo_dataset import YoloDataset
-from picsellia_cv_engine.decorators import step
+from picsellia_cv_engine import step, Pipeline
+from picsellia_cv_engine.core import Model, DatasetCollection, YoloDataset
 from ultralytics import YOLO
+
+from {pipeline_module}.utils.data import generate_data_yaml
 
 
 @step()
-def run_training_step(picsellia_model: Model, picsellia_datasets: DatasetCollection[YoloDataset]):
+def train(picsellia_model: Model, picsellia_datasets: DatasetCollection[YoloDataset]):
     context = Pipeline.get_active_context()
 
     data_yaml_path = generate_data_yaml(picsellia_datasets=picsellia_datasets)
@@ -126,6 +111,25 @@ def run_training_step(picsellia_model: Model, picsellia_datasets: DatasetCollect
             "best.pt",
         ),
     )
+"""
+
+SIMPLE_PIPELINE_PARAMETERS = """from picsellia.types.schemas import LogDataType
+from picsellia_cv_engine.core.parameters import HyperParameters
+
+
+class SimpleHyperParameters(HyperParameters):
+    def __init__(self, log_data: LogDataType):
+        super().__init__(log_data=log_data)
+        self.epochs = self.extract_parameter(["epochs"], expected_type=int, default=3)
+        self.batch_size = self.extract_parameter(["batch_size"], expected_type=int, default=8)
+        self.image_size = self.extract_parameter(["image_size"], expected_type=int, default=640)
+"""
+
+SIMPLE_PIPELINE_DATA = """import os
+
+import yaml
+from picsellia_cv_engine.core.data.dataset.dataset_collection import DatasetCollection
+from picsellia_cv_engine.core.data.dataset.yolo_dataset import YoloDataset
 
 
 def generate_data_yaml(
@@ -194,6 +198,9 @@ class SimpleTrainingTemplate(BaseTemplate):
                 pipeline_module=self.pipeline_dir.replace("/", "."),
                 pipeline_name=self.pipeline_name,
             ),
+            "steps.py": SIMPLE_STEPS.format(
+                pipeline_module=self.pipeline_dir.replace("/", "."),
+            ),
             "requirements.txt": SIMPLE_PIPELINE_REQUIREMENTS,
             "Dockerfile": SIMPLE_PIPELINE_DOCKERFILE.format(
                 pipeline_dir=self.pipeline_dir
@@ -204,5 +211,5 @@ class SimpleTrainingTemplate(BaseTemplate):
     def get_utils_files(self) -> dict[str, str]:
         return {
             "parameters.py": SIMPLE_PIPELINE_PARAMETERS,
-            "pipeline_steps.py": SIMPLE_PIPELINE_STEP,
+            "data.py": SIMPLE_PIPELINE_DATA,
         }
