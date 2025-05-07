@@ -24,7 +24,6 @@ tinydb = "^4.8.2"
 docker = "^7.1.0"
 pre-commit = "^4.2.0"
 picsellia-cv-engine = {git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main"}
-#picsellia-cv-engine = { path = "../picsellia-cv-engine/", develop = true }
 
 [tool.poetry.scripts]
 pipeline-cli = "picsellia_cli.main:app"
