@@ -27,6 +27,7 @@ def register_pipeline(pipeline_name: str, template_instance):
     pipeline_data = {
         "pipeline_name": pipeline_name,
         "pipeline_type": "DATASET_VERSION_CREATION",
+        "pipeline_dir": template_instance.pipeline_dir,
         "picsellia_pipeline_script_path": f"{template_instance.pipeline_dir}/picsellia_pipeline.py",
         "local_pipeline_script_path": f"{template_instance.pipeline_dir}/local_pipeline.py",
         "requirements_path": f"{template_instance.pipeline_dir}/requirements.txt",
@@ -42,7 +43,7 @@ def register_pipeline(pipeline_name: str, template_instance):
 
 
 @app.command(name="init")
-def init_processing_pipeline(
+def init_processing(
     pipeline_name: str,
     template: str = typer.Option("simple", help="Template to use: 'simple'"),
 ):

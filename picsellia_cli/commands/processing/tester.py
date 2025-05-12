@@ -66,7 +66,7 @@ def check_output_dataset_version(
 
 
 @app.command()
-def test_pipeline(
+def test_processing(
     pipeline_name: str = typer.Argument(
         ..., help="Name of the processing pipeline to test"
     ),

@@ -116,6 +116,7 @@ def register_pipeline(pipeline_name: str, template_instance, model_version_id: s
     pipeline_data: Dict[str, Any] = {
         "pipeline_name": pipeline_name,
         "pipeline_type": "TRAINING",
+        "pipeline_dir": template_instance.pipeline_dir,
         "picsellia_pipeline_script_path": f"{template_instance.pipeline_dir}/training_pipeline.py",
         "local_pipeline_script_path": f"{template_instance.pipeline_dir}/local_training_pipeline.py",
         "requirements_path": f"{template_instance.pipeline_dir}/requirements.txt",
@@ -147,7 +148,7 @@ def show_next_steps(template_instance, model_name, model_version_id):
 
 
 @app.command(name="init")
-def init_training_pipeline(
+def init_training(
     pipeline_name: str,
     template: str = typer.Option(
         "simple", help="Template to use: 'simple' or 'ultralytics'"

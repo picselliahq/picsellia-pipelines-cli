@@ -53,14 +53,7 @@ class SessionManager:
             name (str): Name of the pipeline.
             data (dict): Pipeline configuration details.
         """
-        Pipeline = Query()
-        existing_pipeline = self.pipelines_table.search(Pipeline.name == name)
-
-        pipeline_dir = os.path.join(os.getcwd(), "pipelines", name)
-        if os.path.exists(pipeline_dir):
-            print(
-                f"⚠️ A pipeline with the name '{name}' already exists in the directory."
-            )
+        existing_pipeline = self.get_pipeline(name=name)
 
         if existing_pipeline:
             action = input(
@@ -68,7 +61,8 @@ class SessionManager:
             ).lower()
             if action == "d":
                 self.remove_pipeline(name)
-                shutil.rmtree(pipeline_dir)
+                old_pipeline_dir = existing_pipeline["pipeline_dir"]
+                shutil.rmtree(old_pipeline_dir)
                 print(f"✅ Pipeline '{name}' has been deleted.")
                 self.add_pipeline(name, data)
                 return True
@@ -98,7 +92,6 @@ class SessionManager:
 
         if existing_pipeline:
             self.pipelines_table.update({"data": data}, Pipeline.name == name)
-            print(f"Pipeline '{name}' updated successfully.")
         else:
             raise (ValueError(f"Pipeline '{name}' not found."))
 

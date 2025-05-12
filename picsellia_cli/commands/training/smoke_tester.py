@@ -3,6 +3,7 @@ import subprocess
 
 import typer
 
+from picsellia_cli.commands.training.tester import prompt_training_params
 from picsellia_cli.utils.deployer import (
     build_docker_image_only,
     prompt_docker_image_if_missing,
@@ -14,14 +15,18 @@ app = typer.Typer(help="Run a smoke test for a training pipeline using Docker.")
 
 
 @app.command()
-def smoke_test(
+def smoke_test_training(
     pipeline_name: str = typer.Argument(...),
-    experiment_id: str = typer.Option(...),
-    image_tag: str = typer.Option("latest"),
 ):
     session_manager.ensure_session_initialized()
     pipeline_data = get_pipeline_data(pipeline_name)
     pipeline_data = prompt_docker_image_if_missing(pipeline_name, pipeline_data)
+
+    stored_params = pipeline_data.get("last_test_params", {})
+
+    pipeline_data["last_test_params"] = prompt_training_params(stored_params)
+    session_manager.update_pipeline(name=pipeline_name, data=pipeline_data)
+    experiment_id = pipeline_data["last_test_params"]["experiment_id"]
 
     full_image_name = f"{pipeline_data['image_name']}:{pipeline_data['image_tag']}"
 

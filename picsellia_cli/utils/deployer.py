@@ -106,12 +106,12 @@ def prompt_docker_image_if_missing(pipeline_name: str, pipeline_data: Dict) -> D
 
         typer.echo(f"🔧 Current Docker image: {current_image}:{current_tag}")
 
-        change_image = typer.confirm(
-            "Do you want to keep or change the current Docker image and tag?",
+        no_change_image = typer.confirm(
+            "Do you want to keep the current Docker image and tag?",
             default=True,
         )
 
-        if change_image:
+        if not no_change_image:
             pipeline_data["image_name"] = typer.prompt(
                 "📦 Enter Docker image name", default=current_image
             )

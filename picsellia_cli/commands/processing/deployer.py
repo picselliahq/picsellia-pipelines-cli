@@ -55,7 +55,7 @@ def register_processing_pipeline_on_picsellia(
 
 
 @app.command()
-def deploy_pipeline(
+def deploy_processing(
     pipeline_name: str = typer.Argument(
         ..., help="Name of the processing pipeline to deploy"
     ),
