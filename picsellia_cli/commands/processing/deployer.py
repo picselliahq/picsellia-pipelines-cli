@@ -59,14 +59,15 @@ def deploy_processing(
     pipeline_name: str = typer.Argument(
         ..., help="Name of the processing pipeline to deploy"
     ),
-    cpu: int = typer.Option(4, "--cpu", "-c", help="Default CPU allocation"),
-    gpu: int = typer.Option(0, "--gpu", "-g", help="Default GPU allocation"),
 ):
     """
     🚀 Deploy a processing pipeline: build & push its Docker image, then register it on Picsellia.
     """
     pipeline_data = get_pipeline_data(pipeline_name)
     pipeline_data = prompt_docker_image_if_missing(pipeline_name, pipeline_data)
+
+    cpu = int(typer.prompt("Enter CPU allocation", default=4))
+    gpu = int(typer.prompt("Enter GPU allocation", default=0))
 
     repo_root = os.getcwd()
     pipeline_dir = os.path.join(repo_root, "pipelines", pipeline_name)
