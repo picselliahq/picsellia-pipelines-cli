@@ -14,10 +14,8 @@ app = typer.Typer()
 @app.command(name="init")
 def init(
     pipeline_name: str,
-    template: str = typer.Option(
-        "simple", help="Template to use: 'simple' or 'ultralytics'"
-    ),
-    type: str = typer.Option(..., help="Type of pipeline"),
+    type: str = typer.Option(..., help="Type of pipeline ('training' or 'processing')"),
+    template: str = typer.Option("simple", help="Template to use"),
 ):
     if type == "training":
         init_training(pipeline_name=pipeline_name, template=template)
