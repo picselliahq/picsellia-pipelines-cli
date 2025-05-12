@@ -3,7 +3,11 @@ import subprocess
 
 import typer
 
-from picsellia_cli.utils.deployer import build_docker_image_only
+from picsellia_cli.utils.deployer import (
+    build_docker_image_only,
+    prompt_docker_image_if_missing,
+    get_pipeline_data,
+)
 from picsellia_cli.utils.session_manager import session_manager
 
 app = typer.Typer(help="Run a smoke test for a training pipeline using Docker.")
@@ -16,21 +20,8 @@ def smoke_test(
     image_tag: str = typer.Option("latest"),
 ):
     session_manager.ensure_session_initialized()
-    pipeline_data = session_manager.get_pipeline(pipeline_name)
-
-    if not pipeline_data:
-        typer.echo(f"❌ Pipeline '{pipeline_name}' not found.")
-        raise typer.Exit()
-
-    if not pipeline_data.get("image_name"):
-        pipeline_data["image_name"] = typer.prompt("📦 Enter Docker image name")
-
-    if not pipeline_data.get("image_tag"):
-        pipeline_data["image_tag"] = image_tag or typer.prompt(
-            "🏷️ Enter Docker image tag", default="latest"
-        )
-
-    session_manager.add_pipeline(pipeline_name, pipeline_data)
+    pipeline_data = get_pipeline_data(pipeline_name)
+    pipeline_data = prompt_docker_image_if_missing(pipeline_name, pipeline_data)
 
     full_image_name = f"{pipeline_data['image_name']}:{pipeline_data['image_tag']}"
 

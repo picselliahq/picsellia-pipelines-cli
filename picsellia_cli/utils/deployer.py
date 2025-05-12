@@ -100,10 +100,38 @@ def get_pipeline_data(pipeline_name: str) -> Dict:
 
 
 def prompt_docker_image_if_missing(pipeline_name: str, pipeline_data: Dict) -> Dict:
-    if not pipeline_data.get("image_name") or not pipeline_data.get("image_tag"):
-        pipeline_data["image_name"] = typer.prompt("📦 Enter Docker image name")
-        pipeline_data["image_tag"] = typer.prompt(
-            "🏷️ Enter Docker image tag", default="latest"
+    if pipeline_data.get("image_name") and pipeline_data.get("image_tag"):
+        current_image = pipeline_data["image_name"]
+        current_tag = pipeline_data["image_tag"]
+
+        typer.echo(f"🔧 Current Docker image: {current_image}:{current_tag}")
+
+        change_image = typer.confirm(
+            "Do you want to keep or change the current Docker image and tag?",
+            default=True,
         )
-        session_manager.add_pipeline(pipeline_name, pipeline_data)
+
+        if change_image:
+            pipeline_data["image_name"] = typer.prompt(
+                "📦 Enter Docker image name", default=current_image
+            )
+            pipeline_data["image_tag"] = typer.prompt(
+                "🏷️ Enter Docker image tag", default=current_tag
+            )
+
+    else:
+        if not pipeline_data.get("image_name"):
+            pipeline_data["image_name"] = typer.prompt("📦 Enter Docker image name")
+
+        if not pipeline_data.get("image_tag"):
+            pipeline_data["image_tag"] = typer.prompt(
+                "🏷️ Enter Docker image tag", default="latest"
+            )
+
+    typer.echo(
+        f"🔧 Docker image will be built with: {pipeline_data['image_name']}:{pipeline_data['image_tag']}"
+    )
+
+    session_manager.update_pipeline(name=pipeline_name, data=pipeline_data)
+
     return pipeline_data

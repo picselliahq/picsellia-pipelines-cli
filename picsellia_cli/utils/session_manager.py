@@ -82,6 +82,26 @@ class SessionManager:
             self.pipelines_table.insert({"name": name, "data": data})
             return True
 
+    def update_pipeline(self, name: str, data: Dict[str, Any]) -> None:
+        """
+        Update an existing pipeline configuration.
+
+        Args:
+            name (str): Name of the pipeline.
+            data (dict): Updated pipeline configuration details.
+
+        Returns:
+            bool: True if pipeline was updated successfully, False otherwise.
+        """
+        Pipeline = Query()
+        existing_pipeline = self.pipelines_table.search(Pipeline.name == name)
+
+        if existing_pipeline:
+            self.pipelines_table.update({"data": data}, Pipeline.name == name)
+            print(f"Pipeline '{name}' updated successfully.")
+        else:
+            raise (ValueError(f"Pipeline '{name}' not found."))
+
     def get_pipeline(self, name: str) -> Optional[Dict[str, Any]]:
         """
         Retrieve pipeline configuration details.
