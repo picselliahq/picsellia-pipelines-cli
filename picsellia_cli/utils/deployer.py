@@ -14,10 +14,15 @@ def ensure_docker_login():
         )
         if "Username:" not in result.stdout:
             raise RuntimeError("Not logged in to Docker.")
-    except Exception:
+    except Exception as e:
         typer.echo("🔐 You are not logged in to Docker.")
+        typer.echo(f"❌ Error: {str(e)}")
         if typer.confirm("Do you want to login now?", default=True):
-            subprocess.run(["docker", "login"], check=True)
+            try:
+                subprocess.run(["docker", "login"], check=True)
+            except subprocess.CalledProcessError as login_error:
+                typer.echo(f"❌ Docker login failed: {login_error.stderr}")
+                raise typer.Exit()
         else:
             typer.echo("❌ Cannot push image without Docker login.")
             raise typer.Exit()
@@ -42,11 +47,27 @@ def build_docker_image_only(pipeline_dir: str, image_name: str, image_tag: str):
             f.write(".venv/\nvenv/\n__pycache__/\n*.pyc\n*.pyo\n.DS_Store\n")
 
     typer.echo(f"🚀 Building Docker image '{full_image_name}'...")
-    subprocess.run(
-        ["docker", "build", "-t", full_image_name, "-f", dockerfile_path, "."],
-        cwd=pipeline_dir,
-        check=True,
-    )
+    try:
+        result = subprocess.run(
+            ["docker", "build", "-t", full_image_name, "-f", dockerfile_path, "."],
+            cwd=pipeline_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        typer.echo(result.stdout)
+
+    except subprocess.CalledProcessError as e:
+        typer.echo(
+            typer.style(
+                f"\n❌ Failed to build Docker image. Command failed with exit code {e.returncode}.",
+                fg=typer.colors.RED,
+                bold=True,
+            )
+        )
+        typer.echo(f"🔍 Error details:\n{e.stderr}")
+        raise typer.Exit(code=e.returncode)
+
     return full_image_name
 
 
