@@ -23,7 +23,6 @@ typer = ">=0.15.2,<0.16.0"
 tinydb = "^4.8.2"
 docker = "^7.1.0"
 pre-commit = "^4.2.0"
-picsellia-cv-engine = {git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main"}
 
 [tool.poetry.scripts]
 pipeline-cli = "picsellia_cli.main:app"
