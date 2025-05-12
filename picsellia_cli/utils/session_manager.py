@@ -1,3 +1,4 @@
+import getpass
 import os
 from typing import Optional, Dict, List, Any
 from tinydb import TinyDB, Query
@@ -6,10 +7,13 @@ from tinydb import TinyDB, Query
 class SessionManager:
     """Handles global session and pipeline configurations using TinyDB."""
 
-    DB_FILE: str = os.path.join(os.getcwd(), "session.json")
+    CONFIG_DIR: str = os.path.expanduser("~/.config/picsellia")
+    DB_FILE: str = os.path.join(CONFIG_DIR, "session.json")
 
     def __init__(self) -> None:
         """Initialize the TinyDB database and define tables."""
+        os.makedirs(self.CONFIG_DIR, exist_ok=True)
+
         self.db: TinyDB = TinyDB(self.DB_FILE)
         self.global_table: TinyDB = self.db.table("global")
         self.pipelines_table: TinyDB = self.db.table("pipelines")
@@ -26,7 +30,7 @@ class SessionManager:
         print(
             "🌍 Global session is not initialized. Please provide the required details:"
         )
-        api_token: str = input("🔑 API Token: ")
+        api_token: str = getpass.getpass("🔑 API Token: ")
         organization_name: str = input("🏢 Organization Name: ")
 
         self.global_table.truncate()  # Clear previous session data
