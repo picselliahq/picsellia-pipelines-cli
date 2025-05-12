@@ -60,10 +60,12 @@ def init_processing(
         raise typer.Exit()
 
     template_instance.write_all_files()
-    _show_success_message(template_instance)
+    _show_success_message(
+        pipeline_name=pipeline_name, template_instance=template_instance
+    )
 
 
-def _show_success_message(template_instance: SimpleProcessingTemplate):
+def _show_success_message(pipeline_name, template_instance: SimpleProcessingTemplate):
     typer.echo("")
     typer.echo(
         typer.style(
@@ -78,11 +80,11 @@ def _show_success_message(template_instance: SimpleProcessingTemplate):
     typer.echo("- Edit your steps in: " + typer.style("steps.py", bold=True))
     typer.echo(
         "- Test locally with: "
-        + typer.style("pipeline-cli processing test", fg=typer.colors.GREEN)
+        + typer.style(f"pipeline-cli test {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo(
         "- Deploy to Picsellia with: "
-        + typer.style("pipeline-cli processing deploy", fg=typer.colors.GREEN)
+        + typer.style(f"pipeline-cli deploy {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo("")
 
