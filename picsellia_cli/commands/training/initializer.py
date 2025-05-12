@@ -133,9 +133,8 @@ def show_next_steps(template_instance, model_name, model_version_id):
     typer.echo(f"Structure: {template_instance.pipeline_dir}")
     typer.echo(f"Linked to model '{model_name}' (version ID: {model_version_id})\n")
     typer.echo("Next steps:")
-    typer.echo(f"- Edit your training steps in '{template_instance.utils_dir}' folder.")
     typer.echo(
-        f"- Adjust context setup in '{template_instance.pipeline_dir}/training_pipeline.py' if needed."
+        f"- Edit your training steps in '{template_instance.pipeline_dir}/steps.py'"
     )
     typer.echo(
         "- Run locally with: "
