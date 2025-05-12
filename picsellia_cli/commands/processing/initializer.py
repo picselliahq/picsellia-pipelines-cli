@@ -12,9 +12,6 @@ def get_template_instance(template_name: str, pipeline_name: str):
     match template_name:
         case "simple":
             return SimpleProcessingTemplate(pipeline_name)
-        # Prépare ici pour ajouter d'autres templates plus tard :
-        # case "advanced":
-        #     return AdvancedProcessingTemplate(pipeline_name)
         case _:
             typer.echo(
                 typer.style(
@@ -41,7 +38,7 @@ def register_pipeline(pipeline_name: str, template_instance):
         },
     }
 
-    session_manager.add_pipeline(pipeline_name, pipeline_data)
+    return session_manager.add_pipeline(pipeline_name, pipeline_data)
 
 
 @app.command(name="init")
@@ -56,10 +53,12 @@ def init_processing_pipeline(
     session_manager.ensure_session_initialized()
 
     template_instance = get_template_instance(template, pipeline_name)
+
+    if not register_pipeline(pipeline_name, template_instance):
+        typer.echo("❌ Pipeline registration failed. Exiting.")
+        raise typer.Exit()
+
     template_instance.write_all_files()
-
-    register_pipeline(pipeline_name, template_instance)
-
     _show_success_message(template_instance)
 
 
@@ -75,10 +74,7 @@ def _show_success_message(template_instance: SimpleProcessingTemplate):
     typer.echo(f"📁 Structure created at: {template_instance.pipeline_dir}")
     typer.echo("")
     typer.echo("Next steps:")
-    typer.echo(
-        "- Edit your processing logic in: "
-        + typer.style("process_dataset.py", bold=True)
-    )
+    typer.echo("- Edit your steps in: " + typer.style("steps.py", bold=True))
     typer.echo(
         "- Test locally with: "
         + typer.style("pipeline-cli processing test", fg=typer.colors.GREEN)

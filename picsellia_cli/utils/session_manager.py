@@ -1,5 +1,6 @@
 import getpass
 import os
+import shutil
 from typing import Optional, Dict, List, Any
 from tinydb import TinyDB, Query
 
@@ -44,7 +45,7 @@ class SessionManager:
 
     # 🔹 PIPELINE MANAGEMENT 🔹 #
 
-    def add_pipeline(self, name: str, data: Dict[str, Any]) -> None:
+    def add_pipeline(self, name: str, data: Dict[str, Any]) -> bool:
         """
         Add or update a pipeline configuration.
 
@@ -55,10 +56,31 @@ class SessionManager:
         Pipeline = Query()
         existing_pipeline = self.pipelines_table.search(Pipeline.name == name)
 
+        pipeline_dir = os.path.join(os.getcwd(), "pipelines", name)
+        if os.path.exists(pipeline_dir):
+            print(
+                f"⚠️ A pipeline with the name '{name}' already exists in the directory."
+            )
+
         if existing_pipeline:
-            self.pipelines_table.update({"data": data}, Pipeline.name == name)
+            action = input(
+                f"❌ Pipeline '{name}' already exists in the session. Do you want to (D)elete it, or (C)ancel? (d/c): "
+            ).lower()
+            if action == "d":
+                self.remove_pipeline(name)
+                shutil.rmtree(pipeline_dir)
+                print(f"✅ Pipeline '{name}' has been deleted.")
+                self.add_pipeline(name, data)
+                return True
+            elif action == "c":
+                print("Operation canceled. No changes made.")
+                return False
+            else:
+                print("Invalid option, operation canceled.")
+                return False
         else:
             self.pipelines_table.insert({"name": name, "data": data})
+            return True
 
     def get_pipeline(self, name: str) -> Optional[Dict[str, Any]]:
         """

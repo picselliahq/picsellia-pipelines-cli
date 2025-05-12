@@ -125,7 +125,7 @@ def register_pipeline(pipeline_name: str, template_instance, model_version_id: s
         "model_version_id": str(model_version_id),
     }
 
-    session_manager.add_pipeline(pipeline_name, pipeline_data)
+    return session_manager.add_pipeline(pipeline_name, pipeline_data)
 
 
 def show_next_steps(template_instance, model_name, model_version_id):
@@ -155,9 +155,11 @@ def init_training_pipeline(
 ):
     client = init_client()
     template_instance = get_template_instance(template, pipeline_name)
-    template_instance.write_all_files()
-
     model_name, model_version_id = choose_model_version(client)
 
-    register_pipeline(pipeline_name, template_instance, model_version_id)
+    if not register_pipeline(pipeline_name, template_instance, model_version_id):
+        typer.echo("❌ Pipeline registration failed. Exiting.")
+        raise typer.Exit()
+
+    template_instance.write_all_files()
     show_next_steps(template_instance, model_name, model_version_id)
