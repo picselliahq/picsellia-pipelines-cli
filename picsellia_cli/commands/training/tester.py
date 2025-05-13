@@ -29,11 +29,12 @@ def prompt_training_params(stored_params: Dict) -> Dict:
     else:
         experiment_id = typer.prompt("🧪 Enter Experiment ID")
 
-    return {"experiment_id": experiment_id}
+    stored_params["experiment_id"] = experiment_id
+    return stored_params
 
 
 @app.command()
-def test(
+def test_training(
     pipeline_name: str = typer.Argument(
         ..., help="Name of the training pipeline to test"
     ),
@@ -42,12 +43,17 @@ def test(
     global_data = get_global_session()
     stored_params = pipeline.get("last_test_params", {})
 
-    params = prompt_training_params(stored_params)
+    pipeline["last_test_params"] = prompt_training_params(stored_params)
+    session_manager.update_pipeline(name=pipeline_name, data=pipeline)
     env_path = create_virtual_env(pipeline["requirements_path"])
 
     repo_root = os.getcwd()
     working_dir = os.path.join(
-        repo_root, "pipelines", pipeline_name, "tests", params["experiment_id"]
+        repo_root,
+        "pipelines",
+        pipeline_name,
+        "tests",
+        pipeline["last_test_params"]["experiment_id"],
     )
     os.makedirs(working_dir, exist_ok=True)
 
@@ -66,15 +72,13 @@ def test(
         "--organization_name",
         global_data["organization_name"],
         "--experiment_id",
-        params["experiment_id"],
+        pipeline["last_test_params"]["experiment_id"],
         "--working_dir",
         working_dir,
     ]
 
     run_pipeline_command(command, working_dir)
 
-    pipeline["last_test_params"] = params
-    session_manager.add_pipeline(pipeline_name, pipeline)
     typer.echo(
         typer.style(
             f"✅ Training pipeline '{pipeline_name}' tested successfully!",

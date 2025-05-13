@@ -116,6 +116,7 @@ def register_pipeline(pipeline_name: str, template_instance, model_version_id: s
     pipeline_data: Dict[str, Any] = {
         "pipeline_name": pipeline_name,
         "pipeline_type": "TRAINING",
+        "pipeline_dir": template_instance.pipeline_dir,
         "picsellia_pipeline_script_path": f"{template_instance.pipeline_dir}/training_pipeline.py",
         "local_pipeline_script_path": f"{template_instance.pipeline_dir}/local_training_pipeline.py",
         "requirements_path": f"{template_instance.pipeline_dir}/requirements.txt",
@@ -125,40 +126,52 @@ def register_pipeline(pipeline_name: str, template_instance, model_version_id: s
         "model_version_id": str(model_version_id),
     }
 
-    session_manager.add_pipeline(pipeline_name, pipeline_data)
+    return session_manager.add_pipeline(pipeline_name, pipeline_data)
 
 
-def show_next_steps(template_instance, model_name, model_version_id):
+def show_next_steps(pipeline_name, template_instance, model_name, model_version_id):
     typer.echo("\n✅ Pipeline initialized and registered.")
     typer.echo(f"Structure: {template_instance.pipeline_dir}")
     typer.echo(f"Linked to model '{model_name}' (version ID: {model_version_id})\n")
     typer.echo("Next steps:")
-    typer.echo(f"- Edit your training steps in '{template_instance.utils_dir}' folder.")
     typer.echo(
-        f"- Adjust context setup in '{template_instance.pipeline_dir}/training_pipeline.py' if needed."
+        f"- Edit your training steps in '{template_instance.pipeline_dir}/steps.py'"
     )
     typer.echo(
         "- Run locally with: "
-        + typer.style("pipeline-cli training test", fg=typer.colors.GREEN)
+        + typer.style(f"pipeline-cli test {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo(
         "- Deploy when ready with: "
-        + typer.style("pipeline-cli training deploy", fg=typer.colors.GREEN)
+        + typer.style(f"pipeline-cli deploy {pipeline_name}", fg=typer.colors.GREEN)
     )
 
 
 @app.command(name="init")
-def init_training_pipeline(
+def init_training(
     pipeline_name: str,
     template: str = typer.Option(
         "simple", help="Template to use: 'simple' or 'ultralytics'"
     ),
 ):
     client = init_client()
-    template_instance = get_template_instance(template, pipeline_name)
+    template_instance = get_template_instance(
+        template_name=template, pipeline_name=pipeline_name
+    )
+    model_name, model_version_id = choose_model_version(client=client)
+
+    if not register_pipeline(
+        pipeline_name=pipeline_name,
+        template_instance=template_instance,
+        model_version_id=model_version_id,
+    ):
+        typer.echo("❌ Pipeline registration failed. Exiting.")
+        raise typer.Exit()
+
     template_instance.write_all_files()
-
-    model_name, model_version_id = choose_model_version(client)
-
-    register_pipeline(pipeline_name, template_instance, model_version_id)
-    show_next_steps(template_instance, model_name, model_version_id)
+    show_next_steps(
+        pipeline_name=pipeline_name,
+        template_instance=template_instance,
+        model_name=model_name,
+        model_version_id=model_version_id,
+    )

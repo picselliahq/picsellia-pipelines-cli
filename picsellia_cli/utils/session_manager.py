@@ -1,4 +1,6 @@
+import getpass
 import os
+import shutil
 from typing import Optional, Dict, List, Any
 from tinydb import TinyDB, Query
 
@@ -6,10 +8,13 @@ from tinydb import TinyDB, Query
 class SessionManager:
     """Handles global session and pipeline configurations using TinyDB."""
 
-    DB_FILE: str = os.path.join(os.getcwd(), "session.json")
+    CONFIG_DIR: str = os.path.expanduser("~/.config/picsellia")
+    DB_FILE: str = os.path.join(CONFIG_DIR, "session.json")
 
     def __init__(self) -> None:
         """Initialize the TinyDB database and define tables."""
+        os.makedirs(self.CONFIG_DIR, exist_ok=True)
+
         self.db: TinyDB = TinyDB(self.DB_FILE)
         self.global_table: TinyDB = self.db.table("global")
         self.pipelines_table: TinyDB = self.db.table("pipelines")
@@ -26,7 +31,7 @@ class SessionManager:
         print(
             "🌍 Global session is not initialized. Please provide the required details:"
         )
-        api_token: str = input("🔑 API Token: ")
+        api_token: str = getpass.getpass("🔑 API Token: ")
         organization_name: str = input("🏢 Organization Name: ")
 
         self.global_table.truncate()  # Clear previous session data
@@ -40,7 +45,7 @@ class SessionManager:
 
     # 🔹 PIPELINE MANAGEMENT 🔹 #
 
-    def add_pipeline(self, name: str, data: Dict[str, Any]) -> None:
+    def add_pipeline(self, name: str, data: Dict[str, Any]) -> bool:
         """
         Add or update a pipeline configuration.
 
@@ -48,13 +53,47 @@ class SessionManager:
             name (str): Name of the pipeline.
             data (dict): Pipeline configuration details.
         """
+        existing_pipeline = self.get_pipeline(name=name)
+
+        if existing_pipeline:
+            action = input(
+                f"❌ Pipeline '{name}' already exists in the session. Do you want to (D)elete it, or (C)ancel? (d/c): "
+            ).lower()
+            if action == "d":
+                self.remove_pipeline(name)
+                old_pipeline_dir = existing_pipeline["pipeline_dir"]
+                shutil.rmtree(old_pipeline_dir)
+                print(f"✅ Pipeline '{name}' has been deleted.")
+                self.add_pipeline(name, data)
+                return True
+            elif action == "c":
+                print("Operation canceled. No changes made.")
+                return False
+            else:
+                print("Invalid option, operation canceled.")
+                return False
+        else:
+            self.pipelines_table.insert({"name": name, "data": data})
+            return True
+
+    def update_pipeline(self, name: str, data: Dict[str, Any]) -> None:
+        """
+        Update an existing pipeline configuration.
+
+        Args:
+            name (str): Name of the pipeline.
+            data (dict): Updated pipeline configuration details.
+
+        Returns:
+            bool: True if pipeline was updated successfully, False otherwise.
+        """
         Pipeline = Query()
         existing_pipeline = self.pipelines_table.search(Pipeline.name == name)
 
         if existing_pipeline:
             self.pipelines_table.update({"data": data}, Pipeline.name == name)
         else:
-            self.pipelines_table.insert({"name": name, "data": data})
+            raise (ValueError(f"Pipeline '{name}' not found."))
 
     def get_pipeline(self, name: str) -> Optional[Dict[str, Any]]:
         """

@@ -49,7 +49,7 @@ def update_model_version_on_picsellia(model_version_id: str, pipeline_data: dict
 
 
 @app.command()
-def deploy_pipeline(
+def deploy_training(
     pipeline_name: str = typer.Argument(
         ..., help="Name of the training pipeline to deploy"
     ),

@@ -66,7 +66,7 @@ def check_output_dataset_version(
 
 
 @app.command()
-def test_pipeline(
+def test_processing(
     pipeline_name: str = typer.Argument(
         ..., help="Name of the processing pipeline to test"
     ),
@@ -128,7 +128,7 @@ def test_pipeline(
     run_pipeline_command(command, working_dir)
 
     pipeline["last_test_params"] = params
-    session_manager.add_pipeline(pipeline_name, pipeline)
+    session_manager.update_pipeline(name=pipeline_name, data=pipeline)
     typer.echo(
         typer.style(
             f"✅ Processing pipeline '{pipeline_name}' tested successfully!",

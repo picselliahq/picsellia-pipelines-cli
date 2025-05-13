@@ -12,9 +12,6 @@ def get_template_instance(template_name: str, pipeline_name: str):
     match template_name:
         case "simple":
             return SimpleProcessingTemplate(pipeline_name)
-        # Prépare ici pour ajouter d'autres templates plus tard :
-        # case "advanced":
-        #     return AdvancedProcessingTemplate(pipeline_name)
         case _:
             typer.echo(
                 typer.style(
@@ -30,6 +27,7 @@ def register_pipeline(pipeline_name: str, template_instance):
     pipeline_data = {
         "pipeline_name": pipeline_name,
         "pipeline_type": "DATASET_VERSION_CREATION",
+        "pipeline_dir": template_instance.pipeline_dir,
         "picsellia_pipeline_script_path": f"{template_instance.pipeline_dir}/picsellia_pipeline.py",
         "local_pipeline_script_path": f"{template_instance.pipeline_dir}/local_pipeline.py",
         "requirements_path": f"{template_instance.pipeline_dir}/requirements.txt",
@@ -41,11 +39,11 @@ def register_pipeline(pipeline_name: str, template_instance):
         },
     }
 
-    session_manager.add_pipeline(pipeline_name, pipeline_data)
+    return session_manager.add_pipeline(pipeline_name, pipeline_data)
 
 
 @app.command(name="init")
-def init_processing_pipeline(
+def init_processing(
     pipeline_name: str,
     template: str = typer.Option("simple", help="Template to use: 'simple'"),
 ):
@@ -56,14 +54,18 @@ def init_processing_pipeline(
     session_manager.ensure_session_initialized()
 
     template_instance = get_template_instance(template, pipeline_name)
+
+    if not register_pipeline(pipeline_name, template_instance):
+        typer.echo("❌ Pipeline registration failed. Exiting.")
+        raise typer.Exit()
+
     template_instance.write_all_files()
+    _show_success_message(
+        pipeline_name=pipeline_name, template_instance=template_instance
+    )
 
-    register_pipeline(pipeline_name, template_instance)
 
-    _show_success_message(template_instance)
-
-
-def _show_success_message(template_instance: SimpleProcessingTemplate):
+def _show_success_message(pipeline_name, template_instance: SimpleProcessingTemplate):
     typer.echo("")
     typer.echo(
         typer.style(
@@ -75,17 +77,14 @@ def _show_success_message(template_instance: SimpleProcessingTemplate):
     typer.echo(f"📁 Structure created at: {template_instance.pipeline_dir}")
     typer.echo("")
     typer.echo("Next steps:")
-    typer.echo(
-        "- Edit your processing logic in: "
-        + typer.style("process_dataset.py", bold=True)
-    )
+    typer.echo("- Edit your steps in: " + typer.style("steps.py", bold=True))
     typer.echo(
         "- Test locally with: "
-        + typer.style("pipeline-cli processing test", fg=typer.colors.GREEN)
+        + typer.style(f"pipeline-cli test {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo(
         "- Deploy to Picsellia with: "
-        + typer.style("pipeline-cli processing deploy", fg=typer.colors.GREEN)
+        + typer.style(f"pipeline-cli deploy {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo("")
 

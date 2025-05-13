@@ -1,6 +1,5 @@
 import os
 import subprocess
-import venv
 from typing import Dict
 
 import typer
@@ -35,34 +34,88 @@ def get_global_session() -> Dict:
 
 
 def create_virtual_env(requirements_path: str) -> str:
-    env_path = os.path.join(os.path.dirname(requirements_path), ".venv")
-    pip_executable = (
-        os.path.join(env_path, "bin", "pip")
-        if os.name != "nt"
-        else os.path.join(env_path, "Scripts", "pip.exe")
-    )
+    pipeline_dir = os.path.dirname(requirements_path)
+    env_path = os.path.join(pipeline_dir, ".venv")
 
     if not os.path.exists(env_path):
-        typer.echo(f"⚙️ Creating virtual environment at {env_path}...")
-        venv.create(env_path, with_pip=True)
+        typer.echo("⚙️ Creating virtual environment with uv...")
+        try:
+            subprocess.run(
+                ["uv", "venv"],
+                cwd=pipeline_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            typer.echo(
+                typer.style(
+                    f"❌ Failed to create virtual environment. Command failed with exit code {e.returncode}.",
+                    fg=typer.colors.RED,
+                    bold=True,
+                )
+            )
+            typer.echo(f"🔍 Error details:\n{e.stderr}")
+            raise typer.Exit(code=e.returncode)
+    try:
+        typer.echo("📦 Installing dependencies using uv...")
 
-    if os.path.exists(requirements_path):
-        typer.echo(f"📦 Installing dependencies from {requirements_path}...")
-        subprocess.run([pip_executable, "install", "-r", requirements_path], check=True)
-    else:
-        typer.echo("⚠️ No requirements.txt found, skipping dependency installation.")
+        result = subprocess.run(
+            [
+                "uv",
+                "pip",
+                "install",
+                "--python",
+                os.path.join(env_path, "bin", "python3"),
+                "-r",
+                requirements_path,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        typer.echo(result.stdout)
 
-    typer.echo("📦 Installing picsellia-cv-engine from GitHub...")
-    subprocess.run(
-        [
-            pip_executable,
-            "install",
-            "git+https://github.com/picselliahq/picsellia-cv-engine.git@main",
-        ],
-        check=True,
-    )
+    except subprocess.CalledProcessError as e:
+        typer.echo(
+            typer.style(
+                f"\n❌ Failed to install dependencies with uv. Command failed with exit code {e.returncode}.",
+                fg=typer.colors.RED,
+                bold=True,
+            )
+        )
+        typer.echo(f"🔍 Error details:\n{e.stderr}")
+        raise typer.Exit(code=e.returncode)
 
-    return env_path
+    try:
+        typer.echo("📦 Installing picsellia-cv-engine from GitHub...")
+        result = subprocess.run(
+            [
+                "uv",
+                "pip",
+                "install",
+                "--python",
+                os.path.join(env_path, "bin", "python3"),
+                "git+https://github.com/picselliahq/picsellia-cv-engine.git@main",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        typer.echo(result.stdout)
+
+    except subprocess.CalledProcessError as e:
+        typer.echo(
+            typer.style(
+                f"\n❌ Failed to install picsellia-cv-engine. Command failed with exit code {e.returncode}.",
+                fg=typer.colors.RED,
+                bold=True,
+            )
+        )
+        typer.echo(f"🔍 Error details:\n{e.stderr}")
+        raise typer.Exit(code=e.returncode)
+
+    return os.path.join(os.getcwd(), pipeline_dir, ".venv")
 
 
 def run_pipeline_command(command: list[str], working_dir: str):
@@ -82,5 +135,5 @@ def run_pipeline_command(command: list[str], working_dir: str):
             )
         )
         typer.echo("🔍 Most recent error output:\n")
-        typer.echo(typer.style(str(e), fg=typer.colors.RED))
+        typer.echo(f"🔴 Error details:\n{e.stderr}")
         raise typer.Exit(code=e.returncode)
