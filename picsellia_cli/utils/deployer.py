@@ -10,7 +10,9 @@ def ensure_docker_login():
     typer.echo("🔐 Checking Docker authentication...")
     try:
         result = subprocess.run(
-            ["docker", "info"], capture_output=True, text=True, check=True
+            ["docker", "info"],
+            text=True,
+            check=True,
         )
         if "Username:" not in result.stdout:
             raise RuntimeError("Not logged in to Docker.")
@@ -19,7 +21,11 @@ def ensure_docker_login():
         typer.echo(f"❌ Error: {str(e)}")
         if typer.confirm("Do you want to login now?", default=True):
             try:
-                subprocess.run(["docker", "login"], check=True)
+                subprocess.run(
+                    ["docker", "login"],
+                    check=True,
+                    text=True,
+                )
             except subprocess.CalledProcessError as login_error:
                 typer.echo(f"❌ Docker login failed: {login_error.stderr}")
                 raise typer.Exit()
@@ -52,7 +58,6 @@ def build_docker_image_only(pipeline_dir: str, image_name: str, image_tag: str):
             ["docker", "build", "-t", full_image_name, "-f", dockerfile_path, "."],
             cwd=pipeline_dir,
             check=True,
-            capture_output=True,
             text=True,
         )
         typer.echo(result.stdout)
@@ -80,7 +85,11 @@ def build_and_push_docker_image(
         ensure_docker_login()
 
     typer.echo(f"📤 Pushing Docker image '{full_image_name}'...")
-    subprocess.run(["docker", "push", full_image_name], check=True)
+    subprocess.run(
+        ["docker", "push", full_image_name],
+        check=True,
+        text=True,
+    )
 
     typer.echo(f"✅ Docker image '{full_image_name}' pushed successfully!")
 

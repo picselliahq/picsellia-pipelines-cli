@@ -44,7 +44,6 @@ def create_virtual_env(requirements_path: str) -> str:
                 ["uv", "venv"],
                 cwd=pipeline_dir,
                 check=True,
-                capture_output=True,
                 text=True,
             )
         except subprocess.CalledProcessError as e:
@@ -71,7 +70,6 @@ def create_virtual_env(requirements_path: str) -> str:
                 requirements_path,
             ],
             check=True,
-            capture_output=True,
             text=True,
         )
         typer.echo(result.stdout)
@@ -99,7 +97,6 @@ def create_virtual_env(requirements_path: str) -> str:
                 "git+https://github.com/picselliahq/picsellia-cv-engine.git@main",
             ],
             check=True,
-            capture_output=True,
             text=True,
         )
         typer.echo(result.stdout)
@@ -127,7 +124,12 @@ def run_pipeline_command(command: list[str], working_dir: str):
     )
 
     try:
-        subprocess.run(command, check=True, env=env)
+        subprocess.run(
+            command,
+            check=True,
+            env=env,
+            text=True,
+        )
     except subprocess.CalledProcessError as e:
         typer.echo(
             typer.style(
