@@ -3,6 +3,7 @@ import typer
 from picsellia_cli.commands.processing.templates.simple_template import (
     SimpleProcessingTemplate,
 )
+from picsellia_cli.utils.initializer import handle_pipeline_name
 from picsellia_cli.utils.session_manager import session_manager
 
 app = typer.Typer(help="Initialize and register a new processing pipeline.")
@@ -52,6 +53,8 @@ def init_processing(
     """
 
     session_manager.ensure_session_initialized()
+
+    pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
 
     template_instance = get_template_instance(template, pipeline_name)
 
