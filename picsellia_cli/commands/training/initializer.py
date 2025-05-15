@@ -26,6 +26,7 @@ def init_client() -> Client:
     return Client(
         api_token=session["api_token"],
         organization_name=session["organization_name"],
+        host=session["host"],
     )
 
 

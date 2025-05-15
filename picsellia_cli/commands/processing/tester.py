@@ -80,6 +80,7 @@ def test_processing(
     client = Client(
         api_token=global_data["api_token"],
         organization_name=global_data["organization_name"],
+        host=global_data["host"],
     )
     params["output_dataset_version_name"] = check_output_dataset_version(
         client,

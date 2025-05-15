@@ -32,6 +32,7 @@ def register_processing_pipeline_on_picsellia(
     client = Client(
         api_token=global_data["api_token"],
         organization_name=global_data["organization_name"],
+        host=global_data["host"],
     )
 
     try:

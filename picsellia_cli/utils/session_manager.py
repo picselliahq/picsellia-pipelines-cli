@@ -4,6 +4,8 @@ import shutil
 from typing import Optional, Dict, List, Any
 from tinydb import TinyDB, Query
 
+import typer
+
 
 class SessionManager:
     """Handles global session and pipeline configurations using TinyDB."""
@@ -33,10 +35,30 @@ class SessionManager:
         )
         api_token: str = getpass.getpass("🔑 API Token: ")
         organization_name: str = input("🏢 Organization Name: ")
+        host = typer.prompt(
+            "🌐 Enter the host (default: 'app.picsellia.com')",
+            type=str,
+            default="https://app.picsellia.com",
+            show_default=True,
+        )
+
+        if host not in [
+            "https://app.picsellia.com",
+            "https://staging.picsellia.com",
+            "http://localhost",
+        ]:
+            typer.echo(
+                "❌ Invalid host. Setting the default host 'https://app.picsellia.com'."
+            )
+            host = "https://app.picsellia.com"
 
         self.global_table.truncate()  # Clear previous session data
         self.global_table.insert(
-            {"api_token": api_token, "organization_name": organization_name}
+            {
+                "api_token": api_token,
+                "organization_name": organization_name,
+                "host": host,
+            }
         )
 
     def get_global_session(self) -> Optional[Dict[str, str]]:

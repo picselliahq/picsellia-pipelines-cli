@@ -33,6 +33,7 @@ def update_model_version_on_picsellia(model_version_id: str, pipeline_data: dict
     client = Client(
         api_token=global_data["api_token"],
         organization_name=global_data["organization_name"],
+        host=global_data["host"],
     )
 
     model_version = client.get_model_version_by_id(model_version_id)
