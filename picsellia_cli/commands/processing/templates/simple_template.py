@@ -8,10 +8,7 @@ from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 from {pipeline_module}.steps import process
 
 processing_context = create_picsellia_processing_context(
-    processing_parameters={{
-        "datalake": "default",
-        "data_tag": "processed",
-    }}
+    processing_parameters={processing_parameters}
 )
 
 @pipeline(
@@ -58,10 +55,7 @@ processing_context = create_local_processing_context(
     job_type=args.job_type,
     input_dataset_version_id=args.input_dataset_version_id,
     output_dataset_version_name=args.output_dataset_version_name,
-    processing_parameters={{
-        "datalake": "default",
-        "data_tag": "processed",
-    }},
+    processing_parameters={processing_parameters},
     working_dir=args.working_dir,
 )
 
@@ -271,18 +265,28 @@ tests/
 
 
 class SimpleProcessingTemplate(BaseTemplate):
+    def __init__(self, pipeline_name: str):
+        super().__init__(pipeline_name=pipeline_name)
+        self.pipeline_type = "DATASET_VERSION_CREATION"
+        self.default_parameters = {
+            "datalake": "default",
+            "data_tag": "processed",
+        }
+
     def get_main_files(self) -> dict[str, str]:
         return {
             "picsellia_pipeline.py": PROCESSING_PIPELINE_PICSELLIA.format(
-                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
+                processing_parameters=self.default_parameters,
             ),
             "local_pipeline.py": PROCESSING_PIPELINE_LOCAL.format(
-                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
+                processing_parameters=self.default_parameters,
             ),
             "steps.py": PROCESSING_PIPELINE_STEPS.format(
-                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_module=self.pipeline_module,
             ),
             "requirements.txt": PROCESSING_PIPELINE_REQUIREMENTS,
             "Dockerfile": PROCESSING_PIPELINE_DOCKERFILE.format(
@@ -295,3 +299,22 @@ class SimpleProcessingTemplate(BaseTemplate):
         return {
             "processing.py": PROCESSING_PIPELINE_PROCESSING,
         }
+
+    def get_config_toml(self) -> dict:
+        """Define the pipeline-specific configuration."""
+        config_data = {
+            "metadata": {
+                "name": self.pipeline_name,
+                "version": "1.0",
+                "description": "This pipeline processes data for X.",
+                "type": self.pipeline_type,
+            },
+            "execution": {
+                "picsellia_pipeline_script": "picsellia_pipeline.py",
+                "local_pipeline_script": "local_pipeline.py",
+                "requirements_file": "requirements.txt",
+            },
+            "image": {"image_name": "", "image_tag": ""},
+            "default_parameters": self.default_parameters,
+        }
+        return config_data
