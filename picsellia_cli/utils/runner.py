@@ -1,116 +1,65 @@
 import os
 import subprocess
-from typing import Dict
-
 import typer
-from picsellia_cli.utils.session_manager import session_manager
-
-
-def get_pipeline_data(pipeline_name: str) -> Dict:
-    session_manager.ensure_session_initialized()
-    pipeline = session_manager.get_pipeline(pipeline_name)
-    if not pipeline:
-        typer.echo(
-            typer.style(
-                f"❌ Pipeline '{pipeline_name}' not found. Run `pipeline-cli list`.",
-                fg=typer.colors.RED,
-            )
-        )
-        raise typer.Exit()
-    return pipeline
-
-
-def get_global_session() -> Dict:
-    global_data = session_manager.get_global_session()
-    if not global_data:
-        typer.echo(
-            typer.style(
-                "❌ Global session not initialized. Run `pipeline-cli init` first.",
-                fg=typer.colors.RED,
-            )
-        )
-        raise typer.Exit()
-    return global_data
 
 
 def create_virtual_env(requirements_path: str) -> str:
     pipeline_dir = os.path.dirname(requirements_path)
     env_path = os.path.join(pipeline_dir, ".venv")
+    python_path = os.path.join(env_path, "bin", "python3")
 
-    if not os.path.exists(env_path):
-        typer.echo("⚙️ Creating virtual environment with uv...")
+    if requirements_path.endswith("pyproject.toml"):
+        typer.echo("📦 Detected pyproject.toml — using uv sync...")
+
         try:
+            subprocess.run(["uv", "sync"], cwd=pipeline_dir, check=True, text=True)
+
+            typer.echo("➕ Ensuring picsellia-cv-engine is added...")
             subprocess.run(
-                ["uv", "venv"],
+                [
+                    "uv",
+                    "add",
+                    "git+https://github.com/picselliahq/picsellia-cv-engine.git@main",
+                ],
                 cwd=pipeline_dir,
                 check=True,
                 text=True,
             )
-        except subprocess.CalledProcessError as e:
-            typer.echo(
-                typer.style(
-                    f"❌ Failed to create virtual environment. Command failed with exit code {e.returncode}.",
-                    fg=typer.colors.RED,
-                    bold=True,
-                )
-            )
-            typer.echo(f"🔍 Error details:\n{e.stderr}")
-            raise typer.Exit(code=e.returncode)
-    try:
-        typer.echo("📦 Installing dependencies using uv...")
 
-        result = subprocess.run(
-            [
-                "uv",
-                "pip",
-                "install",
-                "--python",
-                os.path.join(env_path, "bin", "python3"),
-                "-r",
-                requirements_path,
-            ],
+        except subprocess.CalledProcessError as e:
+            typer.secho(
+                f"❌ uv operation failed (code {e.returncode})", fg=typer.colors.RED
+            )
+            raise typer.Exit(code=e.returncode)
+
+    elif requirements_path.endswith(".txt"):
+        if not os.path.exists(env_path):
+            typer.echo("⚙️ Creating virtual environment with uv...")
+            subprocess.run(["uv", "venv"], cwd=pipeline_dir, check=True, text=True)
+
+        typer.echo(f"📦 Installing dependencies from {requirements_path}...")
+        subprocess.run(
+            ["uv", "pip", "install", "--python", python_path, "-r", requirements_path],
             check=True,
             text=True,
         )
-        typer.echo(result.stdout)
 
-    except subprocess.CalledProcessError as e:
-        typer.echo(
-            typer.style(
-                f"\n❌ Failed to install dependencies with uv. Command failed with exit code {e.returncode}.",
-                fg=typer.colors.RED,
-                bold=True,
-            )
-        )
-        typer.echo(f"🔍 Error details:\n{e.stderr}")
-        raise typer.Exit(code=e.returncode)
-
-    try:
-        typer.echo("📦 Installing picsellia-cv-engine from GitHub...")
-        result = subprocess.run(
+        typer.echo("➕ Installing picsellia-cv-engine from GitHub...")
+        subprocess.run(
             [
                 "uv",
                 "pip",
                 "install",
                 "--python",
-                os.path.join(env_path, "bin", "python3"),
+                python_path,
                 "git+https://github.com/picselliahq/picsellia-cv-engine.git@main",
             ],
             check=True,
             text=True,
         )
-        typer.echo(result.stdout)
-
-    except subprocess.CalledProcessError as e:
-        typer.echo(
-            typer.style(
-                f"\n❌ Failed to install picsellia-cv-engine. Command failed with exit code {e.returncode}.",
-                fg=typer.colors.RED,
-                bold=True,
-            )
-        )
-        typer.echo(f"🔍 Error details:\n{e.stderr}")
-        raise typer.Exit(code=e.returncode)
+    else:
+        typer.secho("❌ Unsupported requirements format.", fg=typer.colors.RED)
+        raise typer.Exit()
 
     return os.path.join(os.getcwd(), pipeline_dir, ".venv")
 
