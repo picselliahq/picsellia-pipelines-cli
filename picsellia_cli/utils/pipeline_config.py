@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 
 class EnvConfig:
-    def __init__(self, env_path=".env"):
+    def __init__(self, env_path=os.path.join(os.getcwd(), ".env")):
         load_dotenv(env_path)
 
     def get(self, key: str, default=None):
@@ -35,9 +35,7 @@ class PipelineConfig:
         self.pipeline_dir = self.find_pipeline_dir(pipeline_name, search_path)
         self.config_path = self.pipeline_dir / "config.toml"
         self.config = self.load_config()
-        self.env = EnvConfig(
-            env_path=os.path.join(os.path.dirname(self.pipeline_dir), ".env")
-        )
+        self.env = EnvConfig()
 
     def load_config(self):
         if not self.config_path.exists():
