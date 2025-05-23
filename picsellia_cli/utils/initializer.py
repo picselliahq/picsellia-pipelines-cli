@@ -1,5 +1,5 @@
-from picsellia import Client
 import typer
+from picsellia import Client
 
 from picsellia_cli.utils.pipeline_config import EnvConfig
 
