@@ -1,53 +1,54 @@
-import os
 import typer
-from typing import Optional
 
 from picsellia import Client
 from picsellia.types.enums import ProcessingType
 
 from picsellia_cli.utils.deployer import (
-    get_pipeline_data,
     prompt_docker_image_if_missing,
     build_and_push_docker_image,
 )
-from picsellia_cli.utils.session_manager import session_manager
+from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer(help="Deploy a processing pipeline to Picsellia.")
 
 
 def register_processing_pipeline_on_picsellia(
-    pipeline_name: str,
-    pipeline_data: dict,
+    config: PipelineConfig,
     cpu: int,
     gpu: int,
 ):
     """
     Register a processing pipeline in Picsellia.
     """
-    global_data: Optional[dict] = session_manager.get_global_session()
-    if not global_data:
-        typer.echo("❌ Global session not initialized. Run `pipeline-cli init` first.")
+    api_token = config.env.get_api_token()
+    organization_name = config.env.get_organization_name()
+    host = config.env.get_host()
+
+    if not (api_token and organization_name and host):
+        typer.echo(
+            "❌ Missing credentials. Ensure API_TOKEN, ORGANIZATION_NAME, and HOST are set in your .env file."
+        )
         raise typer.Exit()
 
     client = Client(
-        api_token=global_data["api_token"],
-        organization_name=global_data["organization_name"],
-        host=global_data["host"],
+        api_token=api_token,
+        organization_name=organization_name,
+        host=host,
     )
 
     try:
         client.create_processing(
-            name=pipeline_name,
-            type=ProcessingType(pipeline_data["pipeline_type"]),
+            name=config.pipeline_name,
+            type=ProcessingType(config.get("metadata", "type")),
             default_cpu=cpu,
             default_gpu=gpu,
-            default_parameters=pipeline_data["parameters"],
-            docker_image=pipeline_data["image_name"],
-            docker_tag=pipeline_data["image_tag"],
+            default_parameters=config.get_parameters(),
+            docker_image=config.get("image", "image_name"),
+            docker_tag=config.get("image", "image_tag"),
             docker_flags=None,
         )
         typer.echo(
-            f"✅ Processing pipeline '{pipeline_name}' successfully registered on Picsellia!"
+            f"✅ Processing pipeline '{config.pipeline_name}' successfully registered on Picsellia!"
         )
 
     except Exception as e:
@@ -64,25 +65,26 @@ def deploy_processing(
     """
     🚀 Deploy a processing pipeline: build & push its Docker image, then register it on Picsellia.
     """
-    pipeline_data = get_pipeline_data(pipeline_name)
-    pipeline_data = prompt_docker_image_if_missing(pipeline_name, pipeline_data)
+    config = PipelineConfig(pipeline_name)
+
+    # Prompt user for image name/tag if not filled
+    prompt_docker_image_if_missing(
+        pipeline_config=config,
+    )
+    config.save()
 
     cpu = int(typer.prompt("Enter CPU allocation", default=4))
     gpu = int(typer.prompt("Enter GPU allocation", default=0))
 
-    repo_root = os.getcwd()
-    pipeline_dir = os.path.join(repo_root, "pipelines", pipeline_name)
-
     build_and_push_docker_image(
-        pipeline_dir,
-        pipeline_data["image_name"],
-        pipeline_data["image_tag"],
+        pipeline_dir=str(config.pipeline_dir),
+        image_name=config.get("image", "image_name"),
+        image_tag=config.get("image", "image_tag"),
         force_login=False,
     )
 
     register_processing_pipeline_on_picsellia(
-        pipeline_name=pipeline_name,
-        pipeline_data=pipeline_data,
+        config=config,
         cpu=cpu,
         gpu=gpu,
     )
