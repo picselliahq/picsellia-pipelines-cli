@@ -43,8 +43,8 @@ def register_processing_pipeline_on_picsellia(
             default_cpu=cpu,
             default_gpu=gpu,
             default_parameters=config.get_parameters(),
-            docker_image=config.get("image", "image_name"),
-            docker_tag=config.get("image", "image_tag"),
+            docker_image=config.get("docker", "image_name"),
+            docker_tag=config.get("docker", "image_tag"),
             docker_flags=None,
         )
         typer.echo(
@@ -78,8 +78,8 @@ def deploy_processing(
 
     build_and_push_docker_image(
         pipeline_dir=str(config.pipeline_dir),
-        image_name=config.get("image", "image_name"),
-        image_tag=config.get("image", "image_tag"),
+        image_name=config.get("docker", "image_name"),
+        image_tag=config.get("docker", "image_tag"),
         force_login=False,
     )
 
