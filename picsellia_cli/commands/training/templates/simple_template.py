@@ -188,18 +188,27 @@ tests/
 
 
 class SimpleTrainingTemplate(BaseTemplate):
+    def __init__(self, pipeline_name: str):
+        super().__init__(pipeline_name)
+        self.pipeline_type = "TRAINING"
+        self.default_parameters = {
+            "epochs": 3,
+            "batch_size": 8,
+            "image_size": 640,
+        }
+
     def get_main_files(self) -> dict[str, str]:
         return {
             "training_pipeline.py": SIMPLE_PIPELINE_TRAINING.format(
-                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
             "local_training_pipeline.py": SIMPLE_PIPELINE_LOCAL.format(
-                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
             "steps.py": SIMPLE_STEPS.format(
-                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_module=self.pipeline_module,
             ),
             "requirements.txt": SIMPLE_PIPELINE_REQUIREMENTS,
             "Dockerfile": SIMPLE_PIPELINE_DOCKERFILE.format(
@@ -212,4 +221,28 @@ class SimpleTrainingTemplate(BaseTemplate):
         return {
             "parameters.py": SIMPLE_PIPELINE_PARAMETERS,
             "data.py": SIMPLE_PIPELINE_DATA,
+        }
+
+    def get_config_toml(self) -> dict:
+        return {
+            "metadata": {
+                "name": self.pipeline_name,
+                "version": "1.0",
+                "description": "Training pipeline using YOLO and Ultralytics.",
+                "type": self.pipeline_type,
+            },
+            "execution": {
+                "picsellia_pipeline_script": "training_pipeline.py",
+                "local_pipeline_script": "local_training_pipeline.py",
+                "requirements_file": "requirements.txt",
+            },
+            "docker": {
+                "image_name": "",
+                "image_tag": "",
+            },
+            "parameters": self.default_parameters,
+            "model": {
+                "model_name": "",
+                "model_version_id": "",
+            },
         }
