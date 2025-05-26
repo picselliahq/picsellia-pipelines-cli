@@ -46,9 +46,6 @@ class PipelineConfig:
     def get(self, section: str, key: str):
         return self.config.get(section, {}).get(key)
 
-    def get_parameters(self) -> dict:
-        return self.config.get("default_parameters", {})
-
     def get_script_path(self, script_key: str) -> Path:
         """Get the full path to a script defined in the 'execution' section (e.g. 'local_pipeline_script')."""
         script_name = self.get("execution", script_key)
