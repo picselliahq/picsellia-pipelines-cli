@@ -3,9 +3,6 @@ import typer
 from picsellia_cli.commands.training.templates.simple_template import (
     SimpleTrainingTemplate,
 )
-from picsellia_cli.commands.training.templates.ultralytics_template import (
-    UltralyticsTrainingTemplate,
-)
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
@@ -18,10 +15,17 @@ app = typer.Typer(help="Initialize and register a new training pipeline.")
 
 def get_template_instance(template_name: str, pipeline_name: str):
     match template_name:
-        case "ultralytics":
-            return UltralyticsTrainingTemplate(pipeline_name)
-        case "simple" | _:
+        case "simple":
             return SimpleTrainingTemplate(pipeline_name)
+        case _:
+            typer.echo(
+                typer.style(
+                    f"❌ Unknown template '{template_name}'",
+                    fg=typer.colors.RED,
+                    bold=True,
+                )
+            )
+            raise typer.Exit(code=1)
 
 
 def choose_model_version(client: Client) -> tuple[str, str]:
@@ -147,7 +151,16 @@ def init_training(
     model_name, model_version_id = choose_model_version(client=client)
 
     template_instance.write_all_files()
-    config = PipelineConfig(pipeline_name)
-    register_pipeline_metadata(config, model_name, model_version_id)
+    template_instance.post_init_environment()
 
-    show_next_steps(pipeline_name, template_instance, model_name, model_version_id)
+    config = PipelineConfig(pipeline_name=pipeline_name)
+    register_pipeline_metadata(
+        config=config, model_name=model_name, model_version_id=model_version_id
+    )
+
+    show_next_steps(
+        pipeline_name=pipeline_name,
+        template_instance=template_instance,
+        model_name=model_name,
+        model_version_id=model_version_id,
+    )
