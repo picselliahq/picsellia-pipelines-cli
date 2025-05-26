@@ -36,6 +36,7 @@ def init_processing(
     template_instance = get_template_instance(template, pipeline_name)
 
     template_instance.write_all_files()
+    template_instance.post_init_environment()
     _show_success_message(
         pipeline_name=pipeline_name, template_instance=template_instance
     )
