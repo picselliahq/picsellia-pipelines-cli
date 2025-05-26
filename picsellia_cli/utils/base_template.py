@@ -17,7 +17,6 @@ class BaseTemplate(ABC):
         self._write_file(os.path.join(self.BASE_DIR, "__init__.py"), "")
         self._write_file(os.path.join(self.pipeline_dir, "__init__.py"), "")
         self._write_file(os.path.join(self.utils_dir, "__init__.py"), "")
-        self._write_file(os.path.join(self.utils_dir, "config.py"), CONFIG_UTILS)
 
         for filename, content in self.get_main_files().items():
             self._write_file(os.path.join(self.pipeline_dir, filename), content)
@@ -53,25 +52,3 @@ class BaseTemplate(ABC):
         config_path = os.path.join(self.pipeline_dir, "config.toml")
         with open(config_path, "w") as config_file:
             toml.dump(config_data, config_file)
-
-
-CONFIG_UTILS = """import os
-import toml
-from typing import Dict
-
-
-def load_processing_parameters() -> Dict:
-    \"\"\"
-    Load processing_parameters from config.toml in the current pipeline directory.
-    Assumes this file is located in utils/ under the pipeline root.
-    \"\"\"
-    current_dir = os.path.dirname(os.path.dirname(__file__))
-    config_path = os.path.join(current_dir, "config.toml")
-
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"config.toml not found in {config_path}")
-
-    with open(config_path, "r") as f:
-        config = toml.load(f)
-    return config.get("processing_parameters", {})
-"""
