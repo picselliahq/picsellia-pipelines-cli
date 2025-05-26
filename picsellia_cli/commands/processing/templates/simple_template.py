@@ -1,4 +1,8 @@
+import os
+
 from picsellia_cli.utils.base_template import BaseTemplate
+import subprocess
+
 
 PROCESSING_PIPELINE_PICSELLIA = """from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
 from picsellia_cv_engine.core.services.utils.picsellia_context import create_picsellia_processing_context
@@ -227,13 +231,36 @@ def get_image_id_by_filename(coco_data: Dict[str, Any], filename: str) -> int:
 
 """
 
+PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
+"""
+
+PROCESSING_PIPELINE_PYPROJECT = """[project]
+name = "{pipeline_name}"
+version = "0.1.0"
+description = "Picsellia processing pipeline"
+requires-python = ">=3.10"
+
+dependencies = [
+    "picsellia-pipelines-cli",
+]
+
+[dependency-groups]
+dev = [
+    "picsellia-cv-engine",
+]
+
+[tool.uv.sources]
+picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main" }}
+picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "fix/logs" }}
+
+"""
+
+
 PROCESSING_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10
 
 RUN apt-get update && apt-get install -y \\
     libgl1-mesa-glx \\
     && rm -rf /var/lib/apt/lists/*
-
-RUN uv pip install --python=$(which python3.10) git+https://github.com/picselliahq/picsellia-cv-engine.git@main
 
 WORKDIR /experiment
 
@@ -241,16 +268,14 @@ ARG REBUILD_ALL
 COPY ./ ./{pipeline_dir}
 ARG REBUILD_PICSELLIA
 
-RUN uv pip install --python=$(which python3.10) --no-cache -r ./{pipeline_dir}/requirements.txt
+# Sync from uv.lock (assumes uv lock has already been created)
+RUN uv sync --python=$(which python3.10)
 
-ENV PYTHONPATH=\"/experiment\"
+ENV PYTHONPATH="/experiment"
 
 ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/picsellia_pipeline.py"]
 """
 
-
-PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
-"""
 
 PROCESSING_PIPELINE_DOCKERIGNORE = """# Exclude virtual environments
 .venv/
@@ -265,35 +290,40 @@ tests/
 
 
 class SimpleProcessingTemplate(BaseTemplate):
-    def __init__(self, pipeline_name: str):
+    def __init__(self, pipeline_name: str, use_pyproject: bool = True):
         super().__init__(pipeline_name=pipeline_name)
         self.pipeline_type = "DATASET_VERSION_CREATION"
         self.default_parameters = {
             "datalake": "default",
             "data_tag": "processed",
         }
+        self.use_pyproject = use_pyproject
 
     def get_main_files(self) -> dict[str, str]:
-        return {
+        files = {
             "picsellia_pipeline.py": PROCESSING_PIPELINE_PICSELLIA.format(
                 pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
-                processing_parameters=self.default_parameters,
             ),
             "local_pipeline.py": PROCESSING_PIPELINE_LOCAL.format(
                 pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
-                processing_parameters=self.default_parameters,
             ),
             "steps.py": PROCESSING_PIPELINE_STEPS.format(
                 pipeline_module=self.pipeline_module,
             ),
-            "requirements.txt": PROCESSING_PIPELINE_REQUIREMENTS,
-            "Dockerfile": PROCESSING_PIPELINE_DOCKERFILE.format(
-                pipeline_dir=self.pipeline_dir
-            ),
             ".dockerignore": PROCESSING_PIPELINE_DOCKERIGNORE,
+            "Dockerfile": self._get_dockerfile(),
         }
+
+        if self.use_pyproject:
+            files["pyproject.toml"] = PROCESSING_PIPELINE_PYPROJECT.format(
+                pipeline_name=self.pipeline_name
+            )
+        else:
+            files["requirements.txt"] = PROCESSING_PIPELINE_REQUIREMENTS
+
+        return files
 
     def get_utils_files(self) -> dict[str, str]:
         return {
@@ -301,8 +331,7 @@ class SimpleProcessingTemplate(BaseTemplate):
         }
 
     def get_config_toml(self) -> dict:
-        """Define the pipeline-specific configuration."""
-        config_data = {
+        return {
             "metadata": {
                 "name": self.pipeline_name,
                 "version": "1.0",
@@ -312,9 +341,50 @@ class SimpleProcessingTemplate(BaseTemplate):
             "execution": {
                 "picsellia_pipeline_script": "picsellia_pipeline.py",
                 "local_pipeline_script": "local_pipeline.py",
-                "requirements_file": "requirements.txt",
+                "requirements_file": "pyproject.toml"
+                if self.use_pyproject
+                else "requirements.txt",
             },
             "docker": {"image_name": "", "image_tag": ""},
             "default_parameters": self.default_parameters,
         }
-        return config_data
+
+    def _get_dockerfile(self) -> str:
+        if self.use_pyproject:
+            return PROCESSING_PIPELINE_DOCKERFILE.format(pipeline_dir=self.pipeline_dir)
+        else:
+            return PROCESSING_PIPELINE_DOCKERFILE.replace(
+                "uv sync --python=$(which python3.10)",
+                "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
+            ).format(pipeline_dir=self.pipeline_dir)
+
+    def post_init_environment(self):
+        """Create a local .venv and install dependencies based on the selected format."""
+        pipeline_path = self.pipeline_dir
+        python_executable = (
+            os.path.join(pipeline_path, ".venv", "bin", "python3")
+            if os.name != "nt"
+            else os.path.join(pipeline_path, ".venv", "Scripts", "python.exe")
+        )
+
+        print(f"⚙️ Creating virtual environment in {pipeline_path}/.venv ...")
+        subprocess.run(["uv", "venv"], cwd=pipeline_path, check=True)
+
+        if self.use_pyproject:
+            print("🔒 Locking and syncing dependencies from pyproject.toml ...")
+            subprocess.run(["uv", "lock", "--project", pipeline_path], check=True)
+            subprocess.run(["uv", "sync", "--project", pipeline_path], check=True)
+        else:
+            req_path = os.path.join(pipeline_path, "requirements.txt")
+            print("📦 Installing from requirements.txt ...")
+            subprocess.run(
+                ["uv", "pip", "install", "--python", python_executable, "-r", req_path],
+                check=True,
+            )
+
+        print("\n✅ Virtual environment ready. Activate it with:\n")
+        print(
+            f"   source {pipeline_path}/.venv/bin/activate"
+            if os.name != "nt"
+            else f"   {pipeline_path}\\.venv\\Scripts\\activate.bat"
+        )
