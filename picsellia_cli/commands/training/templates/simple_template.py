@@ -153,6 +153,28 @@ SIMPLE_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 ultralytics
 """
 
+SIMPLE_PIPELINE_PYPROJECT = """[project]
+name = "{pipeline_name}"
+version = "0.1.0"
+description = "YoloV8 training pipeline"
+requires-python = ">=3.10"
+
+dependencies = [
+    "picsellia-pipelines-cli",
+    "ultralytics>=8.3.145",
+]
+
+[dependency-groups]
+dev = [
+    "picsellia-cv-engine",
+]
+
+[tool.uv.sources]
+picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main" }}
+picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "fix/logs" }}
+
+"""
+
 SIMPLE_PIPELINE_DOCKERFILE = """FROM picsellia/cuda:11.8.0-cudnn8-ubuntu20.04-python3.10
 
 RUN apt-get update && apt-get install -y \\
@@ -160,16 +182,14 @@ RUN apt-get update && apt-get install -y \\
     git \\
     && rm -rf /var/lib/apt/lists/*
 
-RUN uv pip install --python=$(which python3.10) git+https://github.com/picselliahq/picsellia-cv-engine.git@main
-
 WORKDIR /experiment
 
 ARG REBUILD_ALL
 COPY ./ ./{pipeline_dir}
 ARG REBUILD_PICSELLIA
 
-RUN uv pip install --python=$(which python3.10) --no-cache -r ./{pipeline_dir}/requirements.txt
-RUN uv pip install --python=$(which python3.10) --no-cache torch==2.2.1+cu118 torchaudio==2.2.1+cu118 torchvision==0.17.1+cu118 --find-links https://download.pytorch.org/whl/torch_stable.html
+# Sync from uv.lock (assumes uv lock has already been created)
+RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
 ENV PYTHONPATH=":/experiment"
 
@@ -188,29 +208,35 @@ tests/
 
 
 class SimpleTrainingTemplate(BaseTemplate):
-    def __init__(self, pipeline_name: str):
-        super().__init__(pipeline_name)
+    def __init__(self, pipeline_name: str, use_pyproject: bool = True):
+        super().__init__(pipeline_name=pipeline_name, use_pyproject=use_pyproject)
         self.pipeline_type = "TRAINING"
 
     def get_main_files(self) -> dict[str, str]:
-        return {
-            "training_pipeline.py": SIMPLE_PIPELINE_TRAINING.format(
+        files = {
+            "picsellia_pipeline.py": SIMPLE_PIPELINE_TRAINING.format(
                 pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
-            "local_training_pipeline.py": SIMPLE_PIPELINE_LOCAL.format(
+            "local_pipeline.py": SIMPLE_PIPELINE_LOCAL.format(
                 pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
             "steps.py": SIMPLE_STEPS.format(
                 pipeline_module=self.pipeline_module,
             ),
-            "requirements.txt": SIMPLE_PIPELINE_REQUIREMENTS,
-            "Dockerfile": SIMPLE_PIPELINE_DOCKERFILE.format(
-                pipeline_dir=self.pipeline_dir
-            ),
+            "Dockerfile": self._get_dockerfile(),
             ".dockerignore": SIMPLE_PIPELINE_DOCKERIGNORE,
         }
+
+        if self.use_pyproject:
+            files["pyproject.toml"] = SIMPLE_PIPELINE_PYPROJECT.format(
+                pipeline_name=self.pipeline_name
+            )
+        else:
+            files["requirements.txt"] = SIMPLE_PIPELINE_REQUIREMENTS
+
+        return files
 
     def get_utils_files(self) -> dict[str, str]:
         return {
@@ -227,9 +253,12 @@ class SimpleTrainingTemplate(BaseTemplate):
                 "type": self.pipeline_type,
             },
             "execution": {
-                "picsellia_pipeline_script": "training_pipeline.py",
-                "local_pipeline_script": "local_training_pipeline.py",
-                "requirements_file": "requirements.txt",
+                "picsellia_pipeline_script": "picsellia_pipeline.py",
+                "local_pipeline_script": "local_pipeline.py",
+                "requirements_file": "pyproject.toml"
+                if self.use_pyproject
+                else "requirements.txt",
+                "parameters_class": "utils/parameters.py:SimpleHyperParameters",
             },
             "docker": {
                 "image_name": "",
@@ -240,3 +269,12 @@ class SimpleTrainingTemplate(BaseTemplate):
                 "model_version_id": "",
             },
         }
+
+    def _get_dockerfile(self) -> str:
+        if self.use_pyproject:
+            return SIMPLE_PIPELINE_DOCKERFILE.format(pipeline_dir=self.pipeline_dir)
+        else:
+            return SIMPLE_PIPELINE_DOCKERFILE.replace(
+                "uv sync --python=$(which python3.10) --project {pipeline_dir}",
+                "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
+            ).format(pipeline_dir=self.pipeline_dir)
