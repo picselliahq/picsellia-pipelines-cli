@@ -179,7 +179,6 @@ SIMPLE_PIPELINE_DOCKERFILE = """FROM picsellia/cuda:11.8.0-cudnn8-ubuntu20.04-py
 
 RUN apt-get update && apt-get install -y \\
     libgl1-mesa-glx \\
-    git \\
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /experiment
