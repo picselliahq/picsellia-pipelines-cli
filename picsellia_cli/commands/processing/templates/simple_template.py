@@ -1,7 +1,4 @@
-import os
-
 from picsellia_cli.utils.base_template import BaseTemplate
-import subprocess
 
 
 PROCESSING_PIPELINE_PICSELLIA = """from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
@@ -280,7 +277,7 @@ COPY ./ ./{pipeline_dir}
 ARG REBUILD_PICSELLIA
 
 # Sync from uv.lock (assumes uv lock has already been created)
-RUN uv sync --python=$(which python3.10)
+RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
 ENV PYTHONPATH="/experiment"
 
@@ -352,6 +349,7 @@ class SimpleProcessingTemplate(BaseTemplate):
                 "requirements_file": "pyproject.toml"
                 if self.use_pyproject
                 else "requirements.txt",
+                "parameters_class": "utils/parameters.py:ProcessingParameters",
             },
             "docker": {"image_name": "", "image_tag": ""},
         }
@@ -361,37 +359,6 @@ class SimpleProcessingTemplate(BaseTemplate):
             return PROCESSING_PIPELINE_DOCKERFILE.format(pipeline_dir=self.pipeline_dir)
         else:
             return PROCESSING_PIPELINE_DOCKERFILE.replace(
-                "uv sync --python=$(which python3.10)",
+                "uv sync --python=$(which python3.10) --project {pipeline_dir}",
                 "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
             ).format(pipeline_dir=self.pipeline_dir)
-
-    def post_init_environment(self):
-        """Create a local .venv and install dependencies based on the selected format."""
-        pipeline_path = self.pipeline_dir
-        python_executable = (
-            os.path.join(pipeline_path, ".venv", "bin", "python3")
-            if os.name != "nt"
-            else os.path.join(pipeline_path, ".venv", "Scripts", "python.exe")
-        )
-
-        print(f"⚙️ Creating virtual environment in {pipeline_path}/.venv ...")
-        subprocess.run(["uv", "venv"], cwd=pipeline_path, check=True)
-
-        if self.use_pyproject:
-            print("🔒 Locking and syncing dependencies from pyproject.toml ...")
-            subprocess.run(["uv", "lock", "--project", pipeline_path], check=True)
-            subprocess.run(["uv", "sync", "--project", pipeline_path], check=True)
-        else:
-            req_path = os.path.join(pipeline_path, "requirements.txt")
-            print("📦 Installing from requirements.txt ...")
-            subprocess.run(
-                ["uv", "pip", "install", "--python", python_executable, "-r", req_path],
-                check=True,
-            )
-
-        print("\n✅ Virtual environment ready. Activate it with:\n")
-        print(
-            f"   source {pipeline_path}/.venv/bin/activate"
-            if os.name != "nt"
-            else f"   {pipeline_path}\\.venv\\Scripts\\activate.bat"
-        )
