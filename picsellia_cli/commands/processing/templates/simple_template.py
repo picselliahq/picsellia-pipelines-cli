@@ -10,14 +10,14 @@ from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
 from {pipeline_module}.steps import process
-from {pipeline_module}.utils.config import load_processing_parameters
+from {pipeline_module}.utils.parameters import ProcessingParameters
 
-processing_context = create_picsellia_processing_context(
-    processing_parameters=load_processing_parameters()
+context = create_picsellia_processing_context(
+    processing_parameters=ProcessingParameters
 )
 
 @pipeline(
-    context=processing_context,
+    context=context,
     log_folder_path="logs/",
     remove_logs_on_completion=False,
 )
@@ -40,7 +40,7 @@ from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
 from {pipeline_module}.steps import process
-from {pipeline_module}.utils.config import load_processing_parameters
+from {pipeline_module}.utils.parameters import ProcessingParameters
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
@@ -53,18 +53,18 @@ parser.add_argument("--working_dir", required=False, type=str, help="Working dir
 args = parser.parse_args()
 
 # Create local processing context
-processing_context = create_local_processing_context(
+context = create_local_processing_context(
+    processing_parameters_cls=ProcessingParameters,
     api_token=args.api_token,
     organization_name=args.organization_name,
     job_type=args.job_type,
     input_dataset_version_id=args.input_dataset_version_id,
     output_dataset_version_name=args.output_dataset_version_name,
-    processing_parameters=load_processing_parameters(),
     working_dir=args.working_dir,
 )
 
 @pipeline(
-    context=processing_context,
+    context=context,
     log_folder_path="logs/",
     remove_logs_on_completion=False,
 )
@@ -231,6 +231,17 @@ def get_image_id_by_filename(coco_data: Dict[str, Any], filename: str) -> int:
 
 """
 
+PROCESSING_PIPELINE_PARAMETERS = """from picsellia.types.schemas import LogDataType
+from picsellia_cv_engine.core.parameters import Parameters
+
+
+class ProcessingParameters(Parameters):
+    def __init__(self, log_data: LogDataType):
+        super().__init__(log_data=log_data)
+        self.datalake = self.extract_parameter(["datalake"], expected_type=str, default="default")
+        self.data_tag = self.extract_parameter(["data_tag"], expected_type=str, default="processed")
+"""
+
 PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 """
 
@@ -293,10 +304,6 @@ class SimpleProcessingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, use_pyproject: bool = True):
         super().__init__(pipeline_name=pipeline_name)
         self.pipeline_type = "DATASET_VERSION_CREATION"
-        self.default_parameters = {
-            "datalake": "default",
-            "data_tag": "processed",
-        }
         self.use_pyproject = use_pyproject
 
     def get_main_files(self) -> dict[str, str]:
@@ -328,6 +335,7 @@ class SimpleProcessingTemplate(BaseTemplate):
     def get_utils_files(self) -> dict[str, str]:
         return {
             "processing.py": PROCESSING_PIPELINE_PROCESSING,
+            "parameters.py": PROCESSING_PIPELINE_PARAMETERS,
         }
 
     def get_config_toml(self) -> dict:
@@ -346,7 +354,6 @@ class SimpleProcessingTemplate(BaseTemplate):
                 else "requirements.txt",
             },
             "docker": {"image_name": "", "image_tag": ""},
-            "default_parameters": self.default_parameters,
         }
 
     def _get_dockerfile(self) -> str:
