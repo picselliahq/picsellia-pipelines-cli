@@ -12,20 +12,8 @@ def create_virtual_env(requirements_path: str) -> str:
         typer.echo("📦 Detected pyproject.toml — using uv sync...")
 
         try:
-            subprocess.run(["uv", "sync"], cwd=pipeline_dir, check=True, text=True)
-
-            typer.echo("➕ Ensuring picsellia-cv-engine is added...")
-            subprocess.run(
-                [
-                    "uv",
-                    "add",
-                    "git+https://github.com/picselliahq/picsellia-cv-engine.git@main",
-                ],
-                cwd=pipeline_dir,
-                check=True,
-                text=True,
-            )
-
+            subprocess.run(["uv", "lock", "--project", pipeline_dir], check=True)
+            subprocess.run(["uv", "sync", "--project", pipeline_dir], check=True)
         except subprocess.CalledProcessError as e:
             typer.secho(
                 f"❌ uv operation failed (code {e.returncode})", fg=typer.colors.RED
@@ -40,20 +28,6 @@ def create_virtual_env(requirements_path: str) -> str:
         typer.echo(f"📦 Installing dependencies from {requirements_path}...")
         subprocess.run(
             ["uv", "pip", "install", "--python", python_path, "-r", requirements_path],
-            check=True,
-            text=True,
-        )
-
-        typer.echo("➕ Installing picsellia-cv-engine from GitHub...")
-        subprocess.run(
-            [
-                "uv",
-                "pip",
-                "install",
-                "--python",
-                python_path,
-                "git+https://github.com/picselliahq/picsellia-cv-engine.git@main",
-            ],
             check=True,
             text=True,
         )
