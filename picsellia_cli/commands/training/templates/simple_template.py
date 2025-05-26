@@ -191,11 +191,6 @@ class SimpleTrainingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str):
         super().__init__(pipeline_name)
         self.pipeline_type = "TRAINING"
-        self.default_parameters = {
-            "epochs": 3,
-            "batch_size": 8,
-            "image_size": 640,
-        }
 
     def get_main_files(self) -> dict[str, str]:
         return {
@@ -240,7 +235,6 @@ class SimpleTrainingTemplate(BaseTemplate):
                 "image_name": "",
                 "image_tag": "",
             },
-            "parameters": self.default_parameters,
             "model": {
                 "model_name": "",
                 "model_version_id": "",
