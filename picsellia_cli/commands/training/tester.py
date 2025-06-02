@@ -3,7 +3,7 @@ from typing import Dict
 
 import typer
 
-from picsellia_cli.utils.pipeline_config import PipelineConfig, EnvConfig
+from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.runner import (
     create_virtual_env,
     run_pipeline_command,
@@ -38,12 +38,11 @@ def test_training(
     ),
 ):
     config = PipelineConfig(pipeline_name)
-    env = EnvConfig()
 
     stored_params: dict = {}
     params = prompt_training_params(stored_params)
 
-    working_dir = config.pipeline_dir / "tests" / params["experiment_id"]
+    working_dir = config.pipeline_dir / "runs" / params["experiment_id"]
     os.makedirs(working_dir, exist_ok=True)
 
     env_path = create_virtual_env(str(config.get_requirements_path()))
@@ -59,9 +58,9 @@ def test_training(
         python_executable,
         pipeline_script,
         "--api_token",
-        env.get_api_token(),
+        config.env.get_api_token(),
         "--organization_name",
-        env.get_organization_name(),
+        config.env.get_organization_name(),
         "--experiment_id",
         params["experiment_id"],
         "--working_dir",
