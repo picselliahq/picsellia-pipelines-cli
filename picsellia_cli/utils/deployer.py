@@ -109,3 +109,4 @@ def prompt_docker_image_if_missing(pipeline_config: PipelineConfig) -> None:
         "image_name": image_name,
         "image_tag": image_tag,
     }
+    pipeline_config.save()

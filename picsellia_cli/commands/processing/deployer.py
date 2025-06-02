@@ -71,7 +71,6 @@ def deploy_processing(
     prompt_docker_image_if_missing(
         pipeline_config=config,
     )
-    config.save()
 
     cpu = int(typer.prompt("Enter CPU allocation", default=4))
     gpu = int(typer.prompt("Enter GPU allocation", default=0))
