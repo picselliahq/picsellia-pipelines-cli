@@ -1,53 +1,8 @@
-import os
 import subprocess
 
 import typer
 
-from picsellia_cli.commands.training.tester import prompt_training_params
-from picsellia_cli.utils.deployer import (
-    build_docker_image_only,
-    prompt_docker_image_if_missing,
-)
-from picsellia_cli.utils.pipeline_config import PipelineConfig
-
-app = typer.Typer(help="Run a smoke test for a training pipeline using Docker.")
-
-
-@app.command()
-def smoke_test_training(
-    pipeline_name: str = typer.Argument(...),
-):
-    config = PipelineConfig(pipeline_name)
-    prompt_docker_image_if_missing(pipeline_config=config)
-
-    stored_params: dict = {}
-    params = prompt_training_params(stored_params)
-
-    experiment_id = params["experiment_id"]
-
-    image_name = config.get("docker", "image_name")
-    image_tag = config.get("docker", "image_tag")
-
-    full_image_name = f"{image_name}:{image_tag}"
-
-    build_docker_image_only(
-        pipeline_dir=str(config.pipeline_dir),
-        image_name=image_name,
-        image_tag=image_tag,
-    )
-
-    env_vars = {
-        "api_token": config.env.get_api_token(),
-        "organization_name": config.env.get_organization_name(),
-        "experiment_id": experiment_id,
-        "DEBUG": "True",
-    }
-
-    pipeline_script = str(config.get_script_path("picsellia_pipeline_script"))
-
-    run_smoke_test_container(
-        image=full_image_name, script=pipeline_script, env_vars=env_vars
-    )
+import os
 
 
 def run_smoke_test_container(image: str, script: str, env_vars: dict):
@@ -77,7 +32,7 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
 
     docker_command += [image, "-c", log_cmd]
 
-    typer.echo("🚀 Launching Docker training container...\n")
+    typer.echo("🚀 Launching Docker container...\n")
 
     proc = subprocess.Popen(
         docker_command,
@@ -98,9 +53,7 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
                 typer.echo(
                     "\n❌ '--ec-- 1' detected! Something went wrong during training."
                 )
-                typer.echo(
-                    "📥 Copying training logs before stopping the container...\n"
-                )
+                typer.echo("📥 Copying logs before stopping the container...\n")
                 triggered = True
 
                 # Copy from /experiment instead of /workspace

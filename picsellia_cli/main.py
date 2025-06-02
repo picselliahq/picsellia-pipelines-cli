@@ -2,10 +2,12 @@ import typer
 
 from picsellia_cli.commands.processing.deployer import deploy_processing
 from picsellia_cli.commands.processing.initializer import init_processing
+from picsellia_cli.commands.processing.smoke_tester import smoke_test_processing
 from picsellia_cli.commands.processing.syncer import sync_processing_params
 from picsellia_cli.commands.processing.tester import test_processing
 from picsellia_cli.commands.training.deployer import deploy_training
 from picsellia_cli.commands.training.initializer import init_training
+from picsellia_cli.commands.training.smoke_tester import smoke_test_training
 from picsellia_cli.commands.training.tester import test_training
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
@@ -48,6 +50,18 @@ def test(pipeline_name: str):
         test_training(pipeline_name=pipeline_name)
     elif pipeline_type == "DATASET_VERSION_CREATION":
         test_processing(pipeline_name=pipeline_name)
+    else:
+        typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
+        raise typer.Exit()
+
+
+@app.command(name="smoke-test")
+def smoke_test(pipeline_name: str):
+    pipeline_type = get_pipeline_type(pipeline_name)
+    if pipeline_type == "TRAINING":
+        smoke_test_training(pipeline_name=pipeline_name)
+    elif pipeline_type == "DATASET_VERSION_CREATION":
+        smoke_test_processing(pipeline_name=pipeline_name)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
         raise typer.Exit()
