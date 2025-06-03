@@ -43,11 +43,7 @@ def smoke_test_training(
         "DEBUG": "True",
     }
 
-    pipeline_script = os.path.join(
-        os.path.dirname(config.pipeline_dir),
-        os.path.basename(config.pipeline_dir),
-        str(config.get("execution", "picsellia_pipeline_script")),
-    )
+    pipeline_script = f"pipelines/{pipeline_name}/{config.get('execution', 'picsellia_pipeline_script')}"
 
     run_smoke_test_container(
         image=full_image_name, script=pipeline_script, env_vars=env_vars
