@@ -51,7 +51,7 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
             print(line, end="")
             if "--ec-- 1" in line:
                 typer.echo(
-                    "\n❌ '--ec-- 1' detected! Something went wrong during training."
+                    "\n❌ '--ec-- 1' detected! Something went wrong during execution."
                 )
                 typer.echo("📥 Copying logs before stopping the container...\n")
                 triggered = True
