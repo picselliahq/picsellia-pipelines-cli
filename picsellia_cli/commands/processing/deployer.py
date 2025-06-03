@@ -38,8 +38,8 @@ def register_processing_pipeline_on_picsellia(
         client.create_processing(
             name=pipeline_config.pipeline_name,
             type=ProcessingType(pipeline_config.get("metadata", "type")),
-            default_cpu=pipeline_config.get("docker", "cpu"),
-            default_gpu=pipeline_config.get("docker", "gpu"),
+            default_cpu=int(pipeline_config.get("docker", "cpu")),
+            default_gpu=int(pipeline_config.get("docker", "gpu")),
             default_parameters=pipeline_config.extract_default_parameters(),
             docker_image=pipeline_config.get("docker", "image_name"),
             docker_tag=pipeline_config.get("docker", "image_tag"),
