@@ -87,9 +87,8 @@ def prompt_docker_image_if_missing(pipeline_config: PipelineConfig) -> None:
     Interactively prompt user to fill or modify the Docker image section in config.
     Modifies pipeline_config.config['image'] directly.
     """
-    docker_section = pipeline_config.config.get("docker", {})
-    image_name = docker_section.get("image_name", "")
-    image_tag = docker_section.get("image_tag", "latest")
+    image_name = pipeline_config.get("docker", "image_name")
+    image_tag = pipeline_config.get("docker", "image_tag")
 
     if image_name and image_tag:
         typer.echo(f"🔧 Current Docker image: {image_name}:{image_tag}")
