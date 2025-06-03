@@ -44,6 +44,7 @@ def smoke_test_training(
     }
 
     pipeline_script = os.path.join(
+        os.path.dirname(config.pipeline_dir),
         os.path.basename(config.pipeline_dir),
         str(config.get("execution", "picsellia_pipeline_script")),
     )
