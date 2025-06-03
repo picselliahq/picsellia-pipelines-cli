@@ -105,8 +105,6 @@ def prompt_docker_image_if_missing(pipeline_config: PipelineConfig) -> None:
             image_tag = typer.prompt("🏷️ Enter Docker image tag", default="latest")
 
     typer.echo(f"🔧 Docker image will be built with: {image_name}:{image_tag}")
-    pipeline_config.config["docker"] = {
-        "image_name": image_name,
-        "image_tag": image_tag,
-    }
+    pipeline_config.config["docker"]["image_name"] = image_name
+    pipeline_config.config["docker"]["image_tag"] = image_tag
     pipeline_config.save()
