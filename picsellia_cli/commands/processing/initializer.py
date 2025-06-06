@@ -1,3 +1,5 @@
+from typing import Optional
+
 import typer
 
 from picsellia_cli.commands.processing.templates.simple_template import (
@@ -33,16 +35,19 @@ def get_template_instance(
 def init_processing(
     pipeline_name: str,
     template: str = typer.Option("simple", help="Template to use: 'simple'"),
-    output_dir: str = typer.Option(
-        ".", help="Directory where the pipeline will be created"
+    output_dir: Optional[str] = typer.Option(
+        None, help="Where to create the pipeline folder"
     ),
-    use_pyproject: bool = typer.Option(
-        True, help="Use pyproject.toml (with uv) instead of requirements.txt"
+    use_pyproject: Optional[bool] = typer.Option(
+        True, help="Use pyproject.toml instead of requirements.txt"
     ),
 ):
     """
     Initialize a new dataset processing pipeline.
     """
+    output_dir = output_dir or "."
+    use_pyproject = use_pyproject if use_pyproject is not None else True
+
     pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
 
     template_instance = get_template_instance(
