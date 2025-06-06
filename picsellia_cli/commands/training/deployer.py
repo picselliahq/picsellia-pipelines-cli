@@ -1,3 +1,5 @@
+import os
+
 import typer
 from picsellia import Client
 
@@ -5,6 +7,7 @@ from picsellia_cli.utils.deployer import (
     prompt_docker_image_if_missing,
     build_and_push_docker_image,
 )
+from picsellia_cli.utils.env_utils import require_env_var
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer(
@@ -68,9 +71,9 @@ def deploy_training(
 
     # Update model version
     client = Client(
-        api_token=config.env.get_api_token(),
-        organization_name=config.env.get_organization_name(),
-        host=config.env.get_host(),
+        api_token=require_env_var("API_TOKEN"),
+        organization_name=require_env_var("ORGANIZATION_NAME"),
+        host=os.getenv("HOST", "https://app.picsellia.com"),
     )
 
     update_model_version_on_picsellia(client, model_version_id, image_name, image_tag)

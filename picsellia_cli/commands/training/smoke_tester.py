@@ -8,6 +8,7 @@ from picsellia_cli.utils.deployer import (
     build_docker_image_only,
     prompt_docker_image_if_missing,
 )
+from picsellia_cli.utils.env_utils import require_env_var
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer(help="Run a smoke test for a training pipeline using Docker.")
@@ -37,8 +38,8 @@ def smoke_test_training(
     )
 
     env_vars = {
-        "api_token": config.env.get_api_token(),
-        "organization_name": config.env.get_organization_name(),
+        "api_token": require_env_var("API_TOKEN"),
+        "organization_name": require_env_var("ORGANIZATION_NAME"),
         "experiment_id": experiment_id,
         "DEBUG": "True",
     }

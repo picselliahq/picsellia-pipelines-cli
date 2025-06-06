@@ -1,46 +1,24 @@
 import importlib.util
 import os
 from pathlib import Path
-from typing import TypeVar, Any
+from typing import TypeVar, Any, Optional
 
 import toml
-from dotenv import load_dotenv
 from picsellia_cv_engine.core.parameters import Parameters
 
 TParameters = TypeVar("TParameters", bound=Parameters)
 
 
-class EnvConfig:
-    def __init__(self, env_path=os.path.join(os.getcwd(), ".env")):
-        load_dotenv(env_path)
-
-    def get(self, key: str, default=None):
-        return os.getenv(key, default)
-
-    def require(self, key: str) -> str:
-        value = os.getenv(key)
-        if not value:
-            raise ValueError(f"Missing required env var: {key}")
-        return value
-
-    def get_api_token(self):
-        return self.require("API_TOKEN")
-
-    def get_organization_name(self):
-        return self.require("ORGANIZATION_NAME")
-
-    def get_host(self):
-        return self.require("HOST")
-
-
 class PipelineConfig:
-    def __init__(self, pipeline_name: str, search_path: str = os.getcwd()):
+    def __init__(self, pipeline_name: str, search_path: Optional[Path] = None):
         """Initialize the pipeline configuration by locating the directory and loading config/env."""
+        search_path = search_path or Path(__file__).parent
         self.pipeline_name = pipeline_name
-        self.pipeline_dir = self.find_pipeline_dir(pipeline_name, search_path)
+        self.pipeline_dir = self.find_pipeline_dir(
+            pipeline_name=pipeline_name, search_path=search_path
+        )
         self.config_path = self.pipeline_dir / "config.toml"
         self.config = self.load_config()
-        self.env = EnvConfig()
 
     def load_config(self):
         if not self.config_path.exists():
@@ -64,7 +42,7 @@ class PipelineConfig:
         return self.pipeline_dir / self.get("execution", "requirements_file")
 
     @staticmethod
-    def find_pipeline_dir(pipeline_name: str, search_path: str) -> Path:
+    def find_pipeline_dir(pipeline_name: str, search_path: Path) -> Path:
         for root, dirs, files in os.walk(search_path):
             if Path(root).name == pipeline_name and "config.toml" in files:
                 return Path(root)

@@ -1,3 +1,5 @@
+import os
+
 import typer
 
 from picsellia import Client
@@ -7,6 +9,7 @@ from picsellia_cli.utils.deployer import (
     prompt_docker_image_if_missing,
     build_and_push_docker_image,
 )
+from picsellia_cli.utils.env_utils import require_env_var
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer(help="Deploy a processing pipeline to Picsellia.")
@@ -18,9 +21,9 @@ def register_processing_pipeline_on_picsellia(
     """
     Register a processing pipeline in Picsellia.
     """
-    api_token = pipeline_config.env.get_api_token()
-    organization_name = pipeline_config.env.get_organization_name()
-    host = pipeline_config.env.get_host()
+    api_token = require_env_var("API_TOKEN")
+    organization_name = require_env_var("ORGANIZATION_NAME")
+    host = os.getenv("HOST", "https://app.picsellia.com")
 
     if not (api_token and organization_name and host):
         typer.echo(

@@ -1,10 +1,12 @@
 import json
+import os
 import re
 import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 
-from picsellia_cli.utils.pipeline_config import PipelineConfig, EnvConfig
+from picsellia_cli.utils.env_utils import require_env_var
+from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer(help="Sync processing parameters across code and remote.")
 
@@ -30,9 +32,8 @@ def sync_processing_params(
     ),
 ):
     config = PipelineConfig(pipeline_name)
-    env = EnvConfig()
 
-    params = config.get_parameters()
+    params = config.extract_default_parameters()
     if not params:
         typer.echo("❌ No 'default_parameters' section found in config.toml.")
         raise typer.Exit()
@@ -45,9 +46,9 @@ def sync_processing_params(
 
     # Step 2: Try syncing to Picsellia if processing exists
     client = Client(
-        api_token=env.get_api_token(),
-        organization_name=env.get_organization_name(),
-        host=env.get_host(),
+        api_token=require_env_var("API_TOKEN"),
+        organization_name=require_env_var("ORGANIZATION_NAME"),
+        host=os.getenv("HOST", "https://app.picsellia.com"),
     )
 
     try:

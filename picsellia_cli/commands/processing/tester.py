@@ -5,6 +5,7 @@ import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 
+from picsellia_cli.utils.env_utils import require_env_var
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.run_manager import RunManager
 from picsellia_cli.utils.runner import (
@@ -87,9 +88,9 @@ def test_processing(
         params = prompt_processing_params(pipeline_name, {})
 
     client = Client(
-        api_token=config.env.get_api_token(),
-        organization_name=config.env.get_organization_name(),
-        host=config.env.get_host(),
+        api_token=require_env_var("API_TOKEN"),
+        organization_name=require_env_var("ORGANIZATION_NAME"),
+        host=os.getenv("HOST", "https://app.picsellia.com"),
     )
 
     params["output_dataset_version_name"] = check_output_dataset_version(
@@ -112,9 +113,9 @@ def test_processing(
         python_executable,
         str(config.get_script_path("local_pipeline_script")),
         "--api_token",
-        config.env.get_api_token(),
+        require_env_var("API_TOKEN"),
         "--organization_name",
-        config.env.get_organization_name(),
+        require_env_var("ORGANIZATION_NAME"),
         "--working_dir",
         str(run_dir),
         "--job_type",
