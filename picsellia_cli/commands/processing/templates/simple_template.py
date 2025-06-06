@@ -298,10 +298,13 @@ tests/
 
 
 class SimpleProcessingTemplate(BaseTemplate):
-    def __init__(self, pipeline_name: str, use_pyproject: bool = True):
-        super().__init__(pipeline_name=pipeline_name)
+    def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
+        super().__init__(
+            pipeline_name=pipeline_name,
+            output_dir=output_dir,
+            use_pyproject=use_pyproject,
+        )
         self.pipeline_type = "DATASET_VERSION_CREATION"
-        self.use_pyproject = use_pyproject
 
     def get_main_files(self) -> dict[str, str]:
         files = {
