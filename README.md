@@ -8,92 +8,145 @@ Built with [Typer](https://typer.tiangolo.com/) for intuitive CLI usage.
 
 ## Installation
 
-Clone the repository and install dependencies with Poetry:
+Install the CLI directly from GitHub (no need to clone the repo):
+
+#### Using Poetry:
 
 ```bash
-poetry install
+poetry add git+https://github.com/picselliahq/picsellia-pipelines-cli.git
 ```
-This will automatically install the CLI and register the pipeline-cli command.
 
-If you're using `poetry shell`, you can now run:
+#### Using uv (faster, works with requirements.txt or pyproject.toml):
+
+```bash
+uv pip install git+https://github.com/picselliahq/picsellia-pipelines-cli.git
+```
+
+You can now use:
+
 ```bash
 pipeline-cli --help
 ```
 
-Or from outside the shell:
-```bash
-poetry run pipeline-cli --help
-```
-
 ## Available Commands
-🔹 CLI structure
+🔹 All CLI commands are structured like this:
 
 ```bash
-pipeline-cli [training|processing] [init|test|deploy|remove|list|smoke-test]
+pipeline-cli [init|test|deploy|smoke-test|sync] <pipeline_name>
 ```
+The pipeline type is resolved automatically from its config file (config.toml), except during init.
 
-Each subcommand is documented below.
 
-
-## Processing Pipelines
-Commands for managing dataset processing pipelines.
-
-🔹 Initialize a processing pipeline
+## 🔧 Initialize a Pipeline
 
 ```bash
-pipeline-cli processing init <pipeline_name> --template simple
+pipeline-cli init <pipeline_name> --type [training|processing] --template <template>
 ```
 
-Scaffolds a pipeline with a processing script and template configuration.
+Examples:
+```bash
+pipeline-cli init yolov8 --type training --template ultralytics
+pipeline-cli init resize-images --type processing --template simple
+```
 
-🔹 Run local test
+This generates:
+
+- a `config.toml` with pipeline metadata
+
+- a `Dockerfile`, `.dockerignore`, and dependency file (`pyproject.toml` or `requirements.txt`)
+
+- scripts for both `picsellia_pipeline.py` and `local_pipeline.py`
+
+- pre-filled `steps.py` and utility files
+
+You can customize templates in your own extensions later.
+
+### After Initialization
+
+Once the pipeline is initialized:
+
+- A local virtual environment is automatically created inside the pipeline directory (`<pipeline_name>/.venv`)
+- You can directly activate it and run any pipeline-related commands:
 
 ```bash
-pipeline-cli processing test <pipeline_name>
+cd <pipeline_name>
+source .venv/bin/activate  # or .venv\Scripts\activate.bat on Windows
 ```
 
-Runs the pipeline locally with input and output dataset version IDs.
+You can still use the CLI from inside the venv:
+```bash
+pipeline-cli test <pipeline_name>
+```
 
-🔹 Deploy to Picsellia
+## 🧪 Test Locally
 
 ```bash
-pipeline-cli processing deploy <pipeline_name> --cpu 4 --gpu 0
+pipeline-cli test <pipeline_name>
 ```
 
-Builds and pushes the Docker image, then registers the processing job in Picsellia.
+Runs the pipeline in a local virtualenv (.venv/) and prompts for required parameters (e.g., dataset version ID, experiment ID, etc.).
 
-## Training Pipelines
-
-Commands for managing model training pipelines.
-
-🔹 Initialize a training pipeline
+You’ll need to export the following environment variables before running:
 
 ```bash
-pipeline-cli training init <pipeline_name> --template [simple|ultralytics]
+export API_TOKEN="your-picsellia-token"
+export ORGANIZATION_NAME="your-org-name"
 ```
-
-Creates the directory structure and registers a model version in Picsellia.
-
-🔹 Run local test
 
 ```bash
-pipeline-cli training test <pipeline_name>
+export HOST="https://app.picsellia.com"
 ```
 
-Runs the pipeline locally using a virtual environment and an experiment ID.
-
-🔹 Run Docker smoke test
+## 🔥 Smoke Test in Docker
 
 ```bash
-pipeline-cli training smoke-test <pipeline_name> --experiment-id <id>
+pipeline-cli smoke-test <pipeline_name>
 ```
 
-Builds and runs the training pipeline inside a Docker container to ensure it works.
+Builds the Docker image for the pipeline and runs it locally to validate that everything (code + dependencies + env) works inside the container.
 
-🔹 Deploy a training pipeline
+
+## 🚀 Deploy to Picsellia
 
 ```bash
-pipeline-cli training deploy <pipeline_name>
+pipeline-cli deploy <pipeline_name>
 ```
 
-Builds and pushes the Docker image, then updates the model version in Picsellia with Docker config.
+Builds and pushes the Docker image to your configured registry and registers the pipeline in Picsellia (either as a training pipeline or a dataset processing job).
+
+## 🔁 Sync Parameters (Processing Only)
+
+```bash
+pipeline-cli sync <pipeline_name>
+
+```
+
+For processing pipelines, this updates the default parameters stored in Picsellia based on your Parameters class and config.toml.
+
+Training sync is not yet implemented.
+
+## 📁 Project Structure Example
+
+```bash
+resize-images/
+├── config.toml
+├── Dockerfile
+├── picsellia_pipeline.py
+├── local_pipeline.py
+├── steps.py
+├── utils/
+│   ├── parameters.py
+│   └── processing.py
+└── pyproject.toml
+```
+
+## 💡 Tips
+
+- You can override the output directory on init with --output-dir
+- Virtual environments are created in `<pipeline_name>/.venv` by default
+- It's recommended to `cd <pipeline_name>` after init to work from inside the folder
+- You can always edit config.toml to change pipeline metadata or execution scripts
+
+--------------------------------
+
+Made with ❤️ by the Picsellia team.
