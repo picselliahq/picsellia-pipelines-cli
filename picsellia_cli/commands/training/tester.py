@@ -3,13 +3,12 @@ from typing import Dict
 
 import typer
 
+from picsellia_cli.utils.env_utils import require_env_var
+from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.runner import (
-    get_pipeline_data,
-    get_global_session,
     create_virtual_env,
     run_pipeline_command,
 )
-from picsellia_cli.utils.session_manager import session_manager
 
 app = typer.Typer(help="Test registered training pipelines locally.")
 
@@ -39,25 +38,17 @@ def test_training(
         ..., help="Name of the training pipeline to test"
     ),
 ):
-    pipeline = get_pipeline_data(pipeline_name)
-    global_data = get_global_session()
-    stored_params = pipeline.get("last_test_params", {})
+    config = PipelineConfig(pipeline_name)
 
-    pipeline["last_test_params"] = prompt_training_params(stored_params)
-    session_manager.update_pipeline(name=pipeline_name, data=pipeline)
-    env_path = create_virtual_env(pipeline["requirements_path"])
+    stored_params: dict = {}
+    params = prompt_training_params(stored_params)
 
-    repo_root = os.getcwd()
-    working_dir = os.path.join(
-        repo_root,
-        "pipelines",
-        pipeline_name,
-        "tests",
-        pipeline["last_test_params"]["experiment_id"],
-    )
+    working_dir = config.pipeline_dir / "runs" / params["experiment_id"]
     os.makedirs(working_dir, exist_ok=True)
 
-    pipeline_script = os.path.join(repo_root, pipeline["local_pipeline_script_path"])
+    env_path = create_virtual_env(str(config.get_requirements_path()))
+    pipeline_script = str(config.get_script_path("local_pipeline_script"))
+
     python_executable = (
         os.path.join(env_path, "bin", "python")
         if os.name != "nt"
@@ -68,13 +59,13 @@ def test_training(
         python_executable,
         pipeline_script,
         "--api_token",
-        global_data["api_token"],
+        require_env_var("API_TOKEN"),
         "--organization_name",
-        global_data["organization_name"],
+        require_env_var("ORGANIZATION_NAME"),
         "--experiment_id",
-        pipeline["last_test_params"]["experiment_id"],
+        params["experiment_id"],
         "--working_dir",
-        working_dir,
+        str(working_dir),
     ]
 
     run_pipeline_command(command, working_dir)

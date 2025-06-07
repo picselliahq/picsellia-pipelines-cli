@@ -1,45 +1,31 @@
 import os
-import typer
-from typing import Optional
 
+import typer
 from picsellia import Client
 
 from picsellia_cli.utils.deployer import (
-    get_pipeline_data,
     prompt_docker_image_if_missing,
     build_and_push_docker_image,
 )
-from picsellia_cli.utils.session_manager import session_manager
+from picsellia_cli.utils.env_utils import require_env_var
+from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer(
     help="Deploy training pipeline: build, push Docker image, and update model version on Picsellia."
 )
 
 
-def update_model_version_on_picsellia(model_version_id: str, pipeline_data: dict):
+def update_model_version_on_picsellia(
+    client: Client, model_version_id: str, image_name: str, image_tag: str
+):
     """
     Update the existing model version in Picsellia to attach the Docker image.
     """
-    global_data: Optional[dict] = session_manager.get_global_session()
-    if not global_data:
-        typer.echo(
-            typer.style(
-                "❌ Global session not initialized. Run `pipeline-cli init` first.",
-                fg=typer.colors.RED,
-            )
-        )
-        raise typer.Exit()
-
-    client = Client(
-        api_token=global_data["api_token"],
-        organization_name=global_data["organization_name"],
-    )
-
     model_version = client.get_model_version_by_id(model_version_id)
 
     model_version.update(
-        docker_image_name=pipeline_data["image_name"],
-        docker_tag=pipeline_data["image_tag"],
+        docker_image_name=image_name,
+        docker_tag=image_tag,
         docker_flags=["--gpus all", "--name training", "--ipc host"],
     )
 
@@ -57,31 +43,40 @@ def deploy_training(
     """
     🚀 Deploy a training pipeline: build & push its Docker image, then update the model version in Picsellia.
     """
-    pipeline_data = get_pipeline_data(pipeline_name)
-    pipeline_data = prompt_docker_image_if_missing(pipeline_name, pipeline_data)
+    config = PipelineConfig(pipeline_name)
 
-    repo_root = os.getcwd()
-    pipeline_dir = os.path.join(repo_root, "pipelines", pipeline_name)
+    prompt_docker_image_if_missing(pipeline_config=config)
+    config.save()
 
-    # Build & Push
-    build_and_push_docker_image(
-        pipeline_dir,
-        pipeline_data["image_name"],
-        pipeline_data["image_tag"],
-        force_login=True,
-    )
+    image_name = config.get("docker", "image_name")
+    image_tag = config.get("docker", "image_tag")
+    model_version_id = config.get("model", "model_version_id")
 
-    # Update model version
-    if "model_version_id" not in pipeline_data:
+    if not model_version_id:
         typer.echo(
             typer.style(
-                "❌ No model_version_id associated with this pipeline. Did you properly initialize it?",
+                "❌ No model_version_id found in config.toml. Did you initialize the pipeline properly?",
                 fg=typer.colors.RED,
             )
         )
         raise typer.Exit()
 
-    update_model_version_on_picsellia(pipeline_data["model_version_id"], pipeline_data)
+    # Build & Push Docker image
+    build_and_push_docker_image(
+        pipeline_dir=str(config.pipeline_dir),
+        image_name=image_name,
+        image_tag=image_tag,
+        force_login=True,
+    )
+
+    # Update model version
+    client = Client(
+        api_token=require_env_var("API_TOKEN"),
+        organization_name=require_env_var("ORGANIZATION_NAME"),
+        host=os.getenv("HOST", "https://app.picsellia.com"),
+    )
+
+    update_model_version_on_picsellia(client, model_version_id, image_name, image_tag)
 
 
 if __name__ == "__main__":

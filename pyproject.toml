@@ -17,12 +17,13 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10,<3.13"
 picsellia = ">=6.20.0,<7.0.0"
 typer = ">=0.15.2,<0.16.0"
 tinydb = "^4.8.2"
-docker = "^7.1.0"
 pre-commit = "^4.2.0"
+toml = "^0.10.2"
+dotenv = "^0.9.9"
 
 [tool.poetry.scripts]
 pipeline-cli = "picsellia_cli.main:app"
