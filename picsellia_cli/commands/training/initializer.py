@@ -1,3 +1,5 @@
+from typing import Optional
+
 import typer
 
 from picsellia_cli.commands.training.templates.simple_template import (
@@ -13,10 +15,16 @@ from picsellia_cli.utils.pipeline_config import PipelineConfig
 app = typer.Typer(help="Initialize and register a new training pipeline.")
 
 
-def get_template_instance(template_name: str, pipeline_name: str):
+def get_template_instance(
+    template_name: str, pipeline_name: str, output_dir: str, use_pyproject: bool = True
+):
     match template_name:
         case "simple":
-            return SimpleTrainingTemplate(pipeline_name)
+            return SimpleTrainingTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
         case _:
             typer.echo(
                 typer.style(
@@ -140,12 +148,24 @@ def init_training(
     template: str = typer.Option(
         "simple", help="Template to use: 'simple' or 'ultralytics'"
     ),
+    output_dir: Optional[str] = typer.Option(
+        None, help="Where to create the pipeline folder"
+    ),
+    use_pyproject: Optional[bool] = typer.Option(
+        True, help="Use pyproject.toml instead of requirements.txt"
+    ),
 ):
+    output_dir = output_dir or "."
+    use_pyproject = use_pyproject if use_pyproject is not None else True
+
     pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
 
     client = init_client()
     template_instance = get_template_instance(
-        template_name=template, pipeline_name=pipeline_name
+        template_name=template,
+        pipeline_name=pipeline_name,
+        output_dir=output_dir,
+        use_pyproject=use_pyproject,
     )
 
     model_name, model_version_id = choose_model_version(client=client)

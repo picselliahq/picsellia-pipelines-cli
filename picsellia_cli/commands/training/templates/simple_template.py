@@ -170,7 +170,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main" }}
+picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "fix/processing-parameters" }}
 picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "fix/logs" }}
 
 """
@@ -207,8 +207,12 @@ tests/
 
 
 class SimpleTrainingTemplate(BaseTemplate):
-    def __init__(self, pipeline_name: str, use_pyproject: bool = True):
-        super().__init__(pipeline_name=pipeline_name, use_pyproject=use_pyproject)
+    def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
+        super().__init__(
+            pipeline_name=pipeline_name,
+            output_dir=output_dir,
+            use_pyproject=use_pyproject,
+        )
         self.pipeline_type = "TRAINING"
 
     def get_main_files(self) -> dict[str, str]:
