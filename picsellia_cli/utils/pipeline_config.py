@@ -1,7 +1,7 @@
 import importlib.util
 import os
 from pathlib import Path
-from typing import TypeVar, Any, Optional
+from typing import TypeVar, Any
 
 import toml
 from picsellia_cv_engine.core.parameters import Parameters
@@ -10,9 +10,8 @@ TParameters = TypeVar("TParameters", bound=Parameters)
 
 
 class PipelineConfig:
-    def __init__(self, pipeline_name: str, search_path: Optional[Path] = None):
+    def __init__(self, pipeline_name: str, search_path: Path = Path(os.getcwd())):
         """Initialize the pipeline configuration by locating the directory and loading config/env."""
-        search_path = search_path or Path(__file__).parent
         self.pipeline_name = pipeline_name
         self.pipeline_dir = self.find_pipeline_dir(
             pipeline_name=pipeline_name, search_path=search_path

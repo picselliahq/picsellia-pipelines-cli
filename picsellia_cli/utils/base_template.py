@@ -1,24 +1,30 @@
 import os
 import subprocess
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import toml
 
 
 class BaseTemplate(ABC):
-    BASE_DIR = "pipelines"
-
     def __init__(
         self, pipeline_name: str, output_dir: str = ".", use_pyproject: bool = True
     ):
         self.pipeline_name = pipeline_name
         self.pipeline_dir = os.path.join(output_dir, pipeline_name)
-        self.pipeline_module = self.pipeline_dir.replace("/", ".")
+        abs_pipeline_path = Path(self.pipeline_dir).resolve()
+        cwd = Path.cwd().resolve()
+
+        try:
+            rel_path = abs_pipeline_path.relative_to(cwd)
+        except ValueError:
+            rel_path = abs_pipeline_path
+
+        self.pipeline_module = rel_path.as_posix().replace("/", ".")
         self.utils_dir = os.path.join(self.pipeline_dir, "utils")
         self.use_pyproject = use_pyproject
 
     def write_all_files(self):
-        self._write_file(os.path.join(self.BASE_DIR, "__init__.py"), "")
         self._write_file(os.path.join(self.pipeline_dir, "__init__.py"), "")
         self._write_file(os.path.join(self.utils_dir, "__init__.py"), "")
 

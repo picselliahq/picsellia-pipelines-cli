@@ -19,11 +19,23 @@ def init(
     pipeline_name: str,
     type: str = typer.Option(..., help="Type of pipeline ('training' or 'processing')"),
     template: str = typer.Option("simple", help="Template to use"),
+    output_dir: str = typer.Option(".", help="Where to create the pipeline"),
+    use_pyproject: bool = typer.Option(True, help="Use pyproject.toml"),
 ):
     if type == "training":
-        init_training(pipeline_name=pipeline_name, template=template)
+        init_training(
+            pipeline_name=pipeline_name,
+            template=template,
+            output_dir=output_dir,
+            use_pyproject=use_pyproject,
+        )
     elif type == "processing":
-        init_processing(pipeline_name=pipeline_name, template=template)
+        init_processing(
+            pipeline_name=pipeline_name,
+            template=template,
+            output_dir=output_dir,
+            use_pyproject=use_pyproject,
+        )
     else:
         typer.echo(
             f"❌ Invalid pipeline type '{type}'. Must be 'training' or 'processing'."
