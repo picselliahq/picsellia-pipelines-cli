@@ -5,14 +5,13 @@ import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 
+from picsellia_cli.utils.env_utils import require_env_var
+from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia_cli.utils.run_manager import RunManager
 from picsellia_cli.utils.runner import (
-    get_pipeline_data,
-    get_global_session,
     create_virtual_env,
     run_pipeline_command,
 )
-from picsellia_cli.utils.session_manager import session_manager
-from picsellia_cli.utils.collect_params import update_processing_parameters
 
 app = typer.Typer(help="Test registered processing pipelines locally.")
 
@@ -71,69 +70,68 @@ def test_processing(
         ..., help="Name of the processing pipeline to test"
     ),
 ):
-    pipeline = get_pipeline_data(pipeline_name)
-    global_data = get_global_session()
-    stored_params = pipeline.get("last_test_params", {})
+    config = PipelineConfig(pipeline_name)
+    run_manager = RunManager(config.pipeline_dir)
 
-    params = prompt_processing_params(pipeline_name, stored_params)
+    latest_config = run_manager.get_latest_run_config()
+    if latest_config:
+        reuse = typer.confirm(
+            f"📝 Reuse previous config? input_dataset_version_id={latest_config['input_dataset_version_id']} / "
+            f"output={latest_config['output_dataset_version_name']}",
+            default=True,
+        )
+        if reuse:
+            params = latest_config
+        else:
+            params = prompt_processing_params(pipeline_name, latest_config)
+    else:
+        params = prompt_processing_params(pipeline_name, {})
 
     client = Client(
-        api_token=global_data["api_token"],
-        organization_name=global_data["organization_name"],
+        api_token=require_env_var("API_TOKEN"),
+        organization_name=require_env_var("ORGANIZATION_NAME"),
+        host=os.getenv("HOST", "https://app.picsellia.com"),
     )
+
     params["output_dataset_version_name"] = check_output_dataset_version(
         client,
         params["input_dataset_version_id"],
         params["output_dataset_version_name"],
     )
 
-    env_path = create_virtual_env(pipeline["requirements_path"])
+    run_dir = run_manager.get_next_run_dir()
+    run_manager.save_run_config(run_dir, params)
 
-    repo_root = os.getcwd()
-    working_dir = os.path.join(
-        repo_root,
-        "pipelines",
-        pipeline_name,
-        "tests",
-        params["output_dataset_version_name"],
-    )
-    os.makedirs(working_dir, exist_ok=True)
-
-    pipeline_script = os.path.join(repo_root, pipeline["local_pipeline_script_path"])
+    env_path = create_virtual_env(str(config.get_requirements_path()))
     python_executable = (
         os.path.join(env_path, "bin", "python")
         if os.name != "nt"
         else os.path.join(env_path, "Scripts", "python.exe")
     )
 
-    update_processing_parameters(pipeline_script, pipeline["parameters"])
-
     command = [
         python_executable,
-        pipeline_script,
+        str(config.get_script_path("local_pipeline_script")),
         "--api_token",
-        global_data["api_token"],
+        require_env_var("API_TOKEN"),
         "--organization_name",
-        global_data["organization_name"],
+        require_env_var("ORGANIZATION_NAME"),
         "--working_dir",
-        working_dir,
+        str(run_dir),
         "--job_type",
-        pipeline["pipeline_type"],
+        config.get("metadata", "type"),
         "--input_dataset_version_id",
         params["input_dataset_version_id"],
         "--output_dataset_version_name",
         params["output_dataset_version_name"],
     ]
 
-    run_pipeline_command(command, working_dir)
+    run_pipeline_command(command, str(run_dir))
 
-    pipeline["last_test_params"] = params
-    session_manager.update_pipeline(name=pipeline_name, data=pipeline)
     typer.echo(
         typer.style(
-            f"✅ Processing pipeline '{pipeline_name}' tested successfully!",
+            f"✅ Processing pipeline '{pipeline_name}' run complete: {run_dir.name}",
             fg=typer.colors.GREEN,
-            bold=True,
         )
     )
 

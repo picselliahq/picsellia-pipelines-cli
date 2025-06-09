@@ -1,21 +1,20 @@
 from picsellia_cli.utils.base_template import BaseTemplate
 
+
 PROCESSING_PIPELINE_PICSELLIA = """from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
 from picsellia_cv_engine.core.services.utils.picsellia_context import create_picsellia_processing_context
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
 from {pipeline_module}.steps import process
+from {pipeline_module}.utils.parameters import ProcessingParameters
 
-processing_context = create_picsellia_processing_context(
-    processing_parameters={{
-        "datalake": "default",
-        "data_tag": "processed",
-    }}
+context = create_picsellia_processing_context(
+    processing_parameters=ProcessingParameters
 )
 
 @pipeline(
-    context=processing_context,
+    context=context,
     log_folder_path="logs/",
     remove_logs_on_completion=False,
 )
@@ -38,6 +37,7 @@ from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
 from {pipeline_module}.steps import process
+from {pipeline_module}.utils.parameters import ProcessingParameters
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
@@ -46,27 +46,22 @@ parser.add_argument("--organization_name", required=True, type=str, help="Picsel
 parser.add_argument("--job_type", required=True, type=str, choices=["DATASET_VERSION_CREATION", "TRAINING"], help="Job type")
 parser.add_argument("--input_dataset_version_id", required=True, type=str, help="Input dataset version ID")
 parser.add_argument("--output_dataset_version_name", required=False, type=str, help="Output dataset version name", default=None)
-parser.add_argument("--datalake", required=False, type=str, help="Datalake name", default="default")
-parser.add_argument("--data_tag", required=False, type=str, help="Data tag", default="processed")
 parser.add_argument("--working_dir", required=False, type=str, help="Working directory", default=None)
 args = parser.parse_args()
 
 # Create local processing context
-processing_context = create_local_processing_context(
+context = create_local_processing_context(
+    processing_parameters_cls=ProcessingParameters,
     api_token=args.api_token,
     organization_name=args.organization_name,
     job_type=args.job_type,
     input_dataset_version_id=args.input_dataset_version_id,
     output_dataset_version_name=args.output_dataset_version_name,
-    processing_parameters={{
-        "datalake": "default",
-        "data_tag": "processed",
-    }},
     working_dir=args.working_dir,
 )
 
 @pipeline(
-    context=processing_context,
+    context=context,
     log_folder_path="logs/",
     remove_logs_on_completion=False,
 )
@@ -233,13 +228,47 @@ def get_image_id_by_filename(coco_data: Dict[str, Any], filename: str) -> int:
 
 """
 
+PROCESSING_PIPELINE_PARAMETERS = """from picsellia.types.schemas import LogDataType
+from picsellia_cv_engine.core.parameters import Parameters
+
+
+class ProcessingParameters(Parameters):
+    def __init__(self, log_data: LogDataType):
+        super().__init__(log_data=log_data)
+        self.datalake = self.extract_parameter(["datalake"], expected_type=str, default="default")
+        self.data_tag = self.extract_parameter(["data_tag"], expected_type=str, default="processed")
+"""
+
+PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
+"""
+
+PROCESSING_PIPELINE_PYPROJECT = """[project]
+name = "{pipeline_name}"
+version = "0.1.0"
+description = "Picsellia processing pipeline"
+requires-python = ">=3.10"
+
+dependencies = [
+    "picsellia-pipelines-cli",
+]
+
+[dependency-groups]
+dev = [
+    "picsellia-cv-engine",
+]
+
+[tool.uv.sources]
+picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "fix/processing-parameters" }}
+picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "fix/logs" }}
+
+"""
+
+
 PROCESSING_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10
 
 RUN apt-get update && apt-get install -y \\
     libgl1-mesa-glx \\
     && rm -rf /var/lib/apt/lists/*
-
-RUN uv pip install --python=$(which python3.10) git+https://github.com/picselliahq/picsellia-cv-engine.git@main
 
 WORKDIR /experiment
 
@@ -247,16 +276,14 @@ ARG REBUILD_ALL
 COPY ./ ./{pipeline_dir}
 ARG REBUILD_PICSELLIA
 
-RUN uv pip install --python=$(which python3.10) --no-cache -r ./{pipeline_dir}/requirements.txt
+# Sync from uv.lock (assumes uv lock has already been created)
+RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
-ENV PYTHONPATH=\"/experiment\"
+ENV PYTHONPATH="/experiment"
 
 ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/picsellia_pipeline.py"]
 """
 
-
-PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
-"""
 
 PROCESSING_PIPELINE_DOCKERIGNORE = """# Exclude virtual environments
 .venv/
@@ -271,27 +298,70 @@ tests/
 
 
 class SimpleProcessingTemplate(BaseTemplate):
+    def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
+        super().__init__(
+            pipeline_name=pipeline_name,
+            output_dir=output_dir,
+            use_pyproject=use_pyproject,
+        )
+        self.pipeline_type = "DATASET_VERSION_CREATION"
+
     def get_main_files(self) -> dict[str, str]:
-        return {
+        files = {
             "picsellia_pipeline.py": PROCESSING_PIPELINE_PICSELLIA.format(
-                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
             "local_pipeline.py": PROCESSING_PIPELINE_LOCAL.format(
-                pipeline_module=self.pipeline_dir.replace("/", "."),
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
             "steps.py": PROCESSING_PIPELINE_STEPS.format(
-                pipeline_module=self.pipeline_dir.replace("/", "."),
-            ),
-            "requirements.txt": PROCESSING_PIPELINE_REQUIREMENTS,
-            "Dockerfile": PROCESSING_PIPELINE_DOCKERFILE.format(
-                pipeline_dir=self.pipeline_dir
+                pipeline_module=self.pipeline_module,
             ),
             ".dockerignore": PROCESSING_PIPELINE_DOCKERIGNORE,
+            "Dockerfile": self._get_dockerfile(),
         }
+
+        if self.use_pyproject:
+            files["pyproject.toml"] = PROCESSING_PIPELINE_PYPROJECT.format(
+                pipeline_name=self.pipeline_name
+            )
+        else:
+            files["requirements.txt"] = PROCESSING_PIPELINE_REQUIREMENTS
+
+        return files
 
     def get_utils_files(self) -> dict[str, str]:
         return {
             "processing.py": PROCESSING_PIPELINE_PROCESSING,
+            "parameters.py": PROCESSING_PIPELINE_PARAMETERS,
         }
+
+    def get_config_toml(self) -> dict:
+        return {
+            "metadata": {
+                "name": self.pipeline_name,
+                "version": "1.0",
+                "description": "This pipeline processes data for X.",
+                "type": self.pipeline_type,
+            },
+            "execution": {
+                "picsellia_pipeline_script": "picsellia_pipeline.py",
+                "local_pipeline_script": "local_pipeline.py",
+                "requirements_file": "pyproject.toml"
+                if self.use_pyproject
+                else "requirements.txt",
+                "parameters_class": "utils/parameters.py:ProcessingParameters",
+            },
+            "docker": {"image_name": "", "image_tag": ""},
+        }
+
+    def _get_dockerfile(self) -> str:
+        if self.use_pyproject:
+            return PROCESSING_PIPELINE_DOCKERFILE.format(pipeline_dir=self.pipeline_dir)
+        else:
+            return PROCESSING_PIPELINE_DOCKERFILE.replace(
+                "uv sync --python=$(which python3.10) --project {pipeline_dir}",
+                "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
+            ).format(pipeline_dir=self.pipeline_dir)
