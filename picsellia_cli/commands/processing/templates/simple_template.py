@@ -258,8 +258,8 @@ dev = [
 ]
 
 [tool.uv.sources]
-picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "fix/processing-parameters" }}
-picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "fix/logs" }}
+picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main" }}
+picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "main" }}
 
 """
 
