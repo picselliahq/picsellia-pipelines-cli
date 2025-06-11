@@ -37,7 +37,6 @@ from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
 from {pipeline_module}.steps import process
-from {pipeline_module}.utils.parameters import ProcessingParameters
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
@@ -272,8 +271,12 @@ RUN apt-get update && apt-get install -y \\
 
 WORKDIR /experiment
 
+RUN git clone --depth 1 https://github.com/picselliahq/picsellia-cv-base-docker.git /tmp/base-docker && \
+    cp -r /tmp/base-docker/base/. /experiment
+RUN sed -i '1 a source /experiment/test_pipeline/.venv/bin/activate' /experiment/run.sh
+
 ARG REBUILD_ALL
-COPY ./ ./{pipeline_dir}
+COPY ./ {pipeline_dir}
 ARG REBUILD_PICSELLIA
 
 # Sync from uv.lock (assumes uv lock has already been created)
@@ -297,7 +300,7 @@ tests/
 """
 
 
-class SimpleProcessingTemplate(BaseTemplate):
+class DatasetVersionCreationProcessingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
         super().__init__(
             pipeline_name=pipeline_name,
