@@ -183,8 +183,13 @@ RUN apt-get update && apt-get install -y \\
 
 WORKDIR /experiment
 
+RUN git clone --depth 1 https://github.com/picselliahq/picsellia-cv-base-docker.git /tmp/base-docker && \
+    cp -r /tmp/base-docker/base/. /experiment
+
+RUN sed -i '1 a source /experiment/test_pipeline/.venv/bin/activate' /experiment/run.sh
+
 ARG REBUILD_ALL
-COPY ./ ./{pipeline_dir}
+COPY ./ {pipeline_dir}
 ARG REBUILD_PICSELLIA
 
 # Sync from uv.lock (assumes uv lock has already been created)
