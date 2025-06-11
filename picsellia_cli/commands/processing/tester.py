@@ -1,5 +1,5 @@
 import os
-from typing import Dict
+from typing import Dict, Any
 
 import typer
 from picsellia import Client
@@ -16,7 +16,7 @@ from picsellia_cli.utils.runner import (
 app = typer.Typer(help="Test registered processing pipelines locally.")
 
 
-def prompt_processing_params(pipeline_name: str, stored_params: Dict) -> Dict:
+def prompt_default_params(pipeline_name: str, stored_params: Dict) -> Dict:
     input_dataset_version_id = typer.prompt(
         typer.style("📥 Input dataset version ID", fg=typer.colors.CYAN),
         default=stored_params.get("input_dataset_version_id", ""),
@@ -30,6 +30,21 @@ def prompt_processing_params(pipeline_name: str, stored_params: Dict) -> Dict:
     return {
         "input_dataset_version_id": input_dataset_version_id,
         "output_dataset_version_name": output_dataset_version_name,
+    }
+
+
+def prompt_preannotation_params(stored_params: Dict) -> Dict:
+    input_dataset_version_id = typer.prompt(
+        typer.style("📥 Input dataset version ID", fg=typer.colors.CYAN),
+        default=stored_params.get("input_dataset_version_id", ""),
+    )
+    model_version_id = typer.prompt(
+        typer.style("🧠 Model version ID", fg=typer.colors.CYAN),
+        default=stored_params.get("model_version_id", ""),
+    )
+    return {
+        "input_dataset_version_id": input_dataset_version_id,
+        "model_version_id": model_version_id,
     }
 
 
@@ -71,21 +86,26 @@ def test_processing(
     ),
 ):
     config = PipelineConfig(pipeline_name)
+    pipeline_type = config.get(
+        "metadata", "type"
+    )  # Ex: "PRE_ANNOTATION" or "DATASET_VERSION_CREATION"
     run_manager = RunManager(config.pipeline_dir)
 
     latest_config = run_manager.get_latest_run_config()
+
+    stored_params: Dict[str, Any] = {}
+    params: Dict[str, Any] = {}
+
     if latest_config:
-        reuse = typer.confirm(
-            f"📝 Reuse previous config? input_dataset_version_id={latest_config['input_dataset_version_id']} / "
-            f"output={latest_config['output_dataset_version_name']}",
-            default=True,
-        )
+        summary = " / ".join(f"{k}={v}" for k, v in latest_config.items())
+        reuse = typer.confirm(f"📝 Reuse previous config? {summary}", default=True)
         if reuse:
             params = latest_config
-        else:
-            params = prompt_processing_params(pipeline_name, latest_config)
     else:
-        params = prompt_processing_params(pipeline_name, {})
+        if pipeline_type == "PRE_ANNOTATION":
+            params = prompt_preannotation_params(stored_params)
+        else:
+            params = prompt_default_params(pipeline_name, stored_params)
 
     client = Client(
         api_token=require_env_var("API_TOKEN"),
@@ -93,20 +113,20 @@ def test_processing(
         host=os.getenv("HOST", "https://app.picsellia.com"),
     )
 
-    params["output_dataset_version_name"] = check_output_dataset_version(
-        client,
-        params["input_dataset_version_id"],
-        params["output_dataset_version_name"],
-    )
+    # Only ask output name confirmation for non-pre-annotation
+    if pipeline_type != "PRE_ANNOTATION":
+        params["output_dataset_version_name"] = check_output_dataset_version(
+            client,
+            params["input_dataset_version_id"],
+            params["output_dataset_version_name"],
+        )
 
     run_dir = run_manager.get_next_run_dir()
     run_manager.save_run_config(run_dir, params)
 
     env_path = create_virtual_env(str(config.get_requirements_path()))
-    python_executable = (
-        os.path.join(env_path, "bin", "python")
-        if os.name != "nt"
-        else os.path.join(env_path, "Scripts", "python.exe")
+    python_executable = os.path.join(
+        env_path, "Scripts" if os.name == "nt" else "bin", "python"
     )
 
     command = [
@@ -119,12 +139,18 @@ def test_processing(
         "--working_dir",
         str(run_dir),
         "--job_type",
-        config.get("metadata", "type"),
+        pipeline_type,
         "--input_dataset_version_id",
         params["input_dataset_version_id"],
-        "--output_dataset_version_name",
-        params["output_dataset_version_name"],
     ]
+
+    if pipeline_type != "PRE_ANNOTATION":
+        command += [
+            "--output_dataset_version_name",
+            params["output_dataset_version_name"],
+        ]
+    else:
+        command += ["--model_version_id", params["model_version_id"]]
 
     run_pipeline_command(command, str(run_dir))
 
