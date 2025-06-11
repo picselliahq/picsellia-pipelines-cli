@@ -37,7 +37,6 @@ from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
 from {pipeline_module}.steps import process
-from {pipeline_module}.utils.parameters import ProcessingParameters
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
@@ -302,7 +301,7 @@ tests/
 """
 
 
-class SimpleProcessingTemplate(BaseTemplate):
+class DatasetVersionCreationProcessingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
         super().__init__(
             pipeline_name=pipeline_name,
