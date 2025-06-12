@@ -3,7 +3,7 @@ from typing import Dict
 
 import typer
 
-from picsellia_cli.utils.env_utils import require_env_var
+from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.runner import (
     create_virtual_env,
@@ -38,6 +38,7 @@ def test_training(
         ..., help="Name of the training pipeline to test"
     ),
 ):
+    ensure_env_vars()
     config = PipelineConfig(pipeline_name)
 
     stored_params: dict = {}

@@ -5,7 +5,7 @@ import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 
-from picsellia_cli.utils.env_utils import require_env_var
+from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.run_manager import RunManager
 from picsellia_cli.utils.runner import (
@@ -85,6 +85,7 @@ def test_processing(
         ..., help="Name of the processing pipeline to test"
     ),
 ):
+    ensure_env_vars()
     config = PipelineConfig(pipeline_name)
     pipeline_type = config.get(
         "metadata", "type"
