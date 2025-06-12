@@ -9,6 +9,7 @@ from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
+from picsellia_cli.utils.env_utils import ensure_env_vars
 from picsellia_cli.utils.initializer import init_client, handle_pipeline_name
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
@@ -155,6 +156,7 @@ def init_training(
         True, help="Use pyproject.toml instead of requirements.txt"
     ),
 ):
+    ensure_env_vars()
     output_dir = output_dir or "."
     use_pyproject = use_pyproject if use_pyproject is not None else True
 
