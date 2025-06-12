@@ -9,8 +9,9 @@ from picsellia_cli.utils.deployer import (
     prompt_docker_image_if_missing,
     build_and_push_docker_image,
 )
-from picsellia_cli.utils.env_utils import require_env_var
+from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
 from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia.exceptions import ResourceConflictError
 
 app = typer.Typer(help="Deploy a processing pipeline to Picsellia.")
 
@@ -37,23 +38,56 @@ def register_processing_pipeline_on_picsellia(
         host=host,
     )
 
+    # Compute docker flags
+    docker_flags = None
+    try:
+        gpu_count = int(pipeline_config.get("docker", "gpu"))
+        if gpu_count > 0:
+            docker_flags = ["--gpus=all", "--ipc=host"]
+    except ValueError:
+        typer.echo(
+            "⚠️ Could not parse GPU value from pipeline config. Skipping docker flags."
+        )
+
     try:
         client.create_processing(
             name=pipeline_config.pipeline_name,
+            description=pipeline_config.get("metadata", "description"),
             type=ProcessingType(pipeline_config.get("metadata", "type")),
             default_cpu=int(pipeline_config.get("docker", "cpu")),
             default_gpu=int(pipeline_config.get("docker", "gpu")),
             default_parameters=pipeline_config.extract_default_parameters(),
             docker_image=pipeline_config.get("docker", "image_name"),
             docker_tag=pipeline_config.get("docker", "image_tag"),
-            docker_flags=None,
+            docker_flags=docker_flags,
         )
         typer.echo(
             f"✅ Processing pipeline '{pipeline_config.pipeline_name}' successfully registered on Picsellia!"
         )
 
+    except ResourceConflictError as e:
+        typer.echo(f"⚠️ Processing '{pipeline_config.pipeline_name}' already exists.")
+        if typer.confirm(
+            "Do you want to update the existing processing?", default=True
+        ):
+            processing = client.get_processing(name=pipeline_config.pipeline_name)
+            processing.update(
+                description=pipeline_config.get("metadata", "description"),
+                default_cpu=int(pipeline_config.get("docker", "cpu")),
+                default_gpu=int(pipeline_config.get("docker", "gpu")),
+                default_parameters=pipeline_config.extract_default_parameters(),
+                docker_image=pipeline_config.get("docker", "image_name"),
+                docker_tag=pipeline_config.get("docker", "image_tag"),
+            )
+            typer.echo(
+                f"🔁 Processing '{pipeline_config.pipeline_name}' updated successfully!"
+            )
+            return
+        typer.echo(f"❌ Error registering pipeline: {e}")
+        raise typer.Exit()
+
     except Exception as e:
-        typer.echo(f"❌ Error registering pipeline on Picsellia: {e}")
+        typer.echo(f"❌ Unexpected error: {e}")
         raise typer.Exit()
 
 
@@ -91,6 +125,7 @@ def deploy_processing(
     """
     🚀 Deploy a processing pipeline: build & push its Docker image, then register it on Picsellia.
     """
+    ensure_env_vars()
     config = PipelineConfig(pipeline_name)
 
     # Prompt user for image name/tag if not filled
