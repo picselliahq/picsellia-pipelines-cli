@@ -105,7 +105,7 @@ def deploy_processing(
         pipeline_dir=str(config.pipeline_dir),
         image_name=config.get("docker", "image_name"),
         image_tag=config.get("docker", "image_tag"),
-        force_login=False,
+        force_login=True,
     )
 
     register_processing_pipeline_on_picsellia(
