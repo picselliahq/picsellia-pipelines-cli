@@ -37,7 +37,6 @@ from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
 from {pipeline_module}.steps import process
-from {pipeline_module}.utils.parameters import ProcessingParameters
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
@@ -133,18 +132,18 @@ def process(
 PROCESSING_PIPELINE_PROCESSING = """import os
 from copy import deepcopy
 from glob import glob
-from typing import Dict, Any
+from typing import Any
 
 from PIL import Image
 
 
 def process_images(
     input_images_dir: str,
-    input_coco: Dict[str, Any],
-    parameters: Dict[str, Any],
+    input_coco: dict[str, Any],
+    parameters: dict[str, Any],
     output_images_dir: str,
-    output_coco: Dict[str, Any],
-) -> Dict[str, Any]:
+    output_coco: dict[str, Any],
+) -> dict[str, Any]:
     \"\"\"
     🚀 Modify this function to define how your dataset should be processed.
 
@@ -210,12 +209,12 @@ def process_images(
     print(f"✅ Processed {len(image_paths)} images.")
     return output_coco
 
-def get_image_id_by_filename(coco_data: Dict[str, Any], filename: str) -> int:
+def get_image_id_by_filename(coco_data: dict[str, Any], filename: str) -> int:
     \"\"\"
     Retrieve the image ID for a given filename.
 
     Args:
-        coco_data (Dict): COCO dataset structure containing images.
+        coco_data (dict): COCO dataset structure containing images.
         filename (str): Filename of the image.
 
     Returns:
@@ -272,8 +271,12 @@ RUN apt-get update && apt-get install -y \\
 
 WORKDIR /experiment
 
+RUN git clone --depth 1 https://github.com/picselliahq/picsellia-cv-base-docker.git /tmp/base-docker && \
+    cp -r /tmp/base-docker/base/. /experiment
+RUN sed -i '1 a source /experiment/{pipeline_dir}/.venv/bin/activate' /experiment/run.sh
+
 ARG REBUILD_ALL
-COPY ./ ./{pipeline_dir}
+COPY ./ {pipeline_dir}
 ARG REBUILD_PICSELLIA
 
 # Sync from uv.lock (assumes uv lock has already been created)
@@ -297,7 +300,7 @@ tests/
 """
 
 
-class SimpleProcessingTemplate(BaseTemplate):
+class DatasetVersionCreationProcessingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
         super().__init__(
             pipeline_name=pipeline_name,

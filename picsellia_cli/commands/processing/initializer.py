@@ -2,9 +2,14 @@ from typing import Optional
 
 import typer
 
-from picsellia_cli.commands.processing.templates.simple_template import (
-    SimpleProcessingTemplate,
+from picsellia_cli.commands.processing.templates.pre_annotation_template import (
+    PreAnnotationTemplate,
 )
+from picsellia_cli.commands.processing.templates.dataset_version_creation_template import (
+    DatasetVersionCreationProcessingTemplate,
+)
+
+from picsellia_cli.utils.base_template import BaseTemplate
 from picsellia_cli.utils.initializer import handle_pipeline_name
 
 app = typer.Typer(help="Initialize and register a new processing pipeline.")
@@ -14,8 +19,14 @@ def get_template_instance(
     template_name: str, pipeline_name: str, output_dir: str, use_pyproject: bool = True
 ):
     match template_name:
-        case "simple":
-            return SimpleProcessingTemplate(
+        case "dataset_version_creation":
+            return DatasetVersionCreationProcessingTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
+        case "pre_annotation":
+            return PreAnnotationTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,
@@ -65,7 +76,7 @@ def init_processing(
     )
 
 
-def _show_success_message(pipeline_name, template_instance: SimpleProcessingTemplate):
+def _show_success_message(pipeline_name, template_instance: BaseTemplate):
     typer.echo("")
     typer.echo(
         typer.style(
