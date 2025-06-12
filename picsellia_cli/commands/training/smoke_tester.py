@@ -62,8 +62,10 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
     # Clean up old container if needed
     subprocess.run(
         ["docker", "rm", "-f", container_name],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
     docker_command = [
@@ -117,9 +119,16 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
                         "training.log",
                     ],
                     check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
 
-                subprocess.run(["docker", "stop", container_name], check=False)
+                subprocess.run(
+                    ["docker", "stop", container_name],
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
                 break
     except Exception as e:
         typer.echo(f"❌ Error while monitoring Docker: {e}")
