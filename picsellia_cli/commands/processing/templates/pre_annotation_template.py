@@ -10,7 +10,7 @@ from steps import process
 from utils.parameters import ProcessingParameters
 
 context = create_picsellia_processing_context(
-    processing_parameters=ProcessingParameters
+    processing_parameters_cls=ProcessingParameters
 )
 
 @pipeline(
