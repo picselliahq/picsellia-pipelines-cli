@@ -132,18 +132,18 @@ def process(
 PROCESSING_PIPELINE_PROCESSING = """import os
 from copy import deepcopy
 from glob import glob
-from typing import Dict, Any
+from typing import Any
 
 from PIL import Image
 
 
 def process_images(
     input_images_dir: str,
-    input_coco: Dict[str, Any],
-    parameters: Dict[str, Any],
+    input_coco: dict[str, Any],
+    parameters: dict[str, Any],
     output_images_dir: str,
-    output_coco: Dict[str, Any],
-) -> Dict[str, Any]:
+    output_coco: dict[str, Any],
+) -> dict[str, Any]:
     \"\"\"
     🚀 Modify this function to define how your dataset should be processed.
 
@@ -209,12 +209,12 @@ def process_images(
     print(f"✅ Processed {len(image_paths)} images.")
     return output_coco
 
-def get_image_id_by_filename(coco_data: Dict[str, Any], filename: str) -> int:
+def get_image_id_by_filename(coco_data: dict[str, Any], filename: str) -> int:
     \"\"\"
     Retrieve the image ID for a given filename.
 
     Args:
-        coco_data (Dict): COCO dataset structure containing images.
+        coco_data (dict): COCO dataset structure containing images.
         filename (str): Filename of the image.
 
     Returns:
