@@ -1,6 +1,6 @@
 from picsellia_cli.utils.base_template import BaseTemplate
 
-SIMPLE_PIPELINE_TRAINING = """from picsellia_cv_engine import pipeline
+TRAINING_PIPELINE_TRAINING = """from picsellia_cv_engine import pipeline
 from picsellia_cv_engine.core.parameters import (
     AugmentationParameters,
     ExportParameters,
@@ -11,8 +11,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
-from {pipeline_module}.steps import train
-from {pipeline_module}.utils.parameters import SimpleHyperParameters
+from steps import train
+from utils.parameters import SimpleHyperParameters
 
 context = create_picsellia_training_context(
     hyperparameters_cls=SimpleHyperParameters,
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     {pipeline_name}_pipeline()
 """
 
-SIMPLE_PIPELINE_LOCAL = """import argparse
+TRAINING_PIPELINE_LOCAL = """import argparse
 
 from picsellia_cv_engine import pipeline
 from picsellia_cv_engine.core.parameters import (
@@ -44,8 +44,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
-from {pipeline_module}.steps import train
-from {pipeline_module}.utils.parameters import SimpleHyperParameters
+from steps import train
+from utils.parameters import SimpleHyperParameters
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_token", type=str, required=True)
@@ -75,13 +75,13 @@ if __name__ == "__main__":
     {pipeline_name}_pipeline()
 """
 
-SIMPLE_STEPS = """import os
+TRAINING_STEPS = """import os
 
 from picsellia_cv_engine import step, Pipeline
 from picsellia_cv_engine.core import Model, DatasetCollection, YoloDataset
 from ultralytics import YOLO
 
-from {pipeline_module}.utils.data import generate_data_yaml
+from utils.data import generate_data_yaml
 
 
 @step()
@@ -113,7 +113,7 @@ def train(picsellia_model: Model, picsellia_datasets: DatasetCollection[YoloData
     )
 """
 
-SIMPLE_PIPELINE_PARAMETERS = """from picsellia.types.schemas import LogDataType
+TRAINING_PIPELINE_PARAMETERS = """from picsellia.types.schemas import LogDataType
 from picsellia_cv_engine.core.parameters import HyperParameters
 
 
@@ -125,7 +125,7 @@ class SimpleHyperParameters(HyperParameters):
         self.image_size = self.extract_parameter(["image_size"], expected_type=int, default=640)
 """
 
-SIMPLE_PIPELINE_DATA = """import os
+TRAINING_PIPELINE_DATA = """import os
 
 import yaml
 from picsellia_cv_engine.core.data.dataset.dataset_collection import DatasetCollection
@@ -149,11 +149,11 @@ def generate_data_yaml(
     return os.path.join(picsellia_datasets.dataset_path, "data.yaml")
 """
 
-SIMPLE_PIPELINE_REQUIREMENTS = """# Add your dependencies here
+TRAINING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 ultralytics
 """
 
-SIMPLE_PIPELINE_PYPROJECT = """[project]
+TRAINING_PIPELINE_PYPROJECT = """[project]
 name = "{pipeline_name}"
 version = "0.1.0"
 description = "YoloV8 training pipeline"
@@ -175,7 +175,7 @@ picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pip
 
 """
 
-SIMPLE_PIPELINE_DOCKERFILE = """FROM picsellia/cuda:11.8.0-cudnn8-ubuntu20.04-python3.10
+TRAINING_PIPELINE_DOCKERFILE = """FROM picsellia/cuda:11.8.0-cudnn8-ubuntu20.04-python3.10
 
 RUN apt-get update && apt-get install -y \\
     libgl1-mesa-glx \\
@@ -200,7 +200,7 @@ ENV PYTHONPATH=":/experiment"
 ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/training_pipeline.py"]
 """
 
-SIMPLE_PIPELINE_DOCKERIGNORE = """.venv/
+TRAINING_PIPELINE_DOCKERIGNORE = """.venv/
 venv/
 __pycache__/
 *.pyc
@@ -211,7 +211,7 @@ tests/
 """
 
 
-class SimpleTrainingTemplate(BaseTemplate):
+class UltralyticsTrainingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
         super().__init__(
             pipeline_name=pipeline_name,
@@ -222,34 +222,30 @@ class SimpleTrainingTemplate(BaseTemplate):
 
     def get_main_files(self) -> dict[str, str]:
         files = {
-            "picsellia_pipeline.py": SIMPLE_PIPELINE_TRAINING.format(
-                pipeline_module=self.pipeline_module,
+            "picsellia_pipeline.py": TRAINING_PIPELINE_TRAINING.format(
                 pipeline_name=self.pipeline_name,
             ),
-            "local_pipeline.py": SIMPLE_PIPELINE_LOCAL.format(
-                pipeline_module=self.pipeline_module,
+            "local_pipeline.py": TRAINING_PIPELINE_LOCAL.format(
                 pipeline_name=self.pipeline_name,
             ),
-            "steps.py": SIMPLE_STEPS.format(
-                pipeline_module=self.pipeline_module,
-            ),
+            "steps.py": TRAINING_STEPS,
             "Dockerfile": self._get_dockerfile(),
-            ".dockerignore": SIMPLE_PIPELINE_DOCKERIGNORE,
+            ".dockerignore": TRAINING_PIPELINE_DOCKERIGNORE,
         }
 
         if self.use_pyproject:
-            files["pyproject.toml"] = SIMPLE_PIPELINE_PYPROJECT.format(
+            files["pyproject.toml"] = TRAINING_PIPELINE_PYPROJECT.format(
                 pipeline_name=self.pipeline_name
             )
         else:
-            files["requirements.txt"] = SIMPLE_PIPELINE_REQUIREMENTS
+            files["requirements.txt"] = TRAINING_PIPELINE_REQUIREMENTS
 
         return files
 
     def get_utils_files(self) -> dict[str, str]:
         return {
-            "parameters.py": SIMPLE_PIPELINE_PARAMETERS,
-            "data.py": SIMPLE_PIPELINE_DATA,
+            "parameters.py": TRAINING_PIPELINE_PARAMETERS,
+            "data.py": TRAINING_PIPELINE_DATA,
         }
 
     def get_config_toml(self) -> dict:
@@ -280,9 +276,9 @@ class SimpleTrainingTemplate(BaseTemplate):
 
     def _get_dockerfile(self) -> str:
         if self.use_pyproject:
-            return SIMPLE_PIPELINE_DOCKERFILE.format(pipeline_dir=self.pipeline_dir)
+            return TRAINING_PIPELINE_DOCKERFILE.format(pipeline_dir=self.pipeline_dir)
         else:
-            return SIMPLE_PIPELINE_DOCKERFILE.replace(
+            return TRAINING_PIPELINE_DOCKERFILE.replace(
                 "uv sync --python=$(which python3.10) --project {pipeline_dir}",
                 "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
             ).format(pipeline_dir=self.pipeline_dir)
