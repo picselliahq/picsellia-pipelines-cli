@@ -45,7 +45,10 @@ def get_template_instance(
 @app.command(name="init")
 def init_processing(
     pipeline_name: str,
-    template: str = typer.Option("simple", help="Template to use: 'simple'"),
+    template: str = typer.Option(
+        "dataset_version_creation",
+        help="Template to use: 'dataset_version_creation' or 'pre_annotation'",
+    ),
     output_dir: Optional[str] = typer.Option(
         None, help="Where to create the pipeline folder"
     ),

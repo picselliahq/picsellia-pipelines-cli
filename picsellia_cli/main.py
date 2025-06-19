@@ -15,7 +15,7 @@ app = typer.Typer()
 
 VALID_PIPELINE_TYPES = ["training", "processing"]
 PROCESSING_TEMPLATES = ["dataset_version_creation", "pre_annotation"]
-TRAINING_TEMPLATES = ["simple", "advanced"]
+TRAINING_TEMPLATES = ["ultralytics"]
 
 
 @app.command(name="init")

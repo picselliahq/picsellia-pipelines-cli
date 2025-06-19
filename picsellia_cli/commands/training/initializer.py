@@ -2,8 +2,8 @@ from typing import Optional
 
 import typer
 
-from picsellia_cli.commands.training.templates.simple_template import (
-    SimpleTrainingTemplate,
+from picsellia_cli.commands.training.templates.ultralytics_template import (
+    UltralyticsTrainingTemplate,
 )
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
@@ -20,8 +20,8 @@ def get_template_instance(
     template_name: str, pipeline_name: str, output_dir: str, use_pyproject: bool = True
 ):
     match template_name:
-        case "simple":
-            return SimpleTrainingTemplate(
+        case "ultralytics":
+            return UltralyticsTrainingTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,
@@ -146,9 +146,7 @@ def show_next_steps(pipeline_name, template_instance, model_name, model_version_
 @app.command(name="init")
 def init_training(
     pipeline_name: str,
-    template: str = typer.Option(
-        "simple", help="Template to use: 'simple' or 'ultralytics'"
-    ),
+    template: str = typer.Option("ultralytics", help="Template to use: 'ultralytics'"),
     output_dir: Optional[str] = typer.Option(
         None, help="Where to create the pipeline folder"
     ),
