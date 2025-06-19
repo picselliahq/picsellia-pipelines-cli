@@ -33,8 +33,8 @@ def smoke_test_processing(
     )
 
     env_vars = {
-        "api_token": require_env_var("API_TOKEN"),
-        "organization_name": require_env_var("ORGANIZATION_NAME"),
+        "api_token": require_env_var("PICSELLIA_API_TOKEN"),
+        "organization_name": require_env_var("PICSELLIA_ORGANIZATION_NAME"),
         "DEBUG": "True",
     }
 

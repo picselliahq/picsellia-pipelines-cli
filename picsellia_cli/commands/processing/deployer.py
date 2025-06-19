@@ -22,15 +22,9 @@ def register_processing_pipeline_on_picsellia(
     """
     Register a processing pipeline in Picsellia.
     """
-    api_token = require_env_var("API_TOKEN")
-    organization_name = require_env_var("ORGANIZATION_NAME")
-    host = os.getenv("HOST", "https://app.picsellia.com")
-
-    if not (api_token and organization_name and host):
-        typer.echo(
-            "❌ Missing credentials. Ensure API_TOKEN, ORGANIZATION_NAME, and HOST are set in your .env file."
-        )
-        raise typer.Exit()
+    api_token = require_env_var("PICSELLIA_API_TOKEN")
+    organization_name = require_env_var("PICSELLIA_ORGANIZATION_NAME")
+    host = os.getenv("PICSELLIA_HOST", "https://app.picsellia.com")
 
     client = Client(
         api_token=api_token,

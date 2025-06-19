@@ -71,9 +71,9 @@ def deploy_training(
 
     # Update model version
     client = Client(
-        api_token=require_env_var("API_TOKEN"),
-        organization_name=require_env_var("ORGANIZATION_NAME"),
-        host=os.getenv("HOST", "https://app.picsellia.com"),
+        api_token=require_env_var("PICSELLIA_API_TOKEN"),
+        organization_name=require_env_var("PICSELLIA_ORGANIZATION_NAME"),
+        host=os.getenv("PICSELLIA_HOST", "https://app.picsellia.com"),
     )
 
     update_model_version_on_picsellia(client, model_version_id, image_name, image_tag)

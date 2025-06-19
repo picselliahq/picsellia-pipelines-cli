@@ -46,9 +46,9 @@ def sync_processing_params(
 
     # Step 2: Try syncing to Picsellia if processing exists
     client = Client(
-        api_token=require_env_var("API_TOKEN"),
-        organization_name=require_env_var("ORGANIZATION_NAME"),
-        host=os.getenv("HOST", "https://app.picsellia.com"),
+        api_token=require_env_var("PICSELLIA_API_TOKEN"),
+        organization_name=require_env_var("PICSELLIA_ORGANIZATION_NAME"),
+        host=os.getenv("PICSELLIA_HOST", "https://app.picsellia.com"),
     )
 
     try:

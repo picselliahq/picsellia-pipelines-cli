@@ -109,9 +109,9 @@ def test_processing(
             params = prompt_default_params(pipeline_name, stored_params)
 
     client = Client(
-        api_token=require_env_var("API_TOKEN"),
-        organization_name=require_env_var("ORGANIZATION_NAME"),
-        host=os.getenv("HOST", "https://app.picsellia.com"),
+        api_token=require_env_var("PICSELLIA_API_TOKEN"),
+        organization_name=require_env_var("PICSELLIA_ORGANIZATION_NAME"),
+        host=os.getenv("PICSELLIA_HOST", "https://app.picsellia.com"),
     )
 
     # Only ask output name confirmation for non-pre-annotation
@@ -134,9 +134,9 @@ def test_processing(
         python_executable,
         str(config.get_script_path("local_pipeline_script")),
         "--api_token",
-        require_env_var("API_TOKEN"),
+        require_env_var("PICSELLIA_API_TOKEN"),
         "--organization_name",
-        require_env_var("ORGANIZATION_NAME"),
+        require_env_var("PICSELLIA_ORGANIZATION_NAME"),
         "--working_dir",
         str(run_dir),
         "--job_type",
