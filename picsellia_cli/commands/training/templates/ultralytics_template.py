@@ -11,8 +11,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
-from steps import train
-from utils.parameters import TrainingHyperParameters
+from {pipeline_module}.steps import train
+from {pipeline_module}.utils.parameters import TrainingHyperParameters
 
 context = create_picsellia_training_context(
     hyperparameters_cls=TrainingHyperParameters,
@@ -44,8 +44,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
-from steps import train
-from utils.parameters import TrainingHyperParameters
+from {pipeline_module}.steps import train
+from {pipeline_module}.utils.parameters import TrainingHyperParameters
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_token", type=str, required=True)
@@ -81,7 +81,7 @@ from picsellia_cv_engine import step, Pipeline
 from picsellia_cv_engine.core import Model, DatasetCollection, YoloDataset
 from ultralytics import YOLO
 
-from utils.data import generate_data_yaml
+from {pipeline_module}.utils.data import generate_data_yaml
 
 
 @step()
@@ -223,12 +223,14 @@ class UltralyticsTrainingTemplate(BaseTemplate):
     def get_main_files(self) -> dict[str, str]:
         files = {
             "picsellia_pipeline.py": TRAINING_PIPELINE_TRAINING.format(
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
             "local_pipeline.py": TRAINING_PIPELINE_LOCAL.format(
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
-            "steps.py": TRAINING_STEPS,
+            "steps.py": TRAINING_STEPS.format(pipeline_module=self.pipeline_module),
             "Dockerfile": self._get_dockerfile(),
             ".dockerignore": TRAINING_PIPELINE_DOCKERIGNORE,
         }

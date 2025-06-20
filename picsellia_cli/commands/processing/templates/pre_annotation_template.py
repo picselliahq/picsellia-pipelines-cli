@@ -6,8 +6,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_dataset_annotations
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
-from steps import process
-from utils.parameters import ProcessingParameters
+from {pipeline_module}.steps import process
+from {pipeline_module}.utils.parameters import ProcessingParameters
 
 context = create_picsellia_processing_context(
     processing_parameters_cls=ProcessingParameters
@@ -40,8 +40,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_dataset_annotations
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
-from steps import process
-from utils.parameters import ProcessingParameters
+from {pipeline_module}.steps import process
+from {pipeline_module}.utils.parameters import ProcessingParameters
 
 parser = argparse.ArgumentParser(description="Run the local preannotation pipeline")
 parser.add_argument("--api_token", required=True, type=str, help="Picsellia API token")
@@ -88,7 +88,7 @@ from picsellia_cv_engine.core.contexts import PicselliaProcessingContext
 from picsellia_cv_engine.decorators.pipeline_decorator import Pipeline
 from picsellia_cv_engine.decorators.step_decorator import step
 
-from utils.processing import process_images
+from {pipeline_module}.utils.processing import process_images
 
 
 @step
@@ -155,7 +155,7 @@ def process_images(
         dict[str, Any]: COCO annotations with added bounding boxes.
     \"\"\"
     images_dir = picsellia_dataset.images_dir
-    coco = picsellia_dataset.coco_data
+    coco = picsellia_dataset.coco_data or {}
     labelmap = picsellia_dataset.labelmap or {}
     threshold = parameters.get("threshold", 0.1)
 
@@ -317,12 +317,16 @@ class PreAnnotationTemplate(BaseTemplate):
     def get_main_files(self) -> dict[str, str]:
         files = {
             "picsellia_pipeline.py": PREANNOTATION_PIPELINE_PICSELLIA.format(
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
             "local_pipeline.py": PREANNOTATION_PIPELINE_LOCAL.format(
+                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
-            "steps.py": PREANNOTATION_PIPELINE_STEPS,
+            "steps.py": PREANNOTATION_PIPELINE_STEPS.format(
+                pipeline_module=self.pipeline_module
+            ),
             "requirements.txt": PREANNOTATION_PIPELINE_REQUIREMENTS,
             ".dockerignore": PREANNOTATION_PIPELINE_DOCKERIGNORE,
             "Dockerfile": self._get_dockerfile(),
