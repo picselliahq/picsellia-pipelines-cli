@@ -11,8 +11,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
-from {pipeline_module}.steps import train
-from {pipeline_module}.utils.parameters import TrainingHyperParameters
+from steps import train
+from utils.parameters import TrainingHyperParameters
 
 context = create_picsellia_training_context(
     hyperparameters_cls=TrainingHyperParameters,
@@ -44,8 +44,8 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 )
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
-from {pipeline_module}.steps import train
-from {pipeline_module}.utils.parameters import TrainingHyperParameters
+from steps import train
+from utils.parameters import TrainingHyperParameters
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_token", type=str, required=True)
@@ -81,7 +81,7 @@ from picsellia_cv_engine import step, Pipeline
 from picsellia_cv_engine.core import Model, DatasetCollection, YoloDataset
 from ultralytics import YOLO
 
-from {pipeline_module}.utils.data import generate_data_yaml
+from utils.data import generate_data_yaml
 
 
 @step()

@@ -6,8 +6,8 @@ from picsellia_cv_engine.core.services.utils.picsellia_context import create_pic
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
-from {pipeline_module}.steps import process
-from {pipeline_module}.utils.parameters import ProcessingParameters
+from steps import process
+from utils.parameters import ProcessingParameters
 
 context = create_picsellia_processing_context(
     processing_parameters_cls=ProcessingParameters
@@ -36,8 +36,8 @@ from picsellia_cv_engine.core.services.utils.local_context import create_local_p
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
-from {pipeline_module}.steps import process
-from {pipeline_module}.utils.parameters import ProcessingParameters
+from steps import process
+from utils.parameters import ProcessingParameters
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
@@ -84,7 +84,7 @@ from picsellia_cv_engine.core.contexts import PicselliaProcessingContext
 from picsellia_cv_engine.decorators.pipeline_decorator import Pipeline
 from picsellia_cv_engine.decorators.step_decorator import step
 
-from {pipeline_module}.utils.processing import process_images
+from utils.processing import process_images
 
 
 @step
@@ -314,16 +314,12 @@ class DatasetVersionCreationProcessingTemplate(BaseTemplate):
     def get_main_files(self) -> dict[str, str]:
         files = {
             "picsellia_pipeline.py": PROCESSING_PIPELINE_PICSELLIA.format(
-                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
             "local_pipeline.py": PROCESSING_PIPELINE_LOCAL.format(
-                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
-            "steps.py": PROCESSING_PIPELINE_STEPS.format(
-                pipeline_module=self.pipeline_module
-            ),
+            "steps.py": PROCESSING_PIPELINE_STEPS,
             ".dockerignore": PROCESSING_PIPELINE_DOCKERIGNORE,
             "Dockerfile": self._get_dockerfile(),
         }
