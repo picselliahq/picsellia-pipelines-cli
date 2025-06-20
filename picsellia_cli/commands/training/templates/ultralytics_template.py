@@ -12,10 +12,10 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
 from steps import train
-from utils.parameters import SimpleHyperParameters
+from utils.parameters import TrainingHyperParameters
 
 context = create_picsellia_training_context(
-    hyperparameters_cls=SimpleHyperParameters,
+    hyperparameters_cls=TrainingHyperParameters,
     augmentation_parameters_cls=AugmentationParameters,
     export_parameters_cls=ExportParameters
 )
@@ -45,7 +45,7 @@ from picsellia_cv_engine.steps.base.dataset.loader import (
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
 from steps import train
-from utils.parameters import SimpleHyperParameters
+from utils.parameters import TrainingHyperParameters
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_token", type=str, required=True)
@@ -55,7 +55,7 @@ parser.add_argument("--working_dir", type=str, required=True)
 args = parser.parse_args()
 
 context = create_local_training_context(
-    hyperparameters_cls=SimpleHyperParameters,
+    hyperparameters_cls=TrainingHyperParameters,
     augmentation_parameters_cls=AugmentationParameters,
     export_parameters_cls=ExportParameters,
     api_token=args.api_token,
@@ -170,8 +170,8 @@ dev = [
 ]
 
 [tool.uv.sources]
-picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "fix/processing-parameters" }}
-picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "fix/logs" }}
+picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main" }}
+picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "main" }}
 
 """
 
@@ -179,13 +179,13 @@ TRAINING_PIPELINE_DOCKERFILE = """FROM picsellia/cuda:11.8.0-cudnn8-ubuntu20.04-
 
 RUN apt-get update && apt-get install -y \\
     libgl1-mesa-glx \\
+    git \\
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /experiment
 
 RUN git clone --depth 1 https://github.com/picselliahq/picsellia-cv-base-docker.git /tmp/base-docker && \
     cp -r /tmp/base-docker/base/. /experiment
-
 RUN sed -i '1 a source /experiment/{pipeline_dir}/.venv/bin/activate' /experiment/run.sh
 
 ARG REBUILD_ALL
@@ -197,7 +197,7 @@ RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
 ENV PYTHONPATH=":/experiment"
 
-ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/training_pipeline.py"]
+ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/picsellia_pipeline.py"]
 """
 
 TRAINING_PIPELINE_DOCKERIGNORE = """.venv/
@@ -262,7 +262,7 @@ class UltralyticsTrainingTemplate(BaseTemplate):
                 "requirements_file": "pyproject.toml"
                 if self.use_pyproject
                 else "requirements.txt",
-                "parameters_class": "utils/parameters.py:SimpleHyperParameters",
+                "parameters_class": "utils/parameters.py:TrainingHyperParameters",
             },
             "docker": {
                 "image_name": "",
