@@ -102,7 +102,7 @@ def test_processing(
         reuse = typer.confirm(f"📝 Reuse previous config? {summary}", default=True)
         if reuse:
             params = latest_config
-    else:
+    if not params:
         if pipeline_type == "PRE_ANNOTATION":
             params = prompt_preannotation_params(stored_params)
         else:
