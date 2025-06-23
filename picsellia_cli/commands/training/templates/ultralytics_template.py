@@ -90,7 +90,10 @@ def train(picsellia_model: Model, picsellia_datasets: DatasetCollection[YoloData
 
     data_yaml_path = generate_data_yaml(picsellia_datasets=picsellia_datasets)
 
-    ultralytics_model = YOLO(picsellia_model.pretrained_weights_path)
+    if picsellia_model.pretrained_weights_path:
+        ultralytics_model = YOLO(picsellia_model.pretrained_weights_path)
+    else:
+        raise Exception("No 'pretrained-weights' file found in model version")
 
     ultralytics_model.train(
         data=data_yaml_path,
