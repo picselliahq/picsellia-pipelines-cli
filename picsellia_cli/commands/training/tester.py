@@ -56,7 +56,17 @@ def test_training(
             )
         )
     else:
-        params = prompt_training_params(stored_params=stored_params)
+        if latest_config:
+            summary = " / ".join(f"{k}={v}" for k, v in latest_config.items())
+            reuse = typer.confirm(f"📝 Reuse previous config? {summary}", default=True)
+            if reuse:
+                params = latest_config
+            else:
+                params = prompt_training_params(stored_params=stored_params)
+
+        if not params:
+            params = prompt_training_params(stored_params=stored_params)
+
         run_dir = run_manager.get_next_run_dir()
         run_manager.save_run_config(run_dir, params)
 
