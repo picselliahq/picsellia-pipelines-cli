@@ -36,7 +36,9 @@ def smoke_test_processing(
         "DEBUG": "True",
     }
 
-    pipeline_script = f"{config.pipeline_dir}/{pipeline_name}/{config.get('execution', 'picsellia_pipeline_script')}"
+    pipeline_script = (
+        f"{pipeline_name}/{config.get('execution', 'picsellia_pipeline_script')}"
+    )
 
     run_smoke_test_container(
         image=full_image_name, script=pipeline_script, env_vars=env_vars
