@@ -1,5 +1,3 @@
-import os
-
 import typer
 
 from picsellia_cli.utils.deployer import (
@@ -38,11 +36,7 @@ def smoke_test_processing(
         "DEBUG": "True",
     }
 
-    common_path = os.path.commonpath([os.getcwd(), config.pipeline_dir])
-
-    pipeline_script = str(config.get_script_path("picsellia_pipeline_script")).replace(
-        common_path, "."
-    )
+    pipeline_script = f"{config.pipeline_dir}/{pipeline_name}/{config.get('execution', 'picsellia_pipeline_script')}"
 
     run_smoke_test_container(
         image=full_image_name, script=pipeline_script, env_vars=env_vars
