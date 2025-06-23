@@ -27,6 +27,9 @@ def test_training(
     pipeline_name: str = typer.Argument(
         ..., help="Name of the training pipeline to test"
     ),
+    reuse_dir: bool = typer.Option(
+        False, "--reuse-dir", help="Reuse latest run directory and config"
+    ),
 ):
     ensure_env_vars()
     config = PipelineConfig(pipeline_name)
@@ -36,17 +39,26 @@ def test_training(
     stored_params: Dict[str, Any] = {}
     params: Dict[str, Any] = {}
 
-    if latest_config:
-        summary = " / ".join(f"{k}={v}" for k, v in latest_config.items())
-        reuse = typer.confirm(f"📝 Reuse previous config? {summary}", default=True)
-        if reuse:
-            params = latest_config
-
-    if not params:
+    if reuse_dir:
+        latest_config = run_manager.get_latest_run_config()
+        run_dir = run_manager.get_latest_run_dir()
+        if not latest_config or not run_dir:
+            typer.echo(
+                typer.style(
+                    "❌ No existing run/config found to reuse.", fg=typer.colors.RED
+                )
+            )
+            raise typer.Exit(code=1)
+        params = latest_config
+        typer.echo(
+            typer.style(
+                f"🔁 Reusing latest run: {run_dir.name}", fg=typer.colors.YELLOW
+            )
+        )
+    else:
         params = prompt_training_params(stored_params=stored_params)
-
-    run_dir = run_manager.get_next_run_dir()
-    run_manager.save_run_config(run_dir, params)
+        run_dir = run_manager.get_next_run_dir()
+        run_manager.save_run_config(run_dir, params)
 
     env_path = create_virtual_env(str(config.get_requirements_path()))
     python_executable = os.path.join(

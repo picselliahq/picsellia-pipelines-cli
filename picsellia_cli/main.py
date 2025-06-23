@@ -94,14 +94,17 @@ def get_pipeline_type(pipeline_name: str) -> str:
 
 
 @app.command(name="test")
-def test(pipeline_name: str):
+def test(
+    pipeline_name: str,
+    reuse_dir: bool = typer.Option(
+        False, help="Reuse previous run directory if available"
+    ),
+):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
-        test_training(pipeline_name=pipeline_name)
-    elif (
-        pipeline_type == "DATASET_VERSION_CREATION" or pipeline_type == "PRE_ANNOTATION"
-    ):
-        test_processing(pipeline_name=pipeline_name)
+        test_training(pipeline_name=pipeline_name, reuse_dir=reuse_dir)
+    elif pipeline_type in {"DATASET_VERSION_CREATION", "PRE_ANNOTATION"}:
+        test_processing(pipeline_name=pipeline_name, reuse_dir=reuse_dir)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
         raise typer.Exit()
