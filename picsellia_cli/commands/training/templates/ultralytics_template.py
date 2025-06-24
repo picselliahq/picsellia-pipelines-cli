@@ -210,7 +210,7 @@ __pycache__/
 *.pyo
 .DS_Store
 *.log
-tests/
+runs/
 """
 
 
