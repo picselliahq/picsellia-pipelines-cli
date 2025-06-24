@@ -191,10 +191,6 @@ RUN git clone --depth 1 https://github.com/picselliahq/picsellia-cv-base-docker.
     cp -r /tmp/base-docker/base/. /experiment
 RUN sed -i '1 a source /experiment/{pipeline_dir}/.venv/bin/activate' /experiment/run.sh
 
-RUN ln -s /experiment/run.sh /usr/bin/run && \
-    chmod +x /experiment/run.sh && \
-    chown -R 42420:42420 /experiment
-
 ARG REBUILD_ALL
 COPY ./ {pipeline_dir}
 ARG REBUILD_PICSELLIA
