@@ -72,6 +72,8 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
         "run",
         "--gpus",
         "all",
+        "--shm-size",
+        "8",
         "--name",
         container_name,
         "--entrypoint",
