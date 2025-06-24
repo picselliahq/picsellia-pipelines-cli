@@ -83,6 +83,7 @@ if __name__ == "__main__":
 
 PREANNOTATION_PIPELINE_STEPS = """import json
 
+from picsellia.types.enums import InferenceType
 from picsellia_cv_engine.core import CocoDataset, Model
 from picsellia_cv_engine.core.contexts import PicselliaProcessingContext
 from picsellia_cv_engine.decorators.pipeline_decorator import Pipeline
@@ -111,6 +112,16 @@ def process(picsellia_model: Model, picsellia_dataset: CocoDataset):
     # Get processing parameters from the user-defined configuration
     context: PicselliaProcessingContext = Pipeline.get_active_context()
     parameters = context.processing_parameters.to_dict()
+
+    if picsellia_dataset.dataset_version.type == InferenceType.NOT_CONFIGURED:
+        picsellia_dataset.dataset_version.set_type(picsellia_model.model_version.type)
+        picsellia_dataset.download_annotations(destination_dir=picsellia_dataset.annotations_dir, use_id=True)
+
+    if picsellia_dataset.dataset_version.type != picsellia_model.model_version.type:
+        raise ValueError(
+            f"❌ Dataset type '{picsellia_dataset.dataset_version.type}' "
+            f"does not match model type '{picsellia_model.model_version.type}'"
+        )
 
     # Call the helper function to process images
     output_coco = process_images(
