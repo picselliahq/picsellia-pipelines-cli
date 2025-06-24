@@ -41,7 +41,7 @@ from picsellia_cv_engine.steps.base.dataset.uploader import upload_dataset_annot
 from picsellia_cv_engine.steps.base.model.builder import build_model
 
 from steps import process
-from tils.parameters import ProcessingParameters
+from utils.parameters import ProcessingParameters
 
 parser = argparse.ArgumentParser(description="Run the local preannotation pipeline")
 parser.add_argument("--api_token", required=True, type=str, help="Picsellia API token")
