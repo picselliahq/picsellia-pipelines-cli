@@ -70,6 +70,8 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
     docker_command = [
         "docker",
         "run",
+        "--gpus",
+        "all",
         "--name",
         container_name,
         "--entrypoint",
