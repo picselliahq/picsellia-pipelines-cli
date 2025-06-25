@@ -20,7 +20,9 @@ def ensure_env_vars():
     Prompt for PICSELLIA_API_TOKEN, PICSELLIA_ORGANIZATION_NAME and PICSELLIA_HOST if not found in environment.
     Sets them in os.environ for immediate use and saves them to a .env file.
     """
-    env_file = Path(".env")
+    env_file = Path.home() / ".config" / "picsellia" / ".env"
+    env_file.parent.mkdir(parents=True, exist_ok=True)
+
     if env_file.exists():
         load_dotenv(dotenv_path=env_file)
 
