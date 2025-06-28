@@ -139,11 +139,11 @@ def show_next_steps(pipeline_name, template_instance, model_name, model_version_
     )
     typer.echo(
         "- Run locally with: "
-        + typer.style(f"pipeline-cli test {pipeline_name}", fg=typer.colors.GREEN)
+        + typer.style(f"pxl-pipeline test {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo(
         "- Deploy when ready with: "
-        + typer.style(f"pipeline-cli deploy {pipeline_name}", fg=typer.colors.GREEN)
+        + typer.style(f"pxl-pipeline deploy {pipeline_name}", fg=typer.colors.GREEN)
     )
 
 

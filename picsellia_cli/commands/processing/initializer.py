@@ -96,11 +96,11 @@ def _show_success_message(pipeline_name, template_instance: BaseTemplate):
     typer.echo("- Edit your steps in: " + typer.style("steps.py", bold=True))
     typer.echo(
         "- Test locally with: "
-        + typer.style(f"pipeline-cli test {pipeline_name}", fg=typer.colors.GREEN)
+        + typer.style(f"pxl-pipeline test {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo(
         "- Deploy to Picsellia with: "
-        + typer.style(f"pipeline-cli deploy {pipeline_name}", fg=typer.colors.GREEN)
+        + typer.style(f"pxl-pipeline deploy {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo("")
 
