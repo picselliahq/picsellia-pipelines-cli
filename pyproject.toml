@@ -26,4 +26,4 @@ toml = "^0.10.2"
 dotenv = "^0.9.9"
 
 [tool.poetry.scripts]
-pipeline-cli = "picsellia_cli.main:app"
+pxl-pipeline = "picsellia_cli.main:app"

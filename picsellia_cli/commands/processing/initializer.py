@@ -10,6 +10,7 @@ from picsellia_cli.commands.processing.templates.dataset_version_creation_templa
 )
 
 from picsellia_cli.utils.base_template import BaseTemplate
+from picsellia_cli.utils.env_utils import ensure_env_vars
 from picsellia_cli.utils.initializer import handle_pipeline_name
 
 app = typer.Typer(help="Initialize and register a new processing pipeline.")
@@ -59,6 +60,7 @@ def init_processing(
     """
     Initialize a new dataset processing pipeline.
     """
+    ensure_env_vars()
     output_dir = output_dir or "."
     use_pyproject = use_pyproject if use_pyproject is not None else True
 
