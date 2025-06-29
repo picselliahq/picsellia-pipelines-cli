@@ -13,13 +13,13 @@ Install the CLI directly from GitHub (no need to clone the repo):
 #### Using Poetry:
 
 ```bash
-poetry add git+https://github.com/picselliahq/picsellia-pipelines-cli.git
+poetry add picsellia-pipelines-cli
 ```
 
 #### Using uv (faster, works with requirements.txt or pyproject.toml):
 
 ```bash
-uv pip install git+https://github.com/picselliahq/picsellia-pipelines-cli.git
+uv pip install picsellia-pipelines-cli
 ```
 
 You can now use:

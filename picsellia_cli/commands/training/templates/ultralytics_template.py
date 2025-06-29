@@ -172,10 +172,6 @@ dev = [
     "picsellia-cv-engine",
 ]
 
-[tool.uv.sources]
-picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main" }}
-picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "main" }}
-
 """
 
 TRAINING_PIPELINE_DOCKERFILE = """FROM picsellia/cuda:11.8.0-cudnn8-ubuntu20.04-python3.10
