@@ -2,13 +2,14 @@ from typing import Optional
 
 import typer
 
-from picsellia_cli.commands.training.templates.simple_template import (
-    SimpleTrainingTemplate,
+from picsellia_cli.commands.training.templates.ultralytics_template import (
+    UltralyticsTrainingTemplate,
 )
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
+from picsellia_cli.utils.env_utils import ensure_env_vars
 from picsellia_cli.utils.initializer import init_client, handle_pipeline_name
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
@@ -19,8 +20,8 @@ def get_template_instance(
     template_name: str, pipeline_name: str, output_dir: str, use_pyproject: bool = True
 ):
     match template_name:
-        case "simple":
-            return SimpleTrainingTemplate(
+        case "ultralytics":
+            return UltralyticsTrainingTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,
@@ -36,24 +37,24 @@ def get_template_instance(
             raise typer.Exit(code=1)
 
 
-def choose_model_version(client: Client) -> tuple[str, str]:
+def choose_model_version(client: Client) -> tuple[str, str, str]:
     if typer.confirm("Do you want to use an existing model version?", default=False):
         model_version_id = typer.prompt("Enter the model version ID")
         try:
             model_version = client.get_model_version_by_id(model_version_id)
             typer.echo(
-                f"\n✅ Using model '{model_version.origin_name}' (version ID: {model_version_id})\n"
+                f"\n✅ Using model '{model_version.origin_name}' with version '{model_version.name}')\n"
             )
-            return model_version.origin_name, model_version_id
+            return model_version.origin_name, model_version.name, model_version_id
         except ResourceNotFoundError:
             typer.echo("❌ Could not find model version. Exiting.")
             raise typer.Exit()
     return create_model_version(client)
 
 
-def create_model_version(client: Client) -> tuple[str, str]:
+def create_model_version(client: Client) -> tuple[str, str, str]:
     model_name = typer.prompt("Model name")
-    version_name = typer.prompt("Version name", default="v1")
+    model_version_name = typer.prompt("Version name", default="v1")
 
     framework_options = [f.name for f in Framework if f != Framework.NOT_CONFIGURED]
     inference_options = [
@@ -78,16 +79,16 @@ def create_model_version(client: Client) -> tuple[str, str]:
         typer.echo(f"Created model '{model_name}'")
 
     try:
-        _ = model.get_version(version_name)
+        _ = model.get_version(model_version_name)
         typer.echo(
-            f"❌ Model version '{version_name}' already exists in model '{model_name}'."
+            f"❌ Model version '{model_version_name}' already exists in model '{model_name}'."
         )
         raise typer.Exit()
     except ResourceNotFoundError:
         pass
 
     model_version = model.create_version(
-        name=version_name,
+        name=model_version_name,
         framework=Framework(framework_input),
         type=InferenceType(inference_type_input),
         base_parameters={"epochs": 2, "batch_size": 8, "image_size": 640},
@@ -95,7 +96,7 @@ def create_model_version(client: Client) -> tuple[str, str]:
 
     organization_id = client.connexion.organization_id
     typer.echo(
-        f"\n✅ Created model '{model_name}' with version '{version_name}' (ID: {model_version.id})"
+        f"\n✅ Created model '{model_name}' with version '{model_version_name}' (ID: {model_version.id})"
     )
     typer.echo(
         "Model URL: "
@@ -108,14 +109,18 @@ def create_model_version(client: Client) -> tuple[str, str]:
         "\nReminder: Upload a file named 'pretrained-weights' to this model version. It's required for training.\n"
     )
 
-    return model_name, str(model_version.id)
+    return model_name, model_version_name, str(model_version.id)
 
 
 def register_pipeline_metadata(
-    config: PipelineConfig, model_name: str, model_version_id: str
+    config: PipelineConfig,
+    model_name: str,
+    model_version_name: str,
+    model_version_id: str,
 ):
     config.config.setdefault("model", {})
     config.config["model"]["model_name"] = model_name
+    config.config["model"]["model_version_name"] = model_version_name
     config.config["model"]["model_version_id"] = model_version_id
 
     with open(config.config_path, "w") as f:
@@ -134,20 +139,18 @@ def show_next_steps(pipeline_name, template_instance, model_name, model_version_
     )
     typer.echo(
         "- Run locally with: "
-        + typer.style(f"pipeline-cli test {pipeline_name}", fg=typer.colors.GREEN)
+        + typer.style(f"pxl-pipeline test {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo(
         "- Deploy when ready with: "
-        + typer.style(f"pipeline-cli deploy {pipeline_name}", fg=typer.colors.GREEN)
+        + typer.style(f"pxl-pipeline deploy {pipeline_name}", fg=typer.colors.GREEN)
     )
 
 
 @app.command(name="init")
 def init_training(
     pipeline_name: str,
-    template: str = typer.Option(
-        "simple", help="Template to use: 'simple' or 'ultralytics'"
-    ),
+    template: str = typer.Option("ultralytics", help="Template to use: 'ultralytics'"),
     output_dir: Optional[str] = typer.Option(
         None, help="Where to create the pipeline folder"
     ),
@@ -155,6 +158,7 @@ def init_training(
         True, help="Use pyproject.toml instead of requirements.txt"
     ),
 ):
+    ensure_env_vars()
     output_dir = output_dir or "."
     use_pyproject = use_pyproject if use_pyproject is not None else True
 
@@ -168,14 +172,19 @@ def init_training(
         use_pyproject=use_pyproject,
     )
 
-    model_name, model_version_id = choose_model_version(client=client)
+    model_name, model_version_name, model_version_id = choose_model_version(
+        client=client
+    )
 
     template_instance.write_all_files()
     template_instance.post_init_environment()
 
     config = PipelineConfig(pipeline_name=pipeline_name)
     register_pipeline_metadata(
-        config=config, model_name=model_name, model_version_id=model_version_id
+        config=config,
+        model_name=model_name,
+        model_version_name=model_version_name,
+        model_version_id=model_version_id,
     )
 
     show_next_steps(

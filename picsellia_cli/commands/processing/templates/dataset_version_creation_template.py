@@ -6,8 +6,8 @@ from picsellia_cv_engine.core.services.utils.picsellia_context import create_pic
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
-from {pipeline_module}.steps import process
-from {pipeline_module}.utils.parameters import ProcessingParameters
+from steps import process
+from utils.parameters import ProcessingParameters
 
 context = create_picsellia_processing_context(
     processing_parameters_cls=ProcessingParameters
@@ -36,8 +36,8 @@ from picsellia_cv_engine.core.services.utils.local_context import create_local_p
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
-from {pipeline_module}.steps import process
-from {pipeline_module}.utils.parameters import ProcessingParameters
+from steps import process
+from utils.parameters import ProcessingParameters
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Run the local processing pipeline")
@@ -84,7 +84,7 @@ from picsellia_cv_engine.core.contexts import PicselliaProcessingContext
 from picsellia_cv_engine.decorators.pipeline_decorator import Pipeline
 from picsellia_cv_engine.decorators.step_decorator import step
 
-from {pipeline_module}.utils.processing import process_images
+from utils.processing import process_images
 
 
 @step
@@ -133,18 +133,18 @@ def process(
 PROCESSING_PIPELINE_PROCESSING = """import os
 from copy import deepcopy
 from glob import glob
-from typing import Dict, Any
+from typing import Any
 
 from PIL import Image
 
 
 def process_images(
     input_images_dir: str,
-    input_coco: Dict[str, Any],
-    parameters: Dict[str, Any],
+    input_coco: dict[str, Any],
+    parameters: dict[str, Any],
     output_images_dir: str,
-    output_coco: Dict[str, Any],
-) -> Dict[str, Any]:
+    output_coco: dict[str, Any],
+) -> dict[str, Any]:
     \"\"\"
     🚀 Modify this function to define how your dataset should be processed.
 
@@ -210,12 +210,12 @@ def process_images(
     print(f"✅ Processed {len(image_paths)} images.")
     return output_coco
 
-def get_image_id_by_filename(coco_data: Dict[str, Any], filename: str) -> int:
+def get_image_id_by_filename(coco_data: dict[str, Any], filename: str) -> int:
     \"\"\"
     Retrieve the image ID for a given filename.
 
     Args:
-        coco_data (Dict): COCO dataset structure containing images.
+        coco_data (dict): COCO dataset structure containing images.
         filename (str): Filename of the image.
 
     Returns:
@@ -256,11 +256,6 @@ dependencies = [
 dev = [
     "picsellia-cv-engine",
 ]
-
-[tool.uv.sources]
-picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main" }}
-picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "main" }}
-
 """
 
 
@@ -298,11 +293,11 @@ __pycache__/
 *.pyo
 .DS_Store
 *.log
-tests/
+runs/
 """
 
 
-class SimpleProcessingTemplate(BaseTemplate):
+class DatasetVersionCreationProcessingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
         super().__init__(
             pipeline_name=pipeline_name,
@@ -314,16 +309,12 @@ class SimpleProcessingTemplate(BaseTemplate):
     def get_main_files(self) -> dict[str, str]:
         files = {
             "picsellia_pipeline.py": PROCESSING_PIPELINE_PICSELLIA.format(
-                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
             "local_pipeline.py": PROCESSING_PIPELINE_LOCAL.format(
-                pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
-            "steps.py": PROCESSING_PIPELINE_STEPS.format(
-                pipeline_module=self.pipeline_module,
-            ),
+            "steps.py": PROCESSING_PIPELINE_STEPS,
             ".dockerignore": PROCESSING_PIPELINE_DOCKERIGNORE,
             "Dockerfile": self._get_dockerfile(),
         }

@@ -7,7 +7,7 @@ from picsellia_cli.utils.deployer import (
     prompt_docker_image_if_missing,
     build_and_push_docker_image,
 )
-from picsellia_cli.utils.env_utils import require_env_var
+from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer(
@@ -43,10 +43,10 @@ def deploy_training(
     """
     🚀 Deploy a training pipeline: build & push its Docker image, then update the model version in Picsellia.
     """
+    ensure_env_vars()
     config = PipelineConfig(pipeline_name)
 
     prompt_docker_image_if_missing(pipeline_config=config)
-    config.save()
 
     image_name = config.get("docker", "image_name")
     image_tag = config.get("docker", "image_tag")
@@ -71,9 +71,9 @@ def deploy_training(
 
     # Update model version
     client = Client(
-        api_token=require_env_var("API_TOKEN"),
-        organization_name=require_env_var("ORGANIZATION_NAME"),
-        host=os.getenv("HOST", "https://app.picsellia.com"),
+        api_token=require_env_var("PICSELLIA_API_TOKEN"),
+        organization_name=require_env_var("PICSELLIA_ORGANIZATION_NAME"),
+        host=os.getenv("PICSELLIA_HOST", "https://app.picsellia.com"),
     )
 
     update_model_version_on_picsellia(client, model_version_id, image_name, image_tag)

@@ -36,3 +36,15 @@ class RunManager:
     def save_run_config(self, run_dir: Path, config_data: Dict):
         with open(run_dir / "run_config.toml", "w") as f:
             toml.dump(config_data, f)
+
+    def get_latest_run_dir(self) -> Optional[Path]:
+        runs = sorted(
+            [
+                p
+                for p in self.runs_dir.glob("run*")
+                if p.is_dir() and p.name[3:].isdigit()
+            ],
+            key=lambda p: int(p.name[3:]),
+            reverse=True,
+        )
+        return runs[0] if runs else None

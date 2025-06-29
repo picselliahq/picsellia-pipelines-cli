@@ -2,9 +2,15 @@ from typing import Optional
 
 import typer
 
-from picsellia_cli.commands.processing.templates.simple_template import (
-    SimpleProcessingTemplate,
+from picsellia_cli.commands.processing.templates.pre_annotation_template import (
+    PreAnnotationTemplate,
 )
+from picsellia_cli.commands.processing.templates.dataset_version_creation_template import (
+    DatasetVersionCreationProcessingTemplate,
+)
+
+from picsellia_cli.utils.base_template import BaseTemplate
+from picsellia_cli.utils.env_utils import ensure_env_vars
 from picsellia_cli.utils.initializer import handle_pipeline_name
 
 app = typer.Typer(help="Initialize and register a new processing pipeline.")
@@ -14,8 +20,14 @@ def get_template_instance(
     template_name: str, pipeline_name: str, output_dir: str, use_pyproject: bool = True
 ):
     match template_name:
-        case "simple":
-            return SimpleProcessingTemplate(
+        case "dataset_version_creation":
+            return DatasetVersionCreationProcessingTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
+        case "pre_annotation":
+            return PreAnnotationTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,
@@ -34,7 +46,10 @@ def get_template_instance(
 @app.command(name="init")
 def init_processing(
     pipeline_name: str,
-    template: str = typer.Option("simple", help="Template to use: 'simple'"),
+    template: str = typer.Option(
+        "dataset_version_creation",
+        help="Template to use: 'dataset_version_creation' or 'pre_annotation'",
+    ),
     output_dir: Optional[str] = typer.Option(
         None, help="Where to create the pipeline folder"
     ),
@@ -45,6 +60,7 @@ def init_processing(
     """
     Initialize a new dataset processing pipeline.
     """
+    ensure_env_vars()
     output_dir = output_dir or "."
     use_pyproject = use_pyproject if use_pyproject is not None else True
 
@@ -65,7 +81,7 @@ def init_processing(
     )
 
 
-def _show_success_message(pipeline_name, template_instance: SimpleProcessingTemplate):
+def _show_success_message(pipeline_name, template_instance: BaseTemplate):
     typer.echo("")
     typer.echo(
         typer.style(
@@ -80,11 +96,11 @@ def _show_success_message(pipeline_name, template_instance: SimpleProcessingTemp
     typer.echo("- Edit your steps in: " + typer.style("steps.py", bold=True))
     typer.echo(
         "- Test locally with: "
-        + typer.style(f"pipeline-cli test {pipeline_name}", fg=typer.colors.GREEN)
+        + typer.style(f"pxl-pipeline test {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo(
         "- Deploy to Picsellia with: "
-        + typer.style(f"pipeline-cli deploy {pipeline_name}", fg=typer.colors.GREEN)
+        + typer.style(f"pxl-pipeline deploy {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo("")
 

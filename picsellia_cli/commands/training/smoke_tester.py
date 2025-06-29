@@ -8,7 +8,7 @@ from picsellia_cli.utils.deployer import (
     build_docker_image_only,
     prompt_docker_image_if_missing,
 )
-from picsellia_cli.utils.env_utils import require_env_var
+from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer(help="Run a smoke test for a training pipeline using Docker.")
@@ -18,6 +18,7 @@ app = typer.Typer(help="Run a smoke test for a training pipeline using Docker.")
 def smoke_test_training(
     pipeline_name: str = typer.Argument(...),
 ):
+    ensure_env_vars()
     config = PipelineConfig(pipeline_name)
     prompt_docker_image_if_missing(pipeline_config=config)
 
@@ -38,16 +39,14 @@ def smoke_test_training(
     )
 
     env_vars = {
-        "api_token": require_env_var("API_TOKEN"),
-        "organization_name": require_env_var("ORGANIZATION_NAME"),
+        "api_token": require_env_var("PICSELLIA_API_TOKEN"),
+        "organization_name": require_env_var("PICSELLIA_ORGANIZATION_NAME"),
         "experiment_id": experiment_id,
         "DEBUG": "True",
     }
 
-    common_path = os.path.commonpath([os.getcwd(), config.pipeline_dir])
-
-    pipeline_script = str(config.get_script_path("picsellia_pipeline_script")).replace(
-        common_path, "."
+    pipeline_script = (
+        f"{pipeline_name}/{config.get('execution', 'picsellia_pipeline_script')}"
     )
 
     run_smoke_test_container(
@@ -62,13 +61,19 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
     # Clean up old container if needed
     subprocess.run(
         ["docker", "rm", "-f", container_name],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
     docker_command = [
         "docker",
         "run",
+        "--gpus",
+        "all",
+        "--shm-size",
+        "8",
         "--name",
         container_name,
         "--entrypoint",
@@ -117,9 +122,16 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
                         "training.log",
                     ],
                     check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
 
-                subprocess.run(["docker", "stop", container_name], check=False)
+                subprocess.run(
+                    ["docker", "stop", container_name],
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
                 break
     except Exception as e:
         typer.echo(f"❌ Error while monitoring Docker: {e}")

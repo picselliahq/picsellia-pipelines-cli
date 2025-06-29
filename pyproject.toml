@@ -1,11 +1,27 @@
 [project]
 name = "picsellia-pipelines-cli"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
-authors = [
-    {name = "SoniaGrh",email = "sonia.garrouch@hotmail.fr"}
-]
 readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Sonia Garrouch", email = "sonia.garrouch@picsellia.com" }, { name = "Pierre-Nicolas Tiffreau", email = "pierre-nicolas@picsellia.com" }]
+maintainers = [{ name = "Sonia Garrouch", email = "sonia.garrouch@picsellia.com" }, { name = "Pierre-Nicolas Tiffreau", email = "pierre-nicolas@picsellia.com" }]
+keywords = ["picsellia", "computer-vision", "vision", "cv-engine", "cli", "pipeline"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -17,7 +33,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.10,<3.14"
 picsellia = ">=6.20.0,<7.0.0"
 typer = ">=0.15.2,<0.16.0"
 tinydb = "^4.8.2"
@@ -26,4 +42,4 @@ toml = "^0.10.2"
 dotenv = "^0.9.9"
 
 [tool.poetry.scripts]
-pipeline-cli = "picsellia_cli.main:app"
+pxl-pipeline = "picsellia_cli.main:app"

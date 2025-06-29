@@ -13,15 +13,53 @@ from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer()
 
+VALID_PIPELINE_TYPES = ["training", "processing"]
+PROCESSING_TEMPLATES = ["dataset_version_creation", "pre_annotation"]
+TRAINING_TEMPLATES = ["ultralytics"]
+
 
 @app.command(name="init")
 def init(
     pipeline_name: str,
-    type: str = typer.Option(..., help="Type of pipeline ('training' or 'processing')"),
-    template: str = typer.Option("simple", help="Template to use"),
+    type: str = typer.Option(
+        None, help="Type of pipeline ('training' or 'processing')"
+    ),
+    template: str = typer.Option(None, help="Template to use"),
     output_dir: str = typer.Option(".", help="Where to create the pipeline"),
     use_pyproject: bool = typer.Option(True, help="Use pyproject.toml"),
 ):
+    if type is None:
+        typer.secho(
+            f"❌ Missing required option: --type. Choose from {VALID_PIPELINE_TYPES}.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    available_templates = (
+        PROCESSING_TEMPLATES if type == "processing" else TRAINING_TEMPLATES
+    )
+
+    if template is None:
+        typer.secho(
+            f"❌ Missing required option: --template. Choose from: {', '.join(available_templates)}",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    if type not in VALID_PIPELINE_TYPES:
+        typer.secho(
+            f"❌ Invalid type: '{type}'. Choose from {VALID_PIPELINE_TYPES}.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    if template not in available_templates:
+        typer.echo(
+            f"❌ Invalid template '{template}' for type '{type}'.\n"
+            f"👉 Available: {', '.join(available_templates)}"
+        )
+        raise typer.Exit(code=1)
+
     if type == "training":
         init_training(
             pipeline_name=pipeline_name,
@@ -56,12 +94,17 @@ def get_pipeline_type(pipeline_name: str) -> str:
 
 
 @app.command(name="test")
-def test(pipeline_name: str):
+def test(
+    pipeline_name: str,
+    reuse_dir: bool = typer.Option(
+        False, help="Reuse previous run directory if available"
+    ),
+):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
-        test_training(pipeline_name=pipeline_name)
-    elif pipeline_type == "DATASET_VERSION_CREATION":
-        test_processing(pipeline_name=pipeline_name)
+        test_training(pipeline_name=pipeline_name, reuse_dir=reuse_dir)
+    elif pipeline_type in {"DATASET_VERSION_CREATION", "PRE_ANNOTATION"}:
+        test_processing(pipeline_name=pipeline_name, reuse_dir=reuse_dir)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
         raise typer.Exit()
@@ -72,7 +115,9 @@ def smoke_test(pipeline_name: str):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
         smoke_test_training(pipeline_name=pipeline_name)
-    elif pipeline_type == "DATASET_VERSION_CREATION":
+    elif (
+        pipeline_type == "DATASET_VERSION_CREATION" or pipeline_type == "PRE_ANNOTATION"
+    ):
         smoke_test_processing(pipeline_name=pipeline_name)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
@@ -84,7 +129,9 @@ def deploy(pipeline_name: str):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
         deploy_training(pipeline_name=pipeline_name)
-    elif pipeline_type == "DATASET_VERSION_CREATION":
+    elif (
+        pipeline_type == "DATASET_VERSION_CREATION" or pipeline_type == "PRE_ANNOTATION"
+    ):
         deploy_processing(pipeline_name=pipeline_name)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")

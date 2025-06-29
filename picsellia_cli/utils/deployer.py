@@ -66,7 +66,7 @@ def build_docker_image_only(pipeline_dir: str, image_name: str, image_tag: str) 
 
 
 def build_and_push_docker_image(
-    pipeline_dir: str, image_name: str, image_tag: str, force_login: bool = False
+    pipeline_dir: str, image_name: str, image_tag: str, force_login: bool = True
 ):
     full_image_name = build_docker_image_only(pipeline_dir, image_name, image_tag)
 
