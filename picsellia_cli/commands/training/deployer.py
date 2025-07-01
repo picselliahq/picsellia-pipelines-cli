@@ -10,36 +10,8 @@ from picsellia_cli.utils.deployer import (
 from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
-app = typer.Typer(
-    help="Deploy training pipeline: build, push Docker image, and update model version on Picsellia."
-)
 
-
-def update_model_version_on_picsellia(
-    client: Client, model_version_id: str, image_name: str, image_tag: str
-):
-    """
-    Update the existing model version in Picsellia to attach the Docker image.
-    """
-    model_version = client.get_model_version_by_id(model_version_id)
-
-    model_version.update(
-        docker_image_name=image_name,
-        docker_tag=image_tag,
-        docker_flags=["--gpus all", "--name training", "--ipc host"],
-    )
-
-    typer.echo(
-        f"✅ Updated model version (ID: {model_version_id}) with Docker image info."
-    )
-
-
-@app.command()
-def deploy_training(
-    pipeline_name: str = typer.Argument(
-        ..., help="Name of the training pipeline to deploy"
-    ),
-):
+def deploy_training(pipeline_name: str):
     """
     🚀 Deploy a training pipeline: build & push its Docker image, then update the model version in Picsellia.
     """
@@ -79,5 +51,20 @@ def deploy_training(
     update_model_version_on_picsellia(client, model_version_id, image_name, image_tag)
 
 
-if __name__ == "__main__":
-    app()
+def update_model_version_on_picsellia(
+    client: Client, model_version_id: str, image_name: str, image_tag: str
+):
+    """
+    Update the existing model version in Picsellia to attach the Docker image.
+    """
+    model_version = client.get_model_version_by_id(model_version_id)
+
+    model_version.update(
+        docker_image_name=image_name,
+        docker_tag=image_tag,
+        docker_flags=["--gpus all", "--name training", "--ipc host"],
+    )
+
+    typer.echo(
+        f"✅ Updated model version (ID: {model_version_id}) with Docker image info."
+    )
