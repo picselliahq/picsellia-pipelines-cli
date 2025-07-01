@@ -13,7 +13,48 @@ from picsellia_cli.utils.env_utils import ensure_env_vars
 from picsellia_cli.utils.initializer import init_client, handle_pipeline_name
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
-app = typer.Typer(help="Initialize and register a new training pipeline.")
+
+def init_training(
+    pipeline_name: str,
+    template: str,
+    output_dir: Optional[str] = None,
+    use_pyproject: Optional[bool] = True,
+):
+    ensure_env_vars()
+    output_dir = output_dir or "."
+    use_pyproject = use_pyproject if use_pyproject is not None else True
+
+    pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
+
+    client = init_client()
+    template_instance = get_template_instance(
+        template_name=template,
+        pipeline_name=pipeline_name,
+        output_dir=output_dir,
+        use_pyproject=use_pyproject,
+    )
+
+    model_name, model_version_name, model_version_id = choose_model_version(
+        client=client
+    )
+
+    template_instance.write_all_files()
+    template_instance.post_init_environment()
+
+    config = PipelineConfig(pipeline_name=pipeline_name)
+    register_pipeline_metadata(
+        config=config,
+        model_name=model_name,
+        model_version_name=model_version_name,
+        model_version_id=model_version_id,
+    )
+
+    show_next_steps(
+        pipeline_name=pipeline_name,
+        template_instance=template_instance,
+        model_name=model_name,
+        model_version_id=model_version_id,
+    )
 
 
 def get_template_instance(
@@ -144,52 +185,4 @@ def show_next_steps(pipeline_name, template_instance, model_name, model_version_
     typer.echo(
         "- Deploy when ready with: "
         + typer.style(f"pxl-pipeline deploy {pipeline_name}", fg=typer.colors.GREEN)
-    )
-
-
-@app.command(name="init")
-def init_training(
-    pipeline_name: str,
-    template: str = typer.Option("ultralytics", help="Template to use: 'ultralytics'"),
-    output_dir: Optional[str] = typer.Option(
-        None, help="Where to create the pipeline folder"
-    ),
-    use_pyproject: Optional[bool] = typer.Option(
-        True, help="Use pyproject.toml instead of requirements.txt"
-    ),
-):
-    ensure_env_vars()
-    output_dir = output_dir or "."
-    use_pyproject = use_pyproject if use_pyproject is not None else True
-
-    pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
-
-    client = init_client()
-    template_instance = get_template_instance(
-        template_name=template,
-        pipeline_name=pipeline_name,
-        output_dir=output_dir,
-        use_pyproject=use_pyproject,
-    )
-
-    model_name, model_version_name, model_version_id = choose_model_version(
-        client=client
-    )
-
-    template_instance.write_all_files()
-    template_instance.post_init_environment()
-
-    config = PipelineConfig(pipeline_name=pipeline_name)
-    register_pipeline_metadata(
-        config=config,
-        model_name=model_name,
-        model_version_name=model_version_name,
-        model_version_id=model_version_id,
-    )
-
-    show_next_steps(
-        pipeline_name=pipeline_name,
-        template_instance=template_instance,
-        model_name=model_name,
-        model_version_id=model_version_id,
     )

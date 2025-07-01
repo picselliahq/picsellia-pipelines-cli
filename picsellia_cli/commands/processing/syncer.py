@@ -8,24 +8,7 @@ from picsellia.exceptions import ResourceNotFoundError
 from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
-app = typer.Typer(help="Sync processing parameters across code and remote.")
 
-
-def update_script_parameters(script_path: str, new_params: dict):
-    with open(script_path, "r") as f:
-        content = f.read()
-
-    new_param_str = json.dumps(new_params, indent=4)
-    pattern = r"processing_parameters=\{[\s\S]*?\}"  # matches full param block
-    replacement = f"processing_parameters={new_param_str}"
-
-    new_content = re.sub(pattern, replacement, content)
-
-    with open(script_path, "w") as f:
-        f.write(new_content)
-
-
-@app.command()
 def sync_processing_params(
     pipeline_name: str = typer.Argument(
         ..., help="Name of the processing pipeline to sync"
@@ -60,3 +43,17 @@ def sync_processing_params(
         typer.echo(
             "ℹ️ Processing does not exist yet on Picsellia. Skipped remote update."
         )
+
+
+def update_script_parameters(script_path: str, new_params: dict):
+    with open(script_path, "r") as f:
+        content = f.read()
+
+    new_param_str = json.dumps(new_params, indent=4)
+    pattern = r"processing_parameters=\{[\s\S]*?\}"  # matches full param block
+    replacement = f"processing_parameters={new_param_str}"
+
+    new_content = re.sub(pattern, replacement, content)
+
+    with open(script_path, "w") as f:
+        f.write(new_content)

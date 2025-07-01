@@ -13,7 +13,36 @@ from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia.exceptions import ResourceConflictError
 
-app = typer.Typer(help="Deploy a processing pipeline to Picsellia.")
+
+def deploy_processing(
+    pipeline_name: str = typer.Argument(
+        ..., help="Name of the processing pipeline to deploy"
+    ),
+):
+    """
+    🚀 Deploy a processing pipeline: build & push its Docker image, then register it on Picsellia.
+    """
+    ensure_env_vars()
+    config = PipelineConfig(pipeline_name)
+
+    # Prompt user for image name/tag if not filled
+    prompt_docker_image_if_missing(
+        pipeline_config=config,
+    )
+    prompt_allocation_if_missing(
+        pipeline_config=config,
+    )
+
+    build_and_push_docker_image(
+        pipeline_dir=config.pipeline_dir,
+        image_name=config.get("docker", "image_name"),
+        image_tag=config.get("docker", "image_tag"),
+        force_login=True,
+    )
+
+    register_processing_pipeline_on_picsellia(
+        pipeline_config=config,
+    )
 
 
 def register_processing_pipeline_on_picsellia(
@@ -108,39 +137,3 @@ def prompt_allocation_if_missing(pipeline_config: PipelineConfig):
     pipeline_config.config["docker"]["gpu"] = gpu
 
     pipeline_config.save()
-
-
-@app.command()
-def deploy_processing(
-    pipeline_name: str = typer.Argument(
-        ..., help="Name of the processing pipeline to deploy"
-    ),
-):
-    """
-    🚀 Deploy a processing pipeline: build & push its Docker image, then register it on Picsellia.
-    """
-    ensure_env_vars()
-    config = PipelineConfig(pipeline_name)
-
-    # Prompt user for image name/tag if not filled
-    prompt_docker_image_if_missing(
-        pipeline_config=config,
-    )
-    prompt_allocation_if_missing(
-        pipeline_config=config,
-    )
-
-    build_and_push_docker_image(
-        pipeline_dir=str(config.pipeline_dir),
-        image_name=config.get("docker", "image_name"),
-        image_tag=config.get("docker", "image_tag"),
-        force_login=True,
-    )
-
-    register_processing_pipeline_on_picsellia(
-        pipeline_config=config,
-    )
-
-
-if __name__ == "__main__":
-    app()

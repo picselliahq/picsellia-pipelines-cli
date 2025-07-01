@@ -1,5 +1,6 @@
-import os
 import subprocess
+from pathlib import Path
+
 import typer
 
 from picsellia_cli.utils.pipeline_config import PipelineConfig
@@ -27,28 +28,30 @@ def ensure_docker_login():
             raise typer.Exit()
 
 
-def build_docker_image_only(pipeline_dir: str, image_name: str, image_tag: str) -> str:
+def build_docker_image_only(pipeline_dir: Path, image_name: str, image_tag: str) -> str:
+    pipeline_path = pipeline_dir.resolve()
+    dockerfile_path = pipeline_path / "Dockerfile"
+    dockerignore_path = pipeline_path / ".dockerignore"
     full_image_name = f"{image_name}:{image_tag}"
-    dockerfile_path = os.path.join(pipeline_dir, "Dockerfile")
-    dockerignore_path = os.path.join(pipeline_dir, ".dockerignore")
 
-    if not os.path.exists(pipeline_dir):
+    if not pipeline_path.exists():
         typer.echo(f"⚠️ Pipeline directory '{pipeline_dir}' not found.")
         raise typer.Exit()
 
-    if not os.path.exists(dockerfile_path):
+    if not dockerfile_path.exists():
         typer.echo(f"⚠️ Missing Dockerfile in '{pipeline_dir}'.")
         raise typer.Exit()
 
-    if not os.path.exists(dockerignore_path):
-        with open(dockerignore_path, "w") as f:
-            f.write(".venv/\nvenv/\n__pycache__/\n*.pyc\n*.pyo\n.DS_Store\n")
+    if not dockerignore_path.exists():
+        dockerignore_path.write_text(
+            ".venv/\nvenv/\n__pycache__/\n*.pyc\n*.pyo\n.DS_Store\n"
+        )
 
     typer.echo(f"🚀 Building Docker image '{full_image_name}'...")
     try:
         subprocess.run(
             ["docker", "build", "-t", full_image_name, "-f", dockerfile_path, "."],
-            cwd=pipeline_dir,
+            cwd=str(pipeline_path),
             check=True,
             text=True,
         )
@@ -66,9 +69,11 @@ def build_docker_image_only(pipeline_dir: str, image_name: str, image_tag: str) 
 
 
 def build_and_push_docker_image(
-    pipeline_dir: str, image_name: str, image_tag: str, force_login: bool = True
+    pipeline_dir: Path, image_name: str, image_tag: str, force_login: bool = True
 ):
-    full_image_name = build_docker_image_only(pipeline_dir, image_name, image_tag)
+    full_image_name = build_docker_image_only(
+        pipeline_dir=pipeline_dir, image_name=image_name, image_tag=image_tag
+    )
 
     if force_login:
         ensure_docker_login()

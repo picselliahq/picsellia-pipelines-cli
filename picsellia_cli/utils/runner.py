@@ -1,33 +1,48 @@
 import os
 import subprocess
+from pathlib import Path
+
 import typer
 
 
-def create_virtual_env(requirements_path: str) -> str:
-    pipeline_dir = os.path.dirname(requirements_path)
-    env_path = os.path.join(pipeline_dir, ".venv")
-    python_path = os.path.join(env_path, "bin", "python3")
+def create_virtual_env(requirements_path: Path) -> Path:
+    requirements_path = Path(requirements_path).resolve()
+    pipeline_dir = requirements_path.parent
+    env_path = pipeline_dir / ".venv"
+    python_path = (
+        env_path / "bin" / "python3"
+        if os.name != "nt"
+        else env_path / "Scripts" / "python.exe"
+    )
 
-    if requirements_path.endswith("pyproject.toml"):
+    if requirements_path.name == "pyproject.toml":
         typer.echo("📦 Detected pyproject.toml — using uv sync...")
 
         try:
-            subprocess.run(["uv", "lock", "--project", pipeline_dir], check=True)
-            subprocess.run(["uv", "sync", "--project", pipeline_dir], check=True)
+            subprocess.run(["uv", "lock", "--project", str(pipeline_dir)], check=True)
+            subprocess.run(["uv", "sync", "--project", str(pipeline_dir)], check=True)
         except subprocess.CalledProcessError as e:
             typer.secho(
                 f"❌ uv operation failed (code {e.returncode})", fg=typer.colors.RED
             )
             raise typer.Exit(code=e.returncode)
 
-    elif requirements_path.endswith(".txt"):
-        if not os.path.exists(env_path):
+    elif requirements_path.suffix == ".txt":
+        if not env_path.exists():
             typer.echo("⚙️ Creating virtual environment with uv...")
-            subprocess.run(["uv", "venv"], cwd=pipeline_dir, check=True, text=True)
+            subprocess.run(["uv", "venv"], cwd=str(pipeline_dir), check=True, text=True)
 
         typer.echo(f"📦 Installing dependencies from {requirements_path}...")
         subprocess.run(
-            ["uv", "pip", "install", "--python", python_path, "-r", requirements_path],
+            [
+                "uv",
+                "pip",
+                "install",
+                "--python",
+                str(python_path),
+                "-r",
+                str(requirements_path),
+            ],
             check=True,
             text=True,
         )
@@ -35,15 +50,15 @@ def create_virtual_env(requirements_path: str) -> str:
         typer.secho("❌ Unsupported requirements format.", fg=typer.colors.RED)
         raise typer.Exit()
 
-    return os.path.join(os.getcwd(), pipeline_dir, ".venv")
+    return env_path
 
 
 def run_pipeline_command(command: list[str], working_dir: str):
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(os.getcwd())
+    env["PYTHONPATH"] = str(Path.cwd())
 
     typer.echo(
-        f"🚀 Running pipeline with working_dir={working_dir} and PYTHONPATH={os.getcwd()}..."
+        f"🚀 Running pipeline with working_dir={working_dir} and PYTHONPATH={Path.cwd()}..."
     )
 
     try:
