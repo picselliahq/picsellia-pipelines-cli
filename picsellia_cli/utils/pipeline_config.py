@@ -1,12 +1,9 @@
 import importlib.util
 import os
 from pathlib import Path
-from typing import TypeVar, Any
+from typing import Any
 
 import toml
-from picsellia_cv_engine.core.parameters import Parameters
-
-TParameters = TypeVar("TParameters", bound=Parameters)
 
 
 class PipelineConfig:
@@ -68,7 +65,7 @@ class PipelineConfig:
         instance = cls(log_data={})  # get defaults
         return instance.to_dict()
 
-    def _import_class_from_path(self, path_with_class: str) -> type[Parameters]:
+    def _import_class_from_path(self, path_with_class: str):
         file_path, class_name = path_with_class.split(":")
         abs_path = self.pipeline_dir / file_path
 
