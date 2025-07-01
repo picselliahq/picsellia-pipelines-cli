@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 import typer
 from picsellia import Client
@@ -27,7 +27,7 @@ def test_processing(
     )  # Ex: "PRE_ANNOTATION" or "DATASET_VERSION_CREATION"
     run_manager = RunManager(config.pipeline_dir)
 
-    stored_params: Dict[str, Any] = {}
+    stored_params: dict[str, Any] = {}
     params, run_dir = get_processing_params_and_run_dir(
         run_manager=run_manager,
         reuse_dir=reuse_dir,
@@ -77,7 +77,7 @@ def get_processing_params_and_run_dir(
     reuse_dir: bool,
     pipeline_type: str,
     pipeline_name: str,
-    stored_params: Dict[str, Any],
+    stored_params: dict[str, Any],
 ) -> tuple[dict, Path]:
     latest_config = run_manager.get_latest_run_config()
 
@@ -116,7 +116,7 @@ def get_processing_params_and_run_dir(
     return params, run_dir
 
 
-def prompt_default_params(pipeline_name: str, stored_params: Dict) -> Dict:
+def prompt_default_params(pipeline_name: str, stored_params: dict) -> dict:
     input_dataset_version_id = typer.prompt(
         typer.style("📥 Input dataset version ID", fg=typer.colors.CYAN),
         default=stored_params.get("input_dataset_version_id", ""),
@@ -133,7 +133,7 @@ def prompt_default_params(pipeline_name: str, stored_params: Dict) -> Dict:
     }
 
 
-def prompt_preannotation_params(stored_params: Dict) -> Dict:
+def prompt_preannotation_params(stored_params: dict) -> dict:
     input_dataset_version_id = typer.prompt(
         typer.style("📥 Input dataset version ID", fg=typer.colors.CYAN),
         default=stored_params.get("input_dataset_version_id", ""),
@@ -184,7 +184,7 @@ def build_processing_command(
     config: PipelineConfig,
     pipeline_type: str,
     run_dir: Path,
-    params: Dict[str, str],
+    params: dict[str, str],
 ) -> list:
     command = [
         python_executable,
