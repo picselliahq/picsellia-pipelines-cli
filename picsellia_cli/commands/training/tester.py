@@ -23,7 +23,7 @@ def test_training(pipeline_name: str, reuse_dir: bool = False):
         run_manager, reuse_dir, stored_params
     )
 
-    env_path = create_virtual_env(str(config.get_requirements_path()))
+    env_path = create_virtual_env(requirements_path=config.get_requirements_path())
     python_executable = os.path.join(
         env_path, "Scripts" if os.name == "nt" else "bin", "python"
     )

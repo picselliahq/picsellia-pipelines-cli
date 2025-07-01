@@ -28,7 +28,7 @@ def smoke_test_training(pipeline_name: str):
     full_image_name = f"{image_name}:{image_tag}"
 
     build_docker_image_only(
-        pipeline_dir=str(config.pipeline_dir),
+        pipeline_dir=config.pipeline_dir,
         image_name=image_name,
         image_tag=image_tag,
     )

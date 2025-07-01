@@ -29,12 +29,13 @@ class RunManager:
             reverse=True,
         )
         if latest:
-            with open(latest[0], "r") as f:
+            with latest[0].open("r") as f:
                 return toml.load(f)
         return None
 
     def save_run_config(self, run_dir: Path, config_data: dict):
-        with open(run_dir / "run_config.toml", "w") as f:
+        config_path = run_dir / "run_config.toml"
+        with config_path.open("w") as f:
             toml.dump(config_data, f)
 
     def get_latest_run_dir(self) -> Optional[Path]:

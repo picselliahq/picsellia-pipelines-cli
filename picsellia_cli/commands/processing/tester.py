@@ -49,9 +49,11 @@ def test_processing(
     run_dir = run_manager.get_next_run_dir()
     run_manager.save_run_config(run_dir=run_dir, config_data=params)
 
-    env_path = create_virtual_env(str(config.get_requirements_path()))
-    python_executable = os.path.join(
-        env_path, "Scripts" if os.name == "nt" else "bin", "python"
+    env_path = create_virtual_env(requirements_path=config.get_requirements_path())
+    python_executable = (
+        env_path / "Scripts" / "python.exe"
+        if os.name == "nt"
+        else env_path / "bin" / "python"
     )
 
     command = build_processing_command(
@@ -180,14 +182,14 @@ def check_output_dataset_version(
 
 
 def build_processing_command(
-    python_executable: str,
+    python_executable: Path,
     config: PipelineConfig,
     pipeline_type: str,
     run_dir: Path,
     params: dict[str, str],
 ) -> list:
     command = [
-        python_executable,
+        str(python_executable),
         str(config.get_script_path("local_pipeline_script")),
         "--api_token",
         require_env_var("PICSELLIA_API_TOKEN"),
