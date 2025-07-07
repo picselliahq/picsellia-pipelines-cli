@@ -1,16 +1,13 @@
 import importlib.util
 import os
 from pathlib import Path
-from typing import TypeVar, Any
+from typing import Any
 
 import toml
-from picsellia_cv_engine.core.parameters import Parameters
-
-TParameters = TypeVar("TParameters", bound=Parameters)
 
 
 class PipelineConfig:
-    def __init__(self, pipeline_name: str, search_path: Path = Path(os.getcwd())):
+    def __init__(self, pipeline_name: str, search_path: Path = Path.cwd()):
         """Initialize the pipeline configuration by locating the directory and loading config/env."""
         self.pipeline_name = pipeline_name
         self.pipeline_dir = self.find_pipeline_dir(
@@ -22,7 +19,7 @@ class PipelineConfig:
     def load_config(self):
         if not self.config_path.exists():
             raise ValueError(f"Pipeline config not found at {self.config_path}")
-        with open(self.config_path, "r") as config_file:
+        with self.config_path.open("r") as config_file:
             return toml.load(config_file)
 
     def get(self, section: str, key: str):
@@ -50,7 +47,7 @@ class PipelineConfig:
         )
 
     def save(self):
-        with open(self.config_path, "w") as f:
+        with self.config_path.open("w") as f:
             toml.dump(self.config, f)
 
     def extract_default_parameters(self) -> dict[str, Any]:
@@ -68,7 +65,7 @@ class PipelineConfig:
         instance = cls(log_data={})  # get defaults
         return instance.to_dict()
 
-    def _import_class_from_path(self, path_with_class: str) -> type[Parameters]:
+    def _import_class_from_path(self, path_with_class: str):
         file_path, class_name = path_with_class.split(":")
         abs_path = self.pipeline_dir / file_path
 

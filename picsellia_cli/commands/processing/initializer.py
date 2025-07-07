@@ -13,7 +13,35 @@ from picsellia_cli.utils.base_template import BaseTemplate
 from picsellia_cli.utils.env_utils import ensure_env_vars
 from picsellia_cli.utils.initializer import handle_pipeline_name
 
-app = typer.Typer(help="Initialize and register a new processing pipeline.")
+
+def init_processing(
+    pipeline_name: str,
+    template: str,
+    output_dir: Optional[str] = None,
+    use_pyproject: Optional[bool] = True,
+):
+    """
+    Initialize a new dataset processing pipeline.
+    """
+    ensure_env_vars()
+    output_dir = output_dir or "."
+    use_pyproject = use_pyproject if use_pyproject is not None else True
+
+    pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
+
+    template_instance = get_template_instance(
+        template_name=template,
+        pipeline_name=pipeline_name,
+        output_dir=output_dir,
+        use_pyproject=use_pyproject,
+    )
+
+    template_instance.write_all_files()
+    template_instance.post_init_environment()
+
+    _show_success_message(
+        pipeline_name=pipeline_name, template_instance=template_instance
+    )
 
 
 def get_template_instance(
@@ -43,44 +71,6 @@ def get_template_instance(
             raise typer.Exit(code=1)
 
 
-@app.command(name="init")
-def init_processing(
-    pipeline_name: str,
-    template: str = typer.Option(
-        "dataset_version_creation",
-        help="Template to use: 'dataset_version_creation' or 'pre_annotation'",
-    ),
-    output_dir: Optional[str] = typer.Option(
-        None, help="Where to create the pipeline folder"
-    ),
-    use_pyproject: Optional[bool] = typer.Option(
-        True, help="Use pyproject.toml instead of requirements.txt"
-    ),
-):
-    """
-    Initialize a new dataset processing pipeline.
-    """
-    ensure_env_vars()
-    output_dir = output_dir or "."
-    use_pyproject = use_pyproject if use_pyproject is not None else True
-
-    pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
-
-    template_instance = get_template_instance(
-        template_name=template,
-        pipeline_name=pipeline_name,
-        output_dir=output_dir,
-        use_pyproject=use_pyproject,
-    )
-
-    template_instance.write_all_files()
-    template_instance.post_init_environment()
-
-    _show_success_message(
-        pipeline_name=pipeline_name, template_instance=template_instance
-    )
-
-
 def _show_success_message(pipeline_name, template_instance: BaseTemplate):
     typer.echo("")
     typer.echo(
@@ -103,7 +93,3 @@ def _show_success_message(pipeline_name, template_instance: BaseTemplate):
         + typer.style(f"pxl-pipeline deploy {pipeline_name}", fg=typer.colors.GREEN)
     )
     typer.echo("")
-
-
-if __name__ == "__main__":
-    app()
