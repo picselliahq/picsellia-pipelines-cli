@@ -2,6 +2,9 @@ from typing import Optional
 
 import typer
 
+from picsellia_cli.commands.processing.templates.datalake_autotagging_template import (
+    DatalakeAutotaggingProcessingTemplate,
+)
 from picsellia_cli.commands.processing.templates.pre_annotation_template import (
     PreAnnotationTemplate,
 )
@@ -56,6 +59,12 @@ def get_template_instance(
             )
         case "pre_annotation":
             return PreAnnotationTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
+        case "datalake_autotagging":
+            return DatalakeAutotaggingProcessingTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,
