@@ -14,8 +14,17 @@ from picsellia_cli.utils.pipeline_config import PipelineConfig
 app = typer.Typer()
 
 VALID_PIPELINE_TYPES = ["training", "processing"]
-PROCESSING_TEMPLATES = ["dataset_version_creation", "pre_annotation"]
+PROCESSING_TEMPLATES = [
+    "dataset_version_creation",
+    "pre_annotation",
+    "datalake_autotagging",
+]
 TRAINING_TEMPLATES = ["ultralytics"]
+PROCESSING_TYPES_MAPPING = {
+    "dataset_version_creation": "DATASET_VERSION_CREATION",
+    "pre_annotation": "PRE_ANNOTATION",
+    "datalake_autotagging": "DATALAKE_AUTOTAGGING",
+}
 
 
 @app.command(name="init")
@@ -103,7 +112,7 @@ def test(
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
         test_training(pipeline_name=pipeline_name, reuse_dir=reuse_dir)
-    elif pipeline_type in {"DATASET_VERSION_CREATION", "PRE_ANNOTATION"}:
+    elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
         test_processing(pipeline_name=pipeline_name, reuse_dir=reuse_dir)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
@@ -115,9 +124,7 @@ def smoke_test(pipeline_name: str):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
         smoke_test_training(pipeline_name=pipeline_name)
-    elif (
-        pipeline_type == "DATASET_VERSION_CREATION" or pipeline_type == "PRE_ANNOTATION"
-    ):
+    elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
         smoke_test_processing(pipeline_name=pipeline_name)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
@@ -129,9 +136,7 @@ def deploy(pipeline_name: str):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
         deploy_training(pipeline_name=pipeline_name)
-    elif (
-        pipeline_type == "DATASET_VERSION_CREATION" or pipeline_type == "PRE_ANNOTATION"
-    ):
+    elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
         deploy_processing(pipeline_name=pipeline_name)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
@@ -142,7 +147,7 @@ def deploy(pipeline_name: str):
 def sync(pipeline_name: str):
     pipeline_type = get_pipeline_type(pipeline_name)
 
-    if pipeline_type == "DATASET_VERSION_CREATION":
+    if pipeline_type in PROCESSING_TYPES_MAPPING.values():
         sync_processing_params(pipeline_name=pipeline_name)
     elif pipeline_type == "TRAINING":
         typer.echo("⚠️ Syncing training parameters is not implemented yet.")
