@@ -39,7 +39,7 @@ def test_processing(
     client = init_client()
 
     # Only ask output name confirmation for non-pre-annotation
-    if pipeline_type != "PRE_ANNOTATION":
+    if pipeline_type == "DATASET_VERSION_CREATION":
         params["output_dataset_version_name"] = check_output_dataset_version(
             client=client,
             input_dataset_version_id=params["input_dataset_version_id"],
@@ -109,6 +109,8 @@ def get_processing_params_and_run_dir(
     if not params:
         if pipeline_type == "PRE_ANNOTATION":
             params = prompt_preannotation_params(stored_params)
+        elif pipeline_type == "DATALAKE_AUTOTAGGING":
+            params = prompt_datalake_autotagging_params(stored_params)
         else:
             params = prompt_default_params(pipeline_name, stored_params)
 
@@ -147,6 +149,42 @@ def prompt_preannotation_params(stored_params: dict) -> dict:
     return {
         "input_dataset_version_id": input_dataset_version_id,
         "model_version_id": model_version_id,
+    }
+
+
+def prompt_datalake_autotagging_params(stored_params: dict) -> dict:
+    input_datalake_id = typer.prompt(
+        typer.style("📥 Input datalake ID", fg=typer.colors.CYAN),
+        default=stored_params.get("input_datalake_id", ""),
+    )
+    output_datalake_id = typer.prompt(
+        typer.style("📤 Output datalake ID", fg=typer.colors.CYAN),
+        default=stored_params.get("output_datalake_id", ""),
+    )
+    model_version_id = typer.prompt(
+        typer.style("🧠 Model version ID", fg=typer.colors.CYAN),
+        default=stored_params.get("model_version_id", ""),
+    )
+    tags_list = typer.prompt(
+        typer.style("🏷️ Tags to use (comma-separated)", fg=typer.colors.CYAN),
+        default=stored_params.get("tags_list", ""),
+    )
+    offset = typer.prompt(
+        typer.style("↪ Offset", fg=typer.colors.CYAN),
+        default=stored_params.get("offset", "0"),
+    )
+    limit = typer.prompt(
+        typer.style("🔢 Limit", fg=typer.colors.CYAN),
+        default=stored_params.get("limit", "100"),
+    )
+
+    return {
+        "input_datalake_id": input_datalake_id,
+        "output_datalake_id": output_datalake_id,
+        "model_version_id": model_version_id,
+        "tags_list": tags_list,
+        "offset": offset,
+        "limit": limit,
     }
 
 
@@ -199,16 +237,38 @@ def build_processing_command(
         str(run_dir),
         "--job_type",
         pipeline_type,
-        "--input_dataset_version_id",
-        params["input_dataset_version_id"],
     ]
 
-    if pipeline_type != "PRE_ANNOTATION":
+    if pipeline_type == "DATASET_VERSION_CREATION":
         command += [
+            "--input_dataset_version_id",
+            params["input_dataset_version_id"],
             "--output_dataset_version_name",
             params["output_dataset_version_name"],
         ]
-    else:
-        command += ["--model_version_id", params["model_version_id"]]
+    elif pipeline_type == "PRE_ANNOTATION":
+        command += [
+            "--input_dataset_version_id",
+            params["input_dataset_version_id"],
+            "--model_version_id",
+            params["model_version_id"],
+        ]
+    elif pipeline_type == "DATALAKE_AUTOTAGGING":
+        command += [
+            "--input_datalake_id",
+            params["input_datalake_id"],
+            "--output_datalake_id",
+            params["output_datalake_id"],
+            "--model_version_id",
+            params["model_version_id"],
+            "--tags_list",
+            params["tags_list"],
+            "--offset",
+            str(params["offset"]),
+            "--limit",
+            str(params["limit"]),
+        ]
+
+    print(f"command: {command}")
 
     return command
