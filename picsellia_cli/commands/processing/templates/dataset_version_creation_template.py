@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
 PROCESSING_PIPELINE_LOCAL = """import argparse
 from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
-from picsellia_cv_engine.core.services.utils.local_context import create_local_processing_context
+from picsellia_cv_engine.core.services.utils.local_context import create_local_dataset_processing_context
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
@@ -50,7 +50,7 @@ parser.add_argument("--working_dir", required=False, type=str, help="Working dir
 args = parser.parse_args()
 
 # Create local processing context
-context = create_local_processing_context(
+context = create_local_dataset_processing_context(
     processing_parameters_cls=ProcessingParameters,
     api_token=args.api_token,
     organization_name=args.organization_name,
