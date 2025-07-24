@@ -62,7 +62,13 @@ class PipelineConfig:
             raise ValueError("No parameters_class defined in config.toml")
 
         cls = self._import_class_from_path(class_path)
-        instance = cls(log_data={})  # get defaults
+        try:
+            instance = cls(log_data={})  # attempt instantiation with no input
+        except Exception as e:
+            raise ValueError(
+                f"Failed to instantiate parameters class '{class_path}'. "
+                f"Make sure all parameters have default values."
+            ) from e
         return instance.to_dict()
 
     def _import_class_from_path(self, path_with_class: str):
