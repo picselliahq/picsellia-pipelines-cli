@@ -56,7 +56,7 @@ from steps import get_hugging_face_model, load_clip_model, autotag_datalake_with
 parser = ArgumentParser()
 parser.add_argument("--api_token", required=True, type=str, help="Picsellia API token")
 parser.add_argument("--organization_name", required=True, type=str, help="Picsellia organization name")
-parser.add_argument("--job_type", required=True, type=str, choices=["DATASET_VERSION_CREATION", "PRE_ANNOTATION", "TRAINING", "DATALAKE_AUTOTAGGING"], help="Job type")
+parser.add_argument("--job_type", required=True, type=str, choices=["DATASET_VERSION_CREATION", "PRE_ANNOTATION", "TRAINING", "DATA_AUTO_TAGGING"], help="Job type")
 parser.add_argument("--input_datalake_id", type=str)
 parser.add_argument("--output_datalake_id", type=str, required=False)
 parser.add_argument("--model_version_id", type=str)
