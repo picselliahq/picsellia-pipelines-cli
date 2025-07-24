@@ -17,13 +17,13 @@ VALID_PIPELINE_TYPES = ["training", "processing"]
 PROCESSING_TEMPLATES = [
     "dataset_version_creation",
     "pre_annotation",
-    "datalake_autotagging",
+    "data_auto_tagging",
 ]
 TRAINING_TEMPLATES = ["ultralytics"]
 PROCESSING_TYPES_MAPPING = {
     "dataset_version_creation": "DATASET_VERSION_CREATION",
     "pre_annotation": "PRE_ANNOTATION",
-    "datalake_autotagging": "DATALAKE_AUTOTAGGING",
+    "data_auto_tagging": "DATA_AUTO_TAGGING",
 }
 
 

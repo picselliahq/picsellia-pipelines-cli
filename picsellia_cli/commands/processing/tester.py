@@ -109,8 +109,8 @@ def get_processing_params_and_run_dir(
     if not params:
         if pipeline_type == "PRE_ANNOTATION":
             params = prompt_preannotation_params(stored_params)
-        elif pipeline_type == "DATALAKE_AUTOTAGGING":
-            params = prompt_datalake_autotagging_params(stored_params)
+        elif pipeline_type == "DATA_AUTO_TAGGING":
+            params = prompt_data_auto_tagging_params(stored_params)
         else:
             params = prompt_default_params(pipeline_name, stored_params)
 
@@ -152,7 +152,7 @@ def prompt_preannotation_params(stored_params: dict) -> dict:
     }
 
 
-def prompt_datalake_autotagging_params(stored_params: dict) -> dict:
+def prompt_data_auto_tagging_params(stored_params: dict) -> dict:
     input_datalake_id = typer.prompt(
         typer.style("📥 Input datalake ID", fg=typer.colors.CYAN),
         default=stored_params.get("input_datalake_id", ""),
@@ -253,7 +253,7 @@ def build_processing_command(
             "--model_version_id",
             params["model_version_id"],
         ]
-    elif pipeline_type == "DATALAKE_AUTOTAGGING":
+    elif pipeline_type == "DATA_AUTO_TAGGING":
         command += [
             "--input_datalake_id",
             params["input_datalake_id"],
@@ -268,7 +268,5 @@ def build_processing_command(
             "--limit",
             str(params["limit"]),
         ]
-
-    print(f"command: {command}")
 
     return command
