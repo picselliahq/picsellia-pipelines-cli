@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import Any
 
 import typer
 from picsellia import Client
@@ -14,11 +13,13 @@ from picsellia_cli.utils.runner import (
     create_virtual_env,
     run_pipeline_command,
 )
+import toml
 
 
 def test_processing(
     pipeline_name: str,
     reuse_dir: bool,
+    config_file: Path | None = None,
 ):
     ensure_env_vars()
     config = PipelineConfig(pipeline_name=pipeline_name)
@@ -27,13 +28,15 @@ def test_processing(
     )  # Ex: "PRE_ANNOTATION" or "DATASET_VERSION_CREATION"
     run_manager = RunManager(config.pipeline_dir)
 
-    stored_params: dict[str, Any] = {}
-    params, run_dir = get_processing_params_and_run_dir(
+    config_file_to_reuse = config_file
+    if reuse_dir and config_file_to_reuse is None:
+        config_file_to_reuse = run_manager.get_latest_run_config_path()
+
+    params = get_processing_params(
         run_manager=run_manager,
-        reuse_dir=reuse_dir,
         pipeline_type=pipeline_type,
         pipeline_name=pipeline_name,
-        stored_params=stored_params,
+        config_file=config_file_to_reuse,
     )
 
     client = init_client()
@@ -46,7 +49,13 @@ def test_processing(
             output_name=params["output_dataset_version_name"],
         )
 
-    run_dir = run_manager.get_next_run_dir()
+    if reuse_dir:
+        run_dir = run_manager.get_latest_run_dir()
+        if not run_dir:
+            run_dir = run_manager.get_next_run_dir()
+    else:
+        run_dir = run_manager.get_next_run_dir()
+
     run_manager.save_run_config(run_dir=run_dir, config_data=params)
 
     env_path = create_virtual_env(requirements_path=config.get_requirements_path())
@@ -74,35 +83,30 @@ def test_processing(
     )
 
 
-def get_processing_params_and_run_dir(
+def get_processing_params(
     run_manager: RunManager,
-    reuse_dir: bool,
     pipeline_type: str,
     pipeline_name: str,
-    stored_params: dict[str, Any],
-) -> tuple[dict, Path]:
-    latest_config = run_manager.get_latest_run_config()
-
-    if reuse_dir:
-        run_dir = run_manager.get_latest_run_dir()
-        if not latest_config or not run_dir:
-            typer.echo(
-                typer.style(
-                    "❌ No existing run/config found to reuse.", fg=typer.colors.RED
-                )
-            )
-            raise typer.Exit(code=1)
-        typer.echo(
-            typer.style(
-                f"🔁 Reusing latest run: {run_dir.name}", fg=typer.colors.YELLOW
-            )
-        )
-        return latest_config, run_dir
+    config_file: Path | None = None,
+) -> dict:
+    if config_file and config_file.exists():
+        with config_file.open("r") as f:
+            return toml.load(f)
+    else:
+        latest_config_path = run_manager.get_latest_run_config_path()
+        if latest_config_path:
+            with open(latest_config_path, "r") as f:
+                latest_config = toml.load(f)
+        else:
+            latest_config = None
 
     params = {}
+    stored_params = {}
+
     if latest_config:
         summary = " / ".join(f"{k}={v}" for k, v in latest_config.items())
         reuse = typer.confirm(f"📝 Reuse previous config? {summary}", default=True)
+        stored_params = latest_config
         if reuse:
             params = latest_config
 
@@ -114,10 +118,7 @@ def get_processing_params_and_run_dir(
         else:
             params = prompt_default_params(pipeline_name, stored_params)
 
-    run_dir = run_manager.get_next_run_dir()
-    run_manager.save_run_config(run_dir, params)
-
-    return params, run_dir
+    return params
 
 
 def prompt_default_params(pipeline_name: str, stored_params: dict) -> dict:
