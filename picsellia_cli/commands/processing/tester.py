@@ -19,7 +19,7 @@ import toml
 def test_processing(
     pipeline_name: str,
     reuse_dir: bool,
-    config_file: Path | None = None,
+    config_file: str | None = None,
 ):
     ensure_env_vars()
     config = PipelineConfig(pipeline_name=pipeline_name)
@@ -28,7 +28,7 @@ def test_processing(
     )  # Ex: "PRE_ANNOTATION" or "DATASET_VERSION_CREATION"
     run_manager = RunManager(config.pipeline_dir)
 
-    config_file_to_reuse = config_file
+    config_file_to_reuse = Path(config_file) if config_file else None
     if reuse_dir and config_file_to_reuse is None:
         config_file_to_reuse = run_manager.get_latest_run_config_path()
 
@@ -39,6 +39,13 @@ def test_processing(
         config_file=config_file_to_reuse,
     )
 
+    if reuse_dir:
+        run_dir = run_manager.get_latest_run_dir()
+        if not run_dir:
+            run_dir = run_manager.get_next_run_dir()
+    else:
+        run_dir = run_manager.get_next_run_dir()
+
     client = init_client()
 
     # Only ask output name confirmation for non-pre-annotation
@@ -48,13 +55,6 @@ def test_processing(
             input_dataset_version_id=params["input_dataset_version_id"],
             output_name=params["output_dataset_version_name"],
         )
-
-    if reuse_dir:
-        run_dir = run_manager.get_latest_run_dir()
-        if not run_dir:
-            run_dir = run_manager.get_next_run_dir()
-    else:
-        run_dir = run_manager.get_next_run_dir()
 
     run_manager.save_run_config(run_dir=run_dir, config_data=params)
 
@@ -73,7 +73,7 @@ def test_processing(
         params=params,
     )
 
-    run_pipeline_command(command, str(run_dir))
+    run_pipeline_command(command=command, working_dir=str(run_dir))
 
     typer.echo(
         typer.style(

@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import Any
 
 import typer
 
@@ -12,16 +11,34 @@ from picsellia_cli.utils.runner import (
     run_pipeline_command,
 )
 
+import toml
 
-def test_training(pipeline_name: str, reuse_dir: bool = False):
+
+def test_training(
+    pipeline_name: str,
+    reuse_dir: bool = False,
+    config_file: str | None = None,
+):
     ensure_env_vars()
     config = PipelineConfig(pipeline_name)
     run_manager = RunManager(config.pipeline_dir)
 
-    stored_params: dict[str, Any] = {}
-    params, run_dir = get_training_params_and_run_dir(
-        run_manager, reuse_dir, stored_params
+    config_file_to_reuse = Path(config_file) if config_file else None
+    if reuse_dir and config_file_to_reuse is None:
+        config_file_to_reuse = run_manager.get_latest_run_config_path()
+
+    params = get_training_params(
+        run_manager=run_manager, config_file=config_file_to_reuse
     )
+
+    if reuse_dir:
+        run_dir = run_manager.get_latest_run_dir()
+        if not run_dir:
+            run_dir = run_manager.get_next_run_dir()
+    else:
+        run_dir = run_manager.get_next_run_dir()
+
+    run_manager.save_run_config(run_dir=run_dir, config_data=params)
 
     env_path = create_virtual_env(requirements_path=config.get_requirements_path())
     python_executable = os.path.join(
@@ -41,7 +58,7 @@ def test_training(pipeline_name: str, reuse_dir: bool = False):
         str(run_dir),
     ]
 
-    run_pipeline_command(command, str(run_dir))
+    run_pipeline_command(command=command, working_dir=str(run_dir))
 
     typer.echo(
         typer.style(
@@ -59,47 +76,38 @@ def prompt_training_params(stored_params: dict) -> dict:
     return {"experiment_id": experiment_id}
 
 
-def get_training_params_and_run_dir(
+def get_training_params(
     run_manager: RunManager,
-    reuse_dir: bool,
-    stored_params: dict[str, Any],
-) -> tuple[dict, Path]:
+    config_file: Path | None = None,
+) -> dict:
     """
     Handles reuse or prompting of training parameters and determines the run directory.
 
     Returns:
         Tuple of selected params and the run directory path.
     """
-    latest_config = run_manager.get_latest_run_config()
-
-    if reuse_dir:
-        run_dir = run_manager.get_latest_run_dir()
-        if not latest_config or not run_dir:
-            typer.echo(
-                typer.style(
-                    "❌ No existing run/config found to reuse.", fg=typer.colors.RED
-                )
-            )
-            raise typer.Exit(code=1)
-        typer.echo(
-            typer.style(
-                f"🔁 Reusing latest run: {run_dir.name}", fg=typer.colors.YELLOW
-            )
-        )
-        return latest_config, run_dir
+    if config_file and config_file.exists():
+        with config_file.open("r") as f:
+            return toml.load(f)
+    else:
+        latest_config_path = run_manager.get_latest_run_config_path()
+        if latest_config_path:
+            with open(latest_config_path, "r") as f:
+                latest_config = toml.load(f)
+        else:
+            latest_config = None
 
     params = {}
+    stored_params = {}
+
     if latest_config:
         summary = " / ".join(f"{k}={v}" for k, v in latest_config.items())
         reuse = typer.confirm(f"📝 Reuse previous config? {summary}", default=True)
+        stored_params = latest_config
         if reuse:
             params = latest_config
-        else:
-            params = prompt_training_params(stored_params)
 
     if not params:
         params = prompt_training_params(stored_params)
 
-    run_dir = run_manager.get_next_run_dir()
-    run_manager.save_run_config(run_dir, params)
-    return params, run_dir
+    return params

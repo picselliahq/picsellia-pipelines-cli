@@ -108,12 +108,17 @@ def test(
     reuse_dir: bool = typer.Option(
         False, help="Reuse previous run directory if available"
     ),
+    config_file: str = typer.Option(None, help="Path to a custom config file"),
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
-        test_training(pipeline_name=pipeline_name, reuse_dir=reuse_dir)
+        test_training(
+            pipeline_name=pipeline_name, reuse_dir=reuse_dir, config_file=config_file
+        )
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
-        test_processing(pipeline_name=pipeline_name, reuse_dir=reuse_dir)
+        test_processing(
+            pipeline_name=pipeline_name, reuse_dir=reuse_dir, config_file=config_file
+        )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
         raise typer.Exit()
