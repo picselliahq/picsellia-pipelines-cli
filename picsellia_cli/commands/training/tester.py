@@ -17,13 +17,13 @@ import toml
 def test_training(
     pipeline_name: str,
     reuse_dir: bool = False,
-    config_file: str | None = None,
+    run_config_file: str | None = None,
 ):
     ensure_env_vars()
     config = PipelineConfig(pipeline_name)
     run_manager = RunManager(config.pipeline_dir)
 
-    config_file_to_reuse = Path(config_file) if config_file else None
+    config_file_to_reuse = Path(run_config_file) if run_config_file else None
     if reuse_dir and config_file_to_reuse is None:
         config_file_to_reuse = run_manager.get_latest_run_config_path()
 
