@@ -1,67 +1,114 @@
 import os
-import typer
 from pathlib import Path
+import typer
 from dotenv import load_dotenv
 
 
-def require_env_var(name: str) -> str:
+def resolve_env_from_host(host: str) -> str:
+    host = host.lower()
+    if "staging" in host:
+        return "STAGING"
+    elif "localhost" in host or "127.0.0.1" in host:
+        return "LOCAL"
+    else:
+        return "PROD"
+
+
+def require_env_var(
+    name: str,
+    prompt_if_missing: bool = False,
+    prompt_label: str | None = None,
+    hide_input=False,
+) -> str:
     value = os.getenv(name)
-    if not value:
+    if value:
+        return value
+
+    if not prompt_if_missing:
         raise typer.Exit(
             typer.style(
                 f"❌ Missing required environment variable: {name}", fg=typer.colors.RED
             )
         )
+
+    label = prompt_label or f"Enter value for {name}"
+    value = typer.prompt(label, hide_input=hide_input)
+    os.environ[name] = value
+    _write_env_var(name, value)
     return value
 
 
-def ensure_env_vars():
-    """
-    Prompt for PICSELLIA_API_TOKEN, PICSELLIA_ORGANIZATION_NAME and PICSELLIA_HOST if not found in environment.
-    Sets them in os.environ for immediate use and saves them to a .env file.
-    """
+def _write_env_var(key: str, value: str):
     env_file = Path.home() / ".config" / "picsellia" / ".env"
     env_file.parent.mkdir(parents=True, exist_ok=True)
 
     if env_file.exists():
-        load_dotenv(dotenv_path=env_file)
+        existing = env_file.read_text().splitlines()
+    else:
+        existing = []
 
-    env_vars = {
-        "PICSELLIA_API_TOKEN": {
-            "prompt": "🔐 Enter your Picsellia API token",
-            "hide_input": True,
-        },
-        "PICSELLIA_ORGANIZATION_NAME": {
-            "prompt": "🏢 Enter your Picsellia organization name",
-            "hide_input": False,
-        },
-        "PICSELLIA_HOST": {
-            "prompt": "🌍 Enter the Picsellia host",
-            "default": "https://app.picsellia.com",
-            "hide_input": False,
-        },
+    if not any(line.startswith(f"{key}=") for line in existing):
+        with env_file.open("a") as f:
+            f.write(f"{key}={value}\n")
+
+
+def get_api_token_from_host(host: str) -> str:
+    """
+    Resolve the API token for a given host using the environment config.
+    Will prompt and persist if missing.
+    """
+    suffix = resolve_env_from_host(host)
+    token_var = f"PICSELLIA_API_TOKEN_{suffix}"
+    return require_env_var(
+        token_var,
+        prompt_if_missing=True,
+        prompt_label=f"🔐 Enter API token for host {host} ({suffix})",
+        hide_input=True,
+    )
+
+
+def get_host_env_config(host: str) -> dict[str, str]:
+    """
+    Dynamically load env vars based on host.
+    Prompt and persist if any are missing.
+    """
+    suffix = resolve_env_from_host(host)
+    host_var = f"PICSELLIA_HOST_{suffix}"
+    org_var = f"PICSELLIA_ORGANIZATION_NAME_{suffix}"
+
+    return {
+        "api_token": get_api_token_from_host(host=host),
+        "organization_name": require_env_var(
+            org_var,
+            prompt_if_missing=True,
+            prompt_label=f"🏢 Enter organization name for {suffix}",
+        ),
+        "host": require_env_var(
+            host_var,
+            prompt_if_missing=True,
+            prompt_label=f"🌍 Enter host URL for {suffix}",
+        ),
     }
 
-    existing_lines = []
+
+def ensure_env_vars(host: str = "PROD"):
+    """
+    Load .env to memory. Ensure PROD values are set for default fallbacks.
+    """
+    env_file = Path.home() / ".config" / "picsellia" / ".env"
     if env_file.exists():
-        existing_lines = env_file.read_text().splitlines()
+        load_dotenv(dotenv_path=env_file)
 
-    new_vars = []
-
-    for var, settings in env_vars.items():
-        if not os.getenv(var):
-            if settings.get("hide_input"):
-                value = typer.prompt(settings["prompt"], hide_input=True)
-            else:
-                value = typer.prompt(
-                    settings["prompt"], default=settings.get("default", None)
-                )
-            os.environ[var] = value
-
-            if not any(line.startswith(f"{var}=") for line in existing_lines):
-                new_vars.append(f"{var}={value}")
-
-    if new_vars:
-        with env_file.open("a") as f:
-            for line in new_vars:
-                f.write(f"{line}\n")
+    for var_base, label, hide in [
+        ("PICSELLIA_API_TOKEN", f"🔐 Enter your Picsellia API token ({host})", True),
+        ("PICSELLIA_HOST", "🌍 Enter the Picsellia host ({host})", False),
+        (
+            "PICSELLIA_ORGANIZATION_NAME",
+            "🏢 Enter your Picsellia organization name ({host})",
+            False,
+        ),
+    ]:
+        full_var = f"{var_base}_{host}"
+        require_env_var(
+            full_var, prompt_if_missing=True, prompt_label=label, hide_input=hide
+        )

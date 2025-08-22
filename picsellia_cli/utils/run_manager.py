@@ -28,7 +28,6 @@ class RunManager:
             key=lambda p: int(p.parent.name[3:]),
             reverse=True,
         )
-        print(candidates)
         if not candidates:
             return None
         return candidates[0]

@@ -19,8 +19,12 @@ def create_virtual_env(requirements_path: Path) -> Path:
         typer.echo("📦 Detected pyproject.toml — using uv sync...")
 
         try:
-            subprocess.run(["uv", "lock", "--project", str(pipeline_dir)], check=True)
-            subprocess.run(["uv", "sync", "--project", str(pipeline_dir)], check=True)
+            subprocess.run(
+                ["uv", "lock", "--no-cache", "--project", str(pipeline_dir)], check=True
+            )
+            subprocess.run(
+                ["uv", "sync", "--no-cache", "--project", str(pipeline_dir)], check=True
+            )
         except subprocess.CalledProcessError as e:
             typer.secho(
                 f"❌ uv operation failed (code {e.returncode})", fg=typer.colors.RED
@@ -53,9 +57,10 @@ def create_virtual_env(requirements_path: Path) -> Path:
     return env_path
 
 
-def run_pipeline_command(command: list[str], working_dir: str):
+def run_pipeline_command(command: list[str], working_dir: str, api_token: str):
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path.cwd())
+    env["api_token"] = api_token
 
     typer.echo(
         f"🚀 Running pipeline with working_dir={working_dir} and PYTHONPATH={Path.cwd()}..."
