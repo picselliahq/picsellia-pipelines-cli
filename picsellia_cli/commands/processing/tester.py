@@ -18,6 +18,7 @@ from picsellia_cli.utils.runner import (
     run_pipeline_command,
 )
 import toml
+import json
 
 
 def test_processing(
@@ -139,8 +140,11 @@ def get_processing_params(
     stored_params = {}
 
     if latest_config:
-        summary = " / ".join(f"{k}={v}" for k, v in latest_config.items())
-        reuse = typer.confirm(f"📝 Reuse previous config? {summary}", default=True)
+        print_config_io_summary(latest_config)
+        reuse = typer.confirm(
+            typer.style("📝 Do you want to reuse this config?", fg=typer.colors.CYAN),
+            default=True,
+        )
         stored_params = latest_config
         if reuse:
             return latest_config
@@ -353,7 +357,7 @@ def enrich_output_metadata_after_run(client: Client, params: dict):
 
             params["output"]["dataset_version"].update(
                 {
-                    "id": new_version.id,
+                    "id": str(new_version.id),
                     "version_name": new_version.version,
                     "origin_name": dataset.name,
                     "url": f"{client.connexion.host}/{client.connexion.organization_id}/dataset/{dataset.id}/version/{new_version.id}/assets?offset=0&q=&order_by=-created_at",
@@ -362,3 +366,16 @@ def enrich_output_metadata_after_run(client: Client, params: dict):
 
         except Exception as e:
             typer.echo(f"⚠️ Could not fetch output dataset version metadata: {e}")
+
+
+def print_config_io_summary(config: dict):
+    input_section = config.get("input", {})
+    output_section = config.get("output", {})
+
+    io_summary = {
+        "input": input_section,
+        "output": output_section,
+    }
+
+    typer.echo(typer.style("🧾 Reusing previous config:\n", fg=typer.colors.CYAN))
+    typer.echo(json.dumps(io_summary, indent=2))
