@@ -1,63 +1,28 @@
 from picsellia_cli.utils.base_template import BaseTemplate
 
 
-PROCESSING_PIPELINE_PICSELLIA = """from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
-from picsellia_cv_engine.core.services.utils.picsellia_context import create_picsellia_processing_context
-from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
-from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
+PROCESSING_PIPELINE = """import argparse
 
-from steps import process
-from utils.parameters import ProcessingParameters
-
-context = create_picsellia_processing_context(
-    processing_parameters_cls=ProcessingParameters
-)
-
-@pipeline(
-    context=context,
-    log_folder_path="logs/",
-    remove_logs_on_completion=False,
-)
-def {pipeline_name}_pipeline():
-    dataset_collection = load_coco_datasets()
-    dataset_collection["output"] = process(
-        dataset_collection["input"], dataset_collection["output"]
-    )
-    upload_full_dataset(dataset_collection["output"], use_id=False)
-    return dataset_collection
-
-if __name__ == "__main__":
-    {pipeline_name}_pipeline()
-"""
-
-PROCESSING_PIPELINE_LOCAL = """import argparse
+from picsellia.types.enums import ProcessingType
+from picsellia_cv_engine.core.services.context.unified_context import create_processing_context_from_config
 from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
-from picsellia_cv_engine.core.services.utils.local_context import create_local_dataset_processing_context
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_full_dataset
 
 from steps import process
 from utils.parameters import ProcessingParameters
 
-# Parse command-line arguments
-parser = argparse.ArgumentParser(description="Run the local processing pipeline")
-parser.add_argument("--api_token", required=True, type=str, help="Picsellia API token")
-parser.add_argument("--organization_name", required=True, type=str, help="Picsellia Organization ID")
-parser.add_argument("--job_type", required=True, type=str, choices=["DATASET_VERSION_CREATION", "TRAINING"], help="Job type")
-parser.add_argument("--input_dataset_version_id", required=True, type=str, help="Input dataset version ID")
-parser.add_argument("--output_dataset_version_name", required=False, type=str, help="Output dataset version name", default=None)
-parser.add_argument("--working_dir", required=False, type=str, help="Working directory", default=None)
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--mode", choices=["local", "picsellia"], default="picsellia")
+parser.add_argument("--config-file", type=str, required=False)
 args = parser.parse_args()
 
-# Create local processing context
-context = create_local_dataset_processing_context(
+context = create_processing_context_from_config(
+    processing_type=ProcessingType.DATASET_VERSION_CREATION,
     processing_parameters_cls=ProcessingParameters,
-    api_token=args.api_token,
-    organization_name=args.organization_name,
-    job_type=args.job_type,
-    input_dataset_version_id=args.input_dataset_version_id,
-    output_dataset_version_name=args.output_dataset_version_name,
-    working_dir=args.working_dir,
+    mode=args.mode,
+    config_file_path=args.config_file,
 )
 
 @pipeline(
@@ -80,7 +45,7 @@ if __name__ == "__main__":
 PROCESSING_PIPELINE_STEPS = """from copy import deepcopy
 
 from picsellia_cv_engine.core import CocoDataset
-from picsellia_cv_engine.core.contexts import PicselliaProcessingContext
+from picsellia_cv_engine.core.contexts import PicselliaDatasetProcessingContext
 from picsellia_cv_engine.decorators.pipeline_decorator import Pipeline
 from picsellia_cv_engine.decorators.step_decorator import step
 
@@ -107,7 +72,7 @@ def process(
     \"\"\"
 
     # Get processing parameters from the user-defined configuration
-    context: PicselliaProcessingContext = Pipeline.get_active_context()
+    context: PicselliaDatasetProcessingContext = Pipeline.get_active_context()
     parameters = context.processing_parameters.to_dict()
 
     # Initialize an empty COCO dataset
@@ -240,6 +205,8 @@ class ProcessingParameters(Parameters):
 """
 
 PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
+picsellia-pipelines-cli
+picsellia-cv-engine
 """
 
 PROCESSING_PIPELINE_PYPROJECT = """[project]
@@ -250,12 +217,11 @@ requires-python = ">=3.10"
 
 dependencies = [
     "picsellia-pipelines-cli",
-]
-
-[dependency-groups]
-dev = [
     "picsellia-cv-engine",
 ]
+
+[tool.uv.sources]
+picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "feat/unified-pipeline-context-runner" }}
 """
 
 
@@ -281,7 +247,7 @@ RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
 ENV PYTHONPATH="/experiment"
 
-ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/picsellia_pipeline.py"]
+ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/pipeline.py"]
 """
 
 
@@ -308,10 +274,7 @@ class DatasetVersionCreationProcessingTemplate(BaseTemplate):
 
     def get_main_files(self) -> dict[str, str]:
         files = {
-            "picsellia_pipeline.py": PROCESSING_PIPELINE_PICSELLIA.format(
-                pipeline_name=self.pipeline_name,
-            ),
-            "local_pipeline.py": PROCESSING_PIPELINE_LOCAL.format(
+            "pipeline.py": PROCESSING_PIPELINE.format(
                 pipeline_name=self.pipeline_name,
             ),
             "steps.py": PROCESSING_PIPELINE_STEPS,
@@ -343,8 +306,7 @@ class DatasetVersionCreationProcessingTemplate(BaseTemplate):
                 "type": self.pipeline_type,
             },
             "execution": {
-                "picsellia_pipeline_script": "picsellia_pipeline.py",
-                "local_pipeline_script": "local_pipeline.py",
+                "pipeline_script": "pipeline.py",
                 "requirements_file": "pyproject.toml"
                 if self.use_pyproject
                 else "requirements.txt",
