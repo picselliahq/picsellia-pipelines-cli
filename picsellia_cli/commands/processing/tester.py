@@ -43,8 +43,6 @@ def test_processing(
     if reuse_dir and config_file_to_reuse is None:
         config_file_to_reuse = run_manager.get_latest_run_config_path()
 
-    client = init_client(host=host)
-
     if config_file_to_reuse and config_file_to_reuse.exists():
         params = toml.load(config_file_to_reuse)
         params.setdefault("run", {})
@@ -69,6 +67,8 @@ def test_processing(
 
     if "organization_name" not in params["auth"]:
         params["auth"]["organization_name"] = env_config["organization_name"]
+
+    client = init_client(host=params["auth"]["host"])
 
     if pipeline_type == "DATASET_VERSION_CREATION":
         params["output"]["dataset_version"]["name"] = check_output_dataset_version(
@@ -250,7 +250,7 @@ def prompt_data_auto_tagging_params(stored_params: dict) -> dict:
         "job": {"type": "DATA_AUTO_TAGGING"},
         "input": {
             "datalake": {"id": input_datalake_id},
-            "model_version": {"model_version_id": model_version_id},
+            "model_version": {"id": model_version_id},
         },
         "output": {"datalake": {"id": output_datalake_id}},
         "parameters": {"tags_list": tags_list},
@@ -330,12 +330,30 @@ def enrich_run_config_with_metadata(client: Client, params: dict):
     ):
         model_version_id = params["input"]["model_version"]["id"]
         try:
+            print(f"Resolving model version id: {model_version_id}")
+            print(f"Client connexion: {client.connexion.organization_id}")
             model_version = client.get_model_version_by_id(model_version_id)
             params["input"]["model_version"] = {
                 "id": model_version_id,
                 "name": model_version.name,
                 "origin_name": model_version.origin_name,
                 "url": f"{client.connexion.host}/{client.connexion.organization_id}/model/{model_version.origin_id}/version/{model_version.id}",
+            }
+        except Exception as e:
+            typer.echo(f"⚠️ Could not resolve model metadata: {e}")
+
+    if (
+        "input" in params
+        and "datalake" in params["input"]
+        and "id" in params["input"]["datalake"]
+    ):
+        datalake_id = params["input"]["datalake"]["id"]
+        try:
+            datalake = client.get_datalake(id=datalake_id)
+            params["input"]["datalake"] = {
+                "id": datalake_id,
+                "name": datalake.name,
+                "url": f"{client.connexion.host}/{client.connexion.organization_id}/datalake/{datalake_id}?offset=0&q=&order_by=-created_at",
             }
         except Exception as e:
             typer.echo(f"⚠️ Could not resolve model metadata: {e}")
