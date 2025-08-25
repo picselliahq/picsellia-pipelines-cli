@@ -58,7 +58,9 @@ def test_training(
         str(run_dir),
     ]
 
-    run_pipeline_command(command=command, working_dir=str(run_dir))
+    run_pipeline_command(
+        command=command, working_dir=str(run_dir), api_token=params["api_token"]
+    )
 
     typer.echo(
         typer.style(
