@@ -47,7 +47,9 @@ def deploy_processing(
     )
 
     all_envs = get_available_envs()
-    target_envs = [env for env in all_envs if env["host"] == host] if host else all_envs
+    target_envs = (
+        [env for env in all_envs if env["suffix"] == host.upper()] if host else all_envs
+    )
 
     if host and not target_envs:
         raise typer.Exit(f"❌ No environment found for host '{host}'")
@@ -84,6 +86,7 @@ def get_available_envs():
                     "api_token": token,
                     "organization_name": org,
                     "host": host,
+                    "suffix": suffix,
                 }
             )
 
