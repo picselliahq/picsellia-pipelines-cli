@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from pathlib import Path
 
 import typer
@@ -16,7 +17,11 @@ def ensure_docker_login(image_name: str):
 
     try:
         result = subprocess.run(
-            ["docker", "info"], capture_output=True, text=True, check=True
+            ["docker", "info"],
+            capture_output=True,
+            text=True,
+            check=True,
+            stdin=sys.stdin,
         )
     except subprocess.CalledProcessError:
         typer.echo("❌ Failed to retrieve Docker info. Is Docker running?")
@@ -24,7 +29,7 @@ def ensure_docker_login(image_name: str):
 
     current_user = None
     for line in result.stdout.splitlines():
-        if line.startswith("Username:"):
+        if line.find("Username:") != -1:
             current_user = line.split(":", 1)[1].strip()
             break
 
@@ -44,7 +49,11 @@ def ensure_docker_login(image_name: str):
             f"🔑 Logging in as '{expected_user}' (you may need to enter a Personal Access Token)"
         )
         try:
-            subprocess.run(["docker", "login", "-u", expected_user], check=True)
+            subprocess.run(
+                ["docker", "login", "-u", expected_user],
+                check=True,
+                stdin=sys.stdin,
+            )
         except subprocess.CalledProcessError:
             typer.echo("❌ Docker login failed. Please check your credentials.")
             raise typer.Exit()
