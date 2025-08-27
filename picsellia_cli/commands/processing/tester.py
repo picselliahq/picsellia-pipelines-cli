@@ -28,9 +28,9 @@ def test_processing(
     host: str = "prod",
 ):
     ensure_env_vars()
-    config = PipelineConfig(pipeline_name=pipeline_name)
-    pipeline_type = config.get("metadata", "type")
-    run_manager = RunManager(config.pipeline_dir)
+    piepline_config = PipelineConfig(pipeline_name=pipeline_name)
+    pipeline_type = piepline_config.get("metadata", "type")
+    run_manager = RunManager(piepline_config.pipeline_dir)
 
     if reuse_dir:
         run_dir = run_manager.get_latest_run_dir()
@@ -39,49 +39,54 @@ def test_processing(
     else:
         run_dir = run_manager.get_next_run_dir()
 
-    config_file_to_reuse = Path(run_config_file) if run_config_file else None
-    if reuse_dir and config_file_to_reuse is None:
-        config_file_to_reuse = run_manager.get_latest_run_config_path()
+    run_config_path = Path(run_config_file) if run_config_file else None
+    if reuse_dir and run_config_path is None:
+        run_config_path = run_manager.get_latest_run_config_path()
 
-    if config_file_to_reuse and config_file_to_reuse.exists():
-        params = toml.load(config_file_to_reuse)
-        params.setdefault("run", {})
-        params["run"]["working_dir"] = str(run_dir)
+    if run_config_path and run_config_path.exists():
+        run_config = toml.load(run_config_path)
+        run_config.setdefault("run", {})
+        run_config["run"]["working_dir"] = str(run_dir)
     else:
-        params = get_processing_params(
+        run_config = get_processing_params(
             run_manager=run_manager,
             pipeline_type=pipeline_type,
             pipeline_name=pipeline_name,
             config_file=None,
         )
-        params.setdefault("run", {})
-        params["run"]["working_dir"] = str(run_dir)
+        run_config.setdefault("run", {})
+        run_config["run"]["working_dir"] = str(run_dir)
 
-    if "auth" in params and "host" in params["auth"]:
-        host = params["auth"]["host"]
+    if "auth" in run_config and "host" in run_config["auth"]:
+        host = run_config["auth"]["host"]
         env_config = get_host_env_config(host=host)
     else:
         env_config = get_host_env_config(host=host.upper())
-        params.setdefault("auth", {})
-        params["auth"]["host"] = env_config["host"]
+        run_config.setdefault("auth", {})
+        run_config["auth"]["host"] = env_config["host"]
 
-    if "organization_name" not in params["auth"]:
-        params["auth"]["organization_name"] = env_config["organization_name"]
+    if "organization_name" not in run_config["auth"]:
+        run_config["auth"]["organization_name"] = env_config["organization_name"]
 
-    client = init_client(host=params["auth"]["host"])
+    client = init_client(host=run_config["auth"]["host"])
 
     if pipeline_type == "DATASET_VERSION_CREATION":
-        params["output"]["dataset_version"]["name"] = check_output_dataset_version(
+        run_config["output"]["dataset_version"]["name"] = check_output_dataset_version(
             client=client,
-            input_dataset_version_id=params["input"]["dataset_version"]["id"],
-            output_name=params["output"]["dataset_version"]["name"],
+            input_dataset_version_id=run_config["input"]["dataset_version"]["id"],
+            output_name=run_config["output"]["dataset_version"]["name"],
         )
 
-    enrich_run_config_with_metadata(client=client, params=params)
-    run_manager.save_run_config(run_dir=run_dir, config_data=params)
+    default_pipeline_params = piepline_config.extract_default_parameters()
+    run_config = merge_with_default_parameters(run_config, default_pipeline_params)
+
+    enrich_run_config_with_metadata(client=client, run_config=run_config)
+    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
     saved_run_config_path = _get_saved_run_config_path(run_manager, run_dir)
 
-    env_path = create_virtual_env(requirements_path=config.get_requirements_path())
+    env_path = create_virtual_env(
+        requirements_path=piepline_config.get_requirements_path()
+    )
     python_executable = (
         env_path / "Scripts" / "python.exe"
         if os.name == "nt"
@@ -90,12 +95,12 @@ def test_processing(
 
     command = build_processing_command(
         python_executable=python_executable,
-        pipeline_script_path=config.get_script_path("pipeline_script"),
+        pipeline_script_path=piepline_config.get_script_path("pipeline_script"),
         run_config_file=saved_run_config_path,
         mode="local",
     )
 
-    api_token = get_api_token_from_host(host=params["auth"]["host"])
+    api_token = get_api_token_from_host(host=run_config["auth"]["host"])
 
     run_pipeline_command(
         command=command,
@@ -103,8 +108,8 @@ def test_processing(
         api_token=api_token,
     )
 
-    enrich_output_metadata_after_run(client=client, params=params)
-    run_manager.save_run_config(run_dir=run_dir, config_data=params)
+    enrich_output_metadata_after_run(client=client, run_config=run_config)
+    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
 
     typer.echo(
         typer.style(
@@ -305,16 +310,16 @@ def build_processing_command(
     ]
 
 
-def enrich_run_config_with_metadata(client: Client, params: dict):
+def enrich_run_config_with_metadata(client: Client, run_config: dict):
     if (
-        "input" in params
-        and "dataset_version" in params["input"]
-        and "id" in params["input"]["dataset_version"]
+        "input" in run_config
+        and "dataset_version" in run_config["input"]
+        and "id" in run_config["input"]["dataset_version"]
     ):
-        dataset_version_id = params["input"]["dataset_version"]["id"]
+        dataset_version_id = run_config["input"]["dataset_version"]["id"]
         try:
             dataset_version = client.get_dataset_version_by_id(dataset_version_id)
-            params["input"]["dataset_version"] = {
+            run_config["input"]["dataset_version"] = {
                 "id": dataset_version_id,
                 "name": dataset_version.version,
                 "origin_name": dataset_version.name,
@@ -324,16 +329,16 @@ def enrich_run_config_with_metadata(client: Client, params: dict):
             typer.echo(f"⚠️ Could not resolve dataset metadata: {e}")
 
     if (
-        "input" in params
-        and "model_version" in params["input"]
-        and "id" in params["input"]["model_version"]
+        "input" in run_config
+        and "model_version" in run_config["input"]
+        and "id" in run_config["input"]["model_version"]
     ):
-        model_version_id = params["input"]["model_version"]["id"]
+        model_version_id = run_config["input"]["model_version"]["id"]
         try:
             print(f"Resolving model version id: {model_version_id}")
             print(f"Client connexion: {client.connexion.organization_id}")
             model_version = client.get_model_version_by_id(model_version_id)
-            params["input"]["model_version"] = {
+            run_config["input"]["model_version"] = {
                 "id": model_version_id,
                 "name": model_version.name,
                 "origin_name": model_version.origin_name,
@@ -343,14 +348,14 @@ def enrich_run_config_with_metadata(client: Client, params: dict):
             typer.echo(f"⚠️ Could not resolve model metadata: {e}")
 
     if (
-        "input" in params
-        and "datalake" in params["input"]
-        and "id" in params["input"]["datalake"]
+        "input" in run_config
+        and "datalake" in run_config["input"]
+        and "id" in run_config["input"]["datalake"]
     ):
-        datalake_id = params["input"]["datalake"]["id"]
+        datalake_id = run_config["input"]["datalake"]["id"]
         try:
             datalake = client.get_datalake(id=datalake_id)
-            params["input"]["datalake"] = {
+            run_config["input"]["datalake"] = {
                 "id": datalake_id,
                 "name": datalake.name,
                 "url": f"{client.connexion.host}/{client.connexion.organization_id}/datalake/{datalake_id}?offset=0&q=&order_by=-created_at",
@@ -359,21 +364,21 @@ def enrich_run_config_with_metadata(client: Client, params: dict):
             typer.echo(f"⚠️ Could not resolve model metadata: {e}")
 
 
-def enrich_output_metadata_after_run(client: Client, params: dict):
+def enrich_output_metadata_after_run(client: Client, run_config: dict):
     if (
-        params.get("job", {}).get("type") == "DATASET_VERSION_CREATION"
-        and "output" in params
-        and "dataset_version" in params["output"]
-        and "name" in params["output"]["dataset_version"]
+        run_config.get("job", {}).get("type") == "DATASET_VERSION_CREATION"
+        and "output" in run_config
+        and "dataset_version" in run_config["output"]
+        and "name" in run_config["output"]["dataset_version"]
     ):
         try:
-            input_dataset_id = params["input"]["dataset_version"]["id"]
-            dataset_version_name = params["output"]["dataset_version"]["name"]
+            input_dataset_id = run_config["input"]["dataset_version"]["id"]
+            dataset_version_name = run_config["output"]["dataset_version"]["name"]
             input_dataset = client.get_dataset_version_by_id(input_dataset_id)
             dataset = client.get_dataset_by_id(input_dataset.origin_id)
             new_version = dataset.get_version(version=dataset_version_name)
 
-            params["output"]["dataset_version"].update(
+            run_config["output"]["dataset_version"].update(
                 {
                     "id": str(new_version.id),
                     "version_name": new_version.version,
@@ -397,3 +402,28 @@ def print_config_io_summary(config: dict):
 
     typer.echo(typer.style("🧾 Reusing previous config:\n", fg=typer.colors.CYAN))
     typer.echo(json.dumps(io_summary, indent=2))
+
+
+def merge_with_default_parameters(run_config: dict, default_parameters: dict) -> dict:
+    """
+    Merge existing run config parameters with default parameters from the pipeline.
+
+    - Keeps existing values in `run_config["parameters"]`
+    - Adds missing defaults from `default_parameters`
+
+    Args:
+        run_config (dict): The current parameters dictionary (typically from run_config.toml)
+        default_parameters (dict): The default parameters from the pipeline config
+
+    Returns:
+        dict: The merged parameters dictionary (with all required defaults)
+    """
+    run_config.setdefault("parameters", {})
+    merged_params = default_parameters.copy()
+
+    # Override defaults with existing values from run config
+    merged_params.update(run_config["parameters"])
+
+    # Set back merged values into run_config
+    run_config["parameters"] = merged_params
+    return run_config
