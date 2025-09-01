@@ -20,6 +20,12 @@ from picsellia_cli.utils.runner import (
 import toml
 import json
 
+from picsellia_cli.utils.tester import (
+    merge_with_default_parameters,
+    get_saved_run_config_path,
+    build_pipeline_command,
+)
+
 
 def test_processing(
     pipeline_name: str,
@@ -30,7 +36,7 @@ def test_processing(
     ensure_env_vars()
     piepline_config = PipelineConfig(pipeline_name=pipeline_name)
     pipeline_type = piepline_config.get("metadata", "type")
-    run_manager = RunManager(piepline_config.pipeline_dir)
+    run_manager = RunManager(pipeline_dir=piepline_config.pipeline_dir)
 
     if reuse_dir:
         run_dir = run_manager.get_latest_run_dir()
@@ -78,11 +84,15 @@ def test_processing(
         )
 
     default_pipeline_params = piepline_config.extract_default_parameters()
-    run_config = merge_with_default_parameters(run_config, default_pipeline_params)
+    run_config = merge_with_default_parameters(
+        run_config=run_config, default_parameters=default_pipeline_params
+    )
 
     enrich_run_config_with_metadata(client=client, run_config=run_config)
     run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
-    saved_run_config_path = _get_saved_run_config_path(run_manager, run_dir)
+    saved_run_config_path = get_saved_run_config_path(
+        run_manager=run_manager, run_dir=run_dir
+    )
 
     env_path = create_virtual_env(
         requirements_path=piepline_config.get_requirements_path()
@@ -93,7 +103,7 @@ def test_processing(
         else env_path / "bin" / "python"
     )
 
-    command = build_processing_command(
+    command = build_pipeline_command(
         python_executable=python_executable,
         pipeline_script_path=piepline_config.get_script_path("pipeline_script"),
         run_config_file=saved_run_config_path,
@@ -117,12 +127,6 @@ def test_processing(
             fg=typer.colors.GREEN,
         )
     )
-
-
-def _get_saved_run_config_path(run_manager: RunManager, run_dir: Path) -> Path:
-    if hasattr(run_manager, "get_run_config_path"):
-        return run_manager.get_run_config_path(run_dir)
-    return run_dir / "run_config.toml"
 
 
 def get_processing_params(
@@ -294,22 +298,6 @@ def check_output_dataset_version(
     return output_name
 
 
-def build_processing_command(
-    python_executable: Path,
-    pipeline_script_path: Path,
-    run_config_file: Path,
-    mode: str = "local",
-) -> list[str]:
-    return [
-        str(python_executable),
-        str(pipeline_script_path),
-        "--config-file",
-        str(run_config_file),
-        "--mode",
-        mode,
-    ]
-
-
 def enrich_run_config_with_metadata(client: Client, run_config: dict):
     if (
         "input" in run_config
@@ -402,28 +390,3 @@ def print_config_io_summary(config: dict):
 
     typer.echo(typer.style("🧾 Reusing previous config:\n", fg=typer.colors.CYAN))
     typer.echo(json.dumps(io_summary, indent=2))
-
-
-def merge_with_default_parameters(run_config: dict, default_parameters: dict) -> dict:
-    """
-    Merge existing run config parameters with default parameters from the pipeline.
-
-    - Keeps existing values in `run_config["parameters"]`
-    - Adds missing defaults from `default_parameters`
-
-    Args:
-        run_config (dict): The current parameters dictionary (typically from run_config.toml)
-        default_parameters (dict): The default parameters from the pipeline config
-
-    Returns:
-        dict: The merged parameters dictionary (with all required defaults)
-    """
-    run_config.setdefault("parameters", {})
-    merged_params = default_parameters.copy()
-
-    # Override defaults with existing values from run config
-    merged_params.update(run_config["parameters"])
-
-    # Set back merged values into run_config
-    run_config["parameters"] = merged_params
-    return run_config

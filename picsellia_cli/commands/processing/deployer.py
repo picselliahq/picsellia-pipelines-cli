@@ -1,6 +1,4 @@
-import os
 import typer
-from semver import VersionInfo
 
 from picsellia import Client
 from picsellia.types.enums import ProcessingType
@@ -9,8 +7,9 @@ from picsellia.exceptions import ResourceConflictError
 from picsellia_cli.utils.deployer import (
     prompt_docker_image_if_missing,
     build_and_push_docker_image,
+    bump_pipeline_version,
 )
-from picsellia_cli.utils.env_utils import ensure_env_vars
+from picsellia_cli.utils.env_utils import ensure_env_vars, get_available_envs
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 
@@ -24,14 +23,14 @@ def deploy_processing(
     🚀 Deploy a processing pipeline to all available environments in the .env.
     """
     ensure_env_vars()
-    config = PipelineConfig(pipeline_name=pipeline_name)
+    pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
 
-    prompt_docker_image_if_missing(config)
-    bump_pipeline_version(config)
-    prompt_allocation_if_missing(config)
+    prompt_docker_image_if_missing(pipeline_config=pipeline_config)
+    bump_pipeline_version(pipeline_config=pipeline_config)
+    prompt_allocation_if_missing(pipeline_config=pipeline_config)
 
-    version = config.get("metadata", "version")
-    image_name = config.get("docker", "image_name")
+    version = pipeline_config.get("metadata", "version")
+    image_name = pipeline_config.get("docker", "image_name")
 
     tags_to_push = [version]
     if "-rc" in version:
@@ -40,7 +39,7 @@ def deploy_processing(
         tags_to_push.append("latest")
 
     build_and_push_docker_image(
-        pipeline_dir=config.pipeline_dir,
+        pipeline_dir=pipeline_config.pipeline_dir,
         image_name=image_name,
         image_tags=tags_to_push,
         force_login=True,
@@ -58,87 +57,13 @@ def deploy_processing(
         typer.echo(f"\n🌍 Deploying on: {env['host']}")
         try:
             register_pipeline_on_host(
-                pipeline_config=config,
+                pipeline_config=pipeline_config,
                 api_token=env["api_token"],
                 organization_name=env["organization_name"],
                 host=env["host"],
             )
         except Exception as e:
             typer.echo(f"❌ Failed to register on {env['host']}: {e}")
-
-
-def get_available_envs():
-    """
-    Scans environment variables for configured deployment targets.
-    Returns a list of dicts with keys: host, api_token, organization_name
-    """
-    envs = []
-    suffixes = ["PROD", "STAGING", "LOCAL"]
-
-    for suffix in suffixes:
-        token = os.getenv(f"PICSELLIA_API_TOKEN_{suffix}")
-        org = os.getenv(f"PICSELLIA_ORGANIZATION_NAME_{suffix}")
-        host = os.getenv(f"PICSELLIA_HOST_{suffix}")
-
-        if token and org and host:
-            envs.append(
-                {
-                    "api_token": token,
-                    "organization_name": org,
-                    "host": host,
-                    "suffix": suffix,
-                }
-            )
-
-    if not envs:
-        raise typer.Exit("❌ No valid deployment environments found in .env")
-
-    return envs
-
-
-def bump_pipeline_version(config: PipelineConfig):
-    try:
-        current_version = config.get("metadata", "version")
-    except KeyError:
-        current_version = "0.1.0"
-
-    typer.echo(f"📌 Current version: {current_version}")
-
-    bump_type = typer.prompt(
-        "🔁 Choose version bump: patch, minor, major, rc, final",
-        default="patch",
-    )
-
-    try:
-        base_version = current_version.split("-")[0]
-        # Patch: normalize to MAJOR.MINOR.PATCH
-        parts = base_version.split(".")
-        while len(parts) < 3:
-            parts.append("0")
-        normalized = ".".join(parts)
-
-        version = VersionInfo.parse(normalized)
-    except ValueError:
-        version = VersionInfo.parse("0.1.0")
-
-    if bump_type == "patch":
-        new_version = version.bump_patch()
-    elif bump_type == "minor":
-        new_version = version.bump_minor()
-    elif bump_type == "major":
-        new_version = version.bump_major()
-    elif bump_type == "rc":
-        new_version = f"{version.bump_patch()}-rc"
-    elif bump_type == "final":
-        new_version = str(version)
-    else:
-        raise typer.Exit("❌ Invalid bump type")
-
-    config.config["metadata"]["version"] = str(new_version)
-    config.config["docker"]["image_tag"] = str(new_version)
-    config.save()
-
-    typer.echo(f"✅ Version bumped to: {new_version}")
 
 
 def prompt_allocation_if_missing(pipeline_config: PipelineConfig):

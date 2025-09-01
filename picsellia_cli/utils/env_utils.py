@@ -112,3 +112,32 @@ def ensure_env_vars(host: str = "PROD"):
         require_env_var(
             full_var, prompt_if_missing=True, prompt_label=label, hide_input=hide
         )
+
+
+def get_available_envs():
+    """
+    Scans environment variables for configured deployment targets.
+    Returns a list of dicts with keys: host, api_token, organization_name
+    """
+    envs = []
+    suffixes = ["PROD", "STAGING", "LOCAL"]
+
+    for suffix in suffixes:
+        token = os.getenv(f"PICSELLIA_API_TOKEN_{suffix}")
+        org = os.getenv(f"PICSELLIA_ORGANIZATION_NAME_{suffix}")
+        host = os.getenv(f"PICSELLIA_HOST_{suffix}")
+
+        if token and org and host:
+            envs.append(
+                {
+                    "api_token": token,
+                    "organization_name": org,
+                    "host": host,
+                    "suffix": suffix,
+                }
+            )
+
+    if not envs:
+        raise typer.Exit("❌ No valid deployment environments found in .env")
+
+    return envs

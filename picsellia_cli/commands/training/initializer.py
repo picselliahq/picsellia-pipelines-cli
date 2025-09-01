@@ -19,6 +19,7 @@ def init_training(
     template: str,
     output_dir: Optional[str] = None,
     use_pyproject: Optional[bool] = True,
+    host: str = "prod",
 ):
     ensure_env_vars()
     output_dir = output_dir or "."
@@ -26,7 +27,7 @@ def init_training(
 
     pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
 
-    client = init_client()
+    client = init_client(host=host)
     template_instance = get_template_instance(
         template_name=template,
         pipeline_name=pipeline_name,

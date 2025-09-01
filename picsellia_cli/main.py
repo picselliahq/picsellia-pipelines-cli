@@ -2,6 +2,7 @@ import typer
 
 from picsellia_cli.commands.processing.deployer import deploy_processing
 from picsellia_cli.commands.processing.initializer import init_processing
+from picsellia_cli.commands.processing.launcher import launch_processing
 from picsellia_cli.commands.processing.smoke_tester import smoke_test_processing
 from picsellia_cli.commands.processing.syncer import sync_processing_params
 from picsellia_cli.commands.processing.tester import test_processing
@@ -92,7 +93,7 @@ def init(
 
 def get_pipeline_type(pipeline_name: str) -> str:
     try:
-        config = PipelineConfig(pipeline_name)
+        config = PipelineConfig(pipeline_name=pipeline_name)
         pipeline_type = config.get("metadata", "type")
         if not pipeline_type:
             raise ValueError
@@ -109,6 +110,9 @@ def test(
         False, help="Reuse previous run directory if available"
     ),
     run_config_file: str = typer.Option(None, help="Path to a custom run config file"),
+    host: str = typer.Option(
+        "prod", help="Target host environment (prod, staging, local)"
+    ),
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
@@ -122,6 +126,7 @@ def test(
             pipeline_name=pipeline_name,
             reuse_dir=reuse_dir,
             run_config_file=run_config_file,
+            host=host,
         )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
@@ -141,12 +146,17 @@ def smoke_test(pipeline_name: str):
 
 
 @app.command(name="deploy")
-def deploy(pipeline_name: str):
-    pipeline_type = get_pipeline_type(pipeline_name)
+def deploy(
+    pipeline_name: str,
+    host: str = typer.Option(
+        "prod", help="Target host environment (prod, staging, local)"
+    ),
+):
+    pipeline_type = get_pipeline_type(pipeline_name=pipeline_name)
     if pipeline_type == "TRAINING":
         deploy_training(pipeline_name=pipeline_name)
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
-        deploy_processing(pipeline_name=pipeline_name)
+        deploy_processing(pipeline_name=pipeline_name, host=host)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
         raise typer.Exit()
@@ -163,6 +173,24 @@ def sync(pipeline_name: str):
         # sync_training_params(pipeline_name=pipeline_name)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
+        raise typer.Exit()
+
+
+@app.command(name="launch")
+def launch(
+    pipeline_name: str,
+    run_config_file: str = typer.Option(help="Path to a custom run config file"),
+    host: str = typer.Option(
+        "prod", help="Target host environment (prod, staging, local)"
+    ),
+):
+    pipeline_type = get_pipeline_type(pipeline_name)
+    if pipeline_type in PROCESSING_TYPES_MAPPING.values():
+        launch_processing(
+            pipeline_name=pipeline_name, run_config_file=run_config_file, host=host
+        )
+    else:
+        typer.echo("❌ Launching is only implemented for processing pipelines.")
         raise typer.Exit()
 
 

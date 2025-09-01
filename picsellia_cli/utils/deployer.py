@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from picsellia_cli.utils.pipeline_config import PipelineConfig
+from semver import VersionInfo
 
 
 def ensure_docker_login(image_name: str):
@@ -147,3 +148,48 @@ def prompt_docker_image_if_missing(pipeline_config: PipelineConfig) -> None:
     pipeline_config.config["docker"]["image_name"] = image_name
     pipeline_config.save()
     typer.echo(f"✅ Docker image will be: {image_name}:<version>")
+
+
+def bump_pipeline_version(pipeline_config: PipelineConfig):
+    try:
+        current_version = pipeline_config.get("metadata", "version")
+    except KeyError:
+        current_version = "0.1.0"
+
+    typer.echo(f"📌 Current version: {current_version}")
+
+    bump_type = typer.prompt(
+        "🔁 Choose version bump: patch, minor, major, rc, final",
+        default="patch",
+    )
+
+    try:
+        base_version = current_version.split("-")[0]
+        # Patch: normalize to MAJOR.MINOR.PATCH
+        parts = base_version.split(".")
+        while len(parts) < 3:
+            parts.append("0")
+        normalized = ".".join(parts)
+
+        version = VersionInfo.parse(normalized)
+    except ValueError:
+        version = VersionInfo.parse("0.1.0")
+
+    if bump_type == "patch":
+        new_version = version.bump_patch()
+    elif bump_type == "minor":
+        new_version = version.bump_minor()
+    elif bump_type == "major":
+        new_version = version.bump_major()
+    elif bump_type == "rc":
+        new_version = f"{version.bump_patch()}-rc"
+    elif bump_type == "final":
+        new_version = str(version)
+    else:
+        raise typer.Exit("❌ Invalid bump type")
+
+    pipeline_config.config["metadata"]["version"] = str(new_version)
+    pipeline_config.config["docker"]["image_tag"] = str(new_version)
+    pipeline_config.save()
+
+    typer.echo(f"✅ Version bumped to: {new_version}")

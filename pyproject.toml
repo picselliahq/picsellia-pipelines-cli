@@ -3,7 +3,7 @@ name = "picsellia-pipelines-cli"
 version = "0.1.1"
 description = ""
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Sonia Garrouch", email = "sonia.garrouch@picsellia.com" }, { name = "Pierre-Nicolas Tiffreau", email = "pierre-nicolas@picsellia.com" }]
 maintainers = [{ name = "Sonia Garrouch", email = "sonia.garrouch@picsellia.com" }, { name = "Pierre-Nicolas Tiffreau", email = "pierre-nicolas@picsellia.com" }]

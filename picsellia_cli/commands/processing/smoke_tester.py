@@ -11,7 +11,7 @@ def smoke_test_processing(
     pipeline_name: str,
 ):
     ensure_env_vars()
-    config = PipelineConfig(pipeline_name)
+    config = PipelineConfig(pipeline_name=pipeline_name)
     prompt_docker_image_if_missing(pipeline_config=config)
 
     image_name = config.get("docker", "image_name")
@@ -21,8 +21,7 @@ def smoke_test_processing(
 
     build_docker_image_only(
         pipeline_dir=config.pipeline_dir,
-        image_name=image_name,
-        image_tag=image_tag,
+        full_image_name=full_image_name,
     )
 
     env_vars = {

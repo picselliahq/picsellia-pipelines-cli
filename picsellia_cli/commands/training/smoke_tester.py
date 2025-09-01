@@ -29,8 +29,7 @@ def smoke_test_training(pipeline_name: str):
 
     build_docker_image_only(
         pipeline_dir=config.pipeline_dir,
-        image_name=image_name,
-        image_tag=image_tag,
+        full_image_name=full_image_name,
     )
 
     env_vars = {
