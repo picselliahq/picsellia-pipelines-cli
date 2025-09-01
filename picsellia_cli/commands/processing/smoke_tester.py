@@ -12,16 +12,16 @@ def smoke_test_processing(
     host: str = "prod",
 ):
     ensure_env_vars(host=host)
-    config = PipelineConfig(pipeline_name=pipeline_name)
-    prompt_docker_image_if_missing(pipeline_config=config)
+    pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
+    prompt_docker_image_if_missing(pipeline_config=pipeline_config)
 
-    image_name = config.get("docker", "image_name")
-    image_tag = config.get("docker", "image_tag")
+    image_name = pipeline_config.get("docker", "image_name")
+    image_tag = pipeline_config.get("docker", "image_tag")
 
     full_image_name = f"{image_name}:{image_tag}"
 
     build_docker_image_only(
-        pipeline_dir=config.pipeline_dir,
+        pipeline_dir=pipeline_config.pipeline_dir,
         full_image_name=full_image_name,
     )
 
@@ -34,7 +34,9 @@ def smoke_test_processing(
         "DEBUG": "True",
     }
 
-    pipeline_script = f"{pipeline_name}/{config.get('execution', 'pipeline_script')}"
+    pipeline_script = (
+        f"{pipeline_name}/{pipeline_config.get('execution', 'pipeline_script')}"
+    )
 
     run_smoke_test_container(
         image=full_image_name, script=pipeline_script, env_vars=env_vars
