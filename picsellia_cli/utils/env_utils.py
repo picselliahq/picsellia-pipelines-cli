@@ -91,24 +91,25 @@ def get_host_env_config(host: str) -> dict[str, str]:
     }
 
 
-def ensure_env_vars(host: str = "PROD"):
+def ensure_env_vars(host: str = "prod"):
     """
-    Load .env to memory. Ensure PROD values are set for default fallbacks.
+    Load .env to memory.
     """
+    suffix = resolve_env_from_host(host=host)
     env_file = Path.home() / ".config" / "picsellia" / ".env"
     if env_file.exists():
         load_dotenv(dotenv_path=env_file)
 
     for var_base, label, hide in [
-        ("PICSELLIA_API_TOKEN", f"🔐 Enter your Picsellia API token ({host})", True),
-        ("PICSELLIA_HOST", "🌍 Enter the Picsellia host ({host})", False),
+        ("PICSELLIA_API_TOKEN", f"🔐 Enter your Picsellia API token ({suffix})", True),
+        ("PICSELLIA_HOST", f"🌍 Enter the Picsellia host ({suffix})", False),
         (
             "PICSELLIA_ORGANIZATION_NAME",
-            "🏢 Enter your Picsellia organization name ({host})",
+            f"🏢 Enter your Picsellia organization name ({suffix})",
             False,
         ),
     ]:
-        full_var = f"{var_base}_{host}"
+        full_var = f"{var_base}_{suffix}"
         require_env_var(
             full_var, prompt_if_missing=True, prompt_label=label, hide_input=hide
         )
