@@ -22,7 +22,7 @@ def deploy_processing(
     """
     🚀 Deploy a processing pipeline to all available environments in the .env.
     """
-    ensure_env_vars()
+    ensure_env_vars(host=host)
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
 
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)
@@ -111,7 +111,7 @@ def register_pipeline_on_host(
 
     try:
         client.create_processing(
-            name=pipeline_config.pipeline_name,
+            name=pipeline_config.get("metadata", "name"),
             description=pipeline_config.get("metadata", "description"),
             type=ProcessingType(pipeline_config.get("metadata", "type")),
             default_cpu=int(pipeline_config.get("docker", "cpu")),
@@ -127,10 +127,12 @@ def register_pipeline_on_host(
 
     except ResourceConflictError:
         typer.echo(
-            f"⚠️ Pipeline '{pipeline_config.pipeline_name}' already exists on {host}"
+            f"⚠️ Pipeline with name '{pipeline_config.get('metadata', 'name')}' already exists on {host}"
         )
         if typer.confirm("Update existing pipeline?", default=True):
-            processing = client.get_processing(name=pipeline_config.pipeline_name)
+            processing = client.get_processing(
+                name=pipeline_config.get("metadata", "name")
+            )
             processing.update(
                 description=pipeline_config.get("metadata", "description"),
                 default_cpu=int(pipeline_config.get("docker", "cpu")),
@@ -139,7 +141,9 @@ def register_pipeline_on_host(
                 docker_image=pipeline_config.get("docker", "image_name"),
                 docker_tag=pipeline_config.get("docker", "image_tag"),
             )
-            typer.echo(f"🔁 Updated pipeline on {host}")
+            typer.echo(
+                f"🔁 Updated pipeline with name '{pipeline_config.get('metadata', 'name')}' on {host}"
+            )
         else:
             raise typer.Exit("❌ Aborted by user.")
 

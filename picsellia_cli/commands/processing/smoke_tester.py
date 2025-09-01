@@ -2,15 +2,16 @@ from picsellia_cli.utils.deployer import (
     build_docker_image_only,
     prompt_docker_image_if_missing,
 )
-from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
+from picsellia_cli.utils.env_utils import ensure_env_vars, get_host_env_config
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.smoke_tester import run_smoke_test_container
 
 
 def smoke_test_processing(
     pipeline_name: str,
+    host: str = "prod",
 ):
-    ensure_env_vars()
+    ensure_env_vars(host=host)
     config = PipelineConfig(pipeline_name=pipeline_name)
     prompt_docker_image_if_missing(pipeline_config=config)
 
@@ -24,9 +25,12 @@ def smoke_test_processing(
         full_image_name=full_image_name,
     )
 
+    env_config = get_host_env_config(host=host)
+
     env_vars = {
-        "api_token": require_env_var("PICSELLIA_API_TOKEN"),
-        "organization_name": require_env_var("PICSELLIA_ORGANIZATION_NAME"),
+        "api_token": env_config["api_token"],
+        "organization_name": env_config["organization_name"],
+        "host": env_config["host"],
         "DEBUG": "True",
     }
 

@@ -20,7 +20,7 @@ def launch_processing(
     """
     🚀 Launch a processing directly on the Picsellia platform using a run config file.
     """
-    ensure_env_vars()
+    ensure_env_vars(host=host)
 
     config_file_to_reuse = Path(run_config_file) if run_config_file else None
 

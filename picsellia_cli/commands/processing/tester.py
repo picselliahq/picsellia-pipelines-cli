@@ -33,7 +33,7 @@ def test_processing(
     run_config_file: str | None = None,
     host: str = "prod",
 ):
-    ensure_env_vars()
+    ensure_env_vars(host=host)
     piepline_config = PipelineConfig(pipeline_name=pipeline_name)
     pipeline_type = piepline_config.get("metadata", "type")
     run_manager = RunManager(pipeline_dir=piepline_config.pipeline_dir)
@@ -89,6 +89,7 @@ def test_processing(
     )
 
     enrich_run_config_with_metadata(client=client, run_config=run_config)
+
     run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
     saved_run_config_path = get_saved_run_config_path(
         run_manager=run_manager, run_dir=run_dir
