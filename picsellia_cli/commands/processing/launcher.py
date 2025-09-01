@@ -106,7 +106,7 @@ def launch_processing(
     _section("🌍 Environment")
     org_id = getattr(getattr(client, "connexion", None), "organization_id", None)
     _kv("Workspace", f"{organization_name} ({org_id})" if org_id else organization_name)
-    _kv("Host", host_config)
+    _kv("Host", host_config["host"])
 
     payload = {
         "processing_id": str(processing.id),
@@ -200,10 +200,6 @@ def launch_processing(
     _kv("CPU", payload["cpu"])
     _kv("GPU", payload["gpu"])
 
-    # Endpoint preview
-    _section("🔗 Endpoint")
-    _kv("API", endpoint, color=typer.colors.BLUE)
-
     # Launch
     try:
         _section("🟩 Launch")
@@ -230,14 +226,7 @@ def launch_processing(
             if not run_id:
                 run_id = resp.get("run_id") or (resp.get("run") or {}).get("id")
 
-            # show server status if available
-            _kv("Server status", resp.get("status"))
-
         _kv("Status", "Launched ✅")
-        if job_id:
-            _kv("Job ID", job_id)
-        if run_id:
-            _kv("Run ID", run_id)
 
         # Build URL(s)
         base = client.connexion.host.rstrip("/")
