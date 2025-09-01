@@ -37,6 +37,7 @@ def init(
     template: str = typer.Option(None, help="Template to use"),
     output_dir: str = typer.Option(".", help="Where to create the pipeline"),
     use_pyproject: bool = typer.Option(True, help="Use pyproject.toml"),
+    host: str = typer.Option(None, help="Host to connect to"),
 ):
     if type is None:
         typer.secho(
@@ -76,6 +77,7 @@ def init(
             template=template,
             output_dir=output_dir,
             use_pyproject=use_pyproject,
+            host=host,
         )
     elif type == "processing":
         init_processing(
@@ -83,6 +85,7 @@ def init(
             template=template,
             output_dir=output_dir,
             use_pyproject=use_pyproject,
+            host=host,
         )
     else:
         typer.echo(
@@ -134,12 +137,17 @@ def test(
 
 
 @app.command(name="smoke-test")
-def smoke_test(pipeline_name: str):
+def smoke_test(
+    pipeline_name: str,
+    host: str = typer.Option(
+        "prod", help="Target host environment (prod, staging, local)"
+    ),
+):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
         smoke_test_training(pipeline_name=pipeline_name)
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
-        smoke_test_processing(pipeline_name=pipeline_name)
+        smoke_test_processing(pipeline_name=pipeline_name, host=host)
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
         raise typer.Exit()
