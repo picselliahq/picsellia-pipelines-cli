@@ -13,6 +13,8 @@ from picsellia_cli.utils.env_utils import (
 )
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
+from datetime import datetime
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Small CLI formatting helpers
@@ -101,15 +103,10 @@ def launch_processing(
         typer.echo(f"❌ Error during launch: {e}")
         raise typer.Exit()
 
-    _section("🚀 Launch processing")
-    _kv("Processing", pipeline_name)
-    _kv("Job type", pipeline_type)
-
     _section("🌍 Environment")
-    org_name = getattr(getattr(client, "connexion", None), "organization_name", None)
     org_id = getattr(getattr(client, "connexion", None), "organization_id", None)
-    _kv("Workspace", f"{org_name} ({org_id})" if org_id else org_name)
-    _kv("Host", client.connexion.host)
+    _kv("Workspace", f"{organization_name} ({org_id})" if org_id else organization_name)
+    _kv("Host", host_config)
 
     payload = {
         "processing_id": str(processing.id),
@@ -213,21 +210,28 @@ def launch_processing(
         _bullet(f"Submitting job for processing '{pipeline_name}'…", accent=True)
         resp = client.connexion.post(endpoint, data=orjson.dumps(payload)).json()
 
-        print(f"response: {resp}")
+        # Extract job & run IDs per your example response
+        job_id = None
+        run_id = None
 
-        # Try to extract job/run IDs from various possible shapes
-        job_id = (
-            isinstance(resp, dict)
-            and (resp.get("job_id") or (resp.get("job") or {}).get("id"))
-        ) or None
-        run_id = (
-            isinstance(resp, dict)
-            and (
-                resp.get("run_id")
+        if isinstance(resp, dict):
+            # job id can be at top level
+            job_id = (
+                resp.get("job_id")
                 or resp.get("id")
-                or (resp.get("run") or {}).get("id")
+                or (resp.get("job") or {}).get("id")
             )
-        ) or None
+
+            # run id may be in runs list (pick the latest), or at top-level
+            runs = resp.get("runs") or []
+            latest_run = _pick_latest_run(runs) if isinstance(runs, list) else None
+            if latest_run and isinstance(latest_run, dict):
+                run_id = latest_run.get("id")
+            if not run_id:
+                run_id = resp.get("run_id") or (resp.get("run") or {}).get("id")
+
+            # show server status if available
+            _kv("Server status", resp.get("status"))
 
         _kv("Status", "Launched ✅")
         if job_id:
@@ -235,11 +239,14 @@ def launch_processing(
         if run_id:
             _kv("Run ID", run_id)
 
-        # Build job URL if we have both IDs
-        if job_id and run_id:
-            org_id = client.connexion.organization_id
-            base = client.connexion.host.rstrip("/")
-            job_url = f"{base}/{org_id}/jobs/{job_id}/runs/{run_id}"
+        # Build URL(s)
+        base = client.connexion.host.rstrip("/")
+        org_id = getattr(client.connexion, "organization_id", None)
+        if job_id and org_id:
+            if run_id:
+                job_url = f"{base}/{org_id}/jobs/{job_id}/runs/{run_id}"
+            else:
+                job_url = f"{base}/{org_id}/jobs/{job_id}"
             _kv("Job URL", job_url, color=typer.colors.BLUE)
 
     except Exception as e:
@@ -247,3 +254,28 @@ def launch_processing(
         raise typer.Exit(code=1)
 
     _hr()
+
+
+def _parse_dt(s: Optional[str]) -> Optional[datetime]:
+    if not s:
+        return None
+    try:
+        # fromisoformat handles offsets like "+00:00"
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _pick_latest_run(runs: list[dict]) -> Optional[dict]:
+    if not runs:
+        return None
+
+    # use updated_at, fallback to created_at
+    def key(r: dict) -> datetime:
+        return (
+            _parse_dt(r.get("updated_at"))
+            or _parse_dt(r.get("created_at"))
+            or datetime.min
+        )
+
+    return max(runs, key=key)
