@@ -11,6 +11,7 @@ from picsellia_cli.utils.env_utils import (
     ensure_env_vars,
     get_api_token_from_host,
 )
+from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 
 def launch_processing(
@@ -23,16 +24,19 @@ def launch_processing(
     """
     ensure_env_vars(host=host)
 
+    pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
+    pipeline_type = pipeline_config.get("metadata", "type")
+
     config_file_to_reuse = Path(run_config_file) if run_config_file else None
 
     if not config_file_to_reuse:
         typer.echo(f"❌ Config file not found: {run_config_file}")
         raise typer.Exit(code=1)
 
-    config_data = toml.load(run_config_file)
+    run_config = toml.load(run_config_file)
 
     # Load auth
-    auth = config_data.get("auth", {})
+    auth = run_config.get("auth", {})
     host_config = get_host_env_config(host=auth.get("host") or host)
     api_token = get_api_token_from_host(host=host_config["host"])
     organization_name = auth.get("organization_name", host_config["organization_name"])
@@ -43,32 +47,25 @@ def launch_processing(
         host=host_config["host"],
     )
 
-    job_type = config_data.get("job", {}).get("type")
-    if not job_type:
-        typer.echo("❌ Missing job type in config.")
-        raise typer.Exit()
-
     try:
         processing = client.get_processing(name=pipeline_name)
     except Exception as e:
         typer.echo(f"❌ Error during launch: {e}")
         raise typer.Exit()
 
-    typer.echo(f"🚀 Launching processing '{pipeline_name}' ({job_type})...")
-
     payload = {
         "processing_id": str(processing.id),
-        "parameters": config_data.get("parameters", {}),
-        "cpu": int(config_data.get("docker", {}).get("cpu", 4)),
-        "gpu": int(config_data.get("docker", {}).get("gpu", 0)),
+        "parameters": run_config.get("parameters", {}),
+        "cpu": int(pipeline_config.config["docker"].get("cpu", 4)),
+        "gpu": int(pipeline_config.config["docker"].get("gpu", 0)),
     }
-    inputs = config_data.get("input", {}) or {}
-    output = config_data.get("output", {}) or {}
+    inputs = run_config.get("input", {}) or {}
+    output = run_config.get("output", {}) or {}
 
     # Resolve endpoint + payload details by job type
     endpoint: Optional[str] = None
 
-    if job_type == "DATASET_VERSION_CREATION":
+    if pipeline_type == "DATASET_VERSION_CREATION":
         ds_ver = inputs.get("dataset_version") or {}
         dataset_version_id = ds_ver.get("id")
         if not dataset_version_id:
@@ -83,7 +80,7 @@ def launch_processing(
         if target_version_name:
             payload["target_version_name"] = target_version_name
 
-    elif job_type == "PRE_ANNOTATION":
+    elif pipeline_type == "PRE_ANNOTATION":
         ds_ver = inputs.get("dataset_version") or {}
         dataset_version_id = ds_ver.get("id")
         if not dataset_version_id:
@@ -99,7 +96,7 @@ def launch_processing(
         endpoint = f"/api/dataset/version/{dataset_version_id}/processing/launch"
         payload["model_version_id"] = model_version_id
 
-    elif job_type == "DATA_AUTO_TAGGING":
+    elif pipeline_type == "DATA_AUTO_TAGGING":
         dl = inputs.get("datalake") or {}
         datalake_id = dl.get("id")
         if not datalake_id:
@@ -118,26 +115,26 @@ def launch_processing(
         # Optional: data_ids (try multiple places)
         data_ids = (
             inputs.get("data_ids")
-            or (config_data.get("run_parameters") or {}).get("data_ids")
-            or (config_data.get("parameters") or {}).get("data_ids")
+            or (run_config.get("run_parameters") or {}).get("data_ids")
+            or (run_config.get("parameters") or {}).get("data_ids")
         )
         if data_ids:
             payload["data_ids"] = data_ids
 
         # Optional: target_datalake_name
-        target_name = (output.get("datalake") or {}).get("name") or config_data.get(
+        target_name = (output.get("datalake") or {}).get("name") or run_config.get(
             "target_datalake_name"
         )
         if target_name:
             payload["target_datalake_name"] = target_name
 
     else:
-        typer.echo(f"❌ Unknown job type: {job_type}")
+        typer.echo(f"❌ Unknown job type: {pipeline_type}")
         raise typer.Exit(code=1)
 
     # Launch
     try:
-        typer.echo(f"🚀 Launching processing '{pipeline_name}' ({job_type})…")
+        typer.echo(f"🚀 Launching processing '{pipeline_name}' ({pipeline_type})…")
         resp = client.connexion.post(endpoint, data=orjson.dumps(payload)).json()
         typer.echo("✅ Processing launched successfully!")
         if isinstance(resp, dict):
