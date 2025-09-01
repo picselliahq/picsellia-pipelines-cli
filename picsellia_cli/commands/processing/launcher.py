@@ -213,6 +213,8 @@ def launch_processing(
         _bullet(f"Submitting job for processing '{pipeline_name}'…", accent=True)
         resp = client.connexion.post(endpoint, data=orjson.dumps(payload)).json()
 
+        print(f"response: {resp}")
+
         # Try to extract job/run IDs from various possible shapes
         job_id = (
             isinstance(resp, dict)
