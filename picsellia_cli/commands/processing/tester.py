@@ -34,9 +34,9 @@ def test_processing(
     host: str = "prod",
 ):
     ensure_env_vars(host=host)
-    piepline_config = PipelineConfig(pipeline_name=pipeline_name)
-    pipeline_type = piepline_config.get("metadata", "type")
-    run_manager = RunManager(pipeline_dir=piepline_config.pipeline_dir)
+    pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
+    pipeline_type = pipeline_config.get("metadata", "type")
+    run_manager = RunManager(pipeline_dir=pipeline_config.pipeline_dir)
 
     if reuse_dir:
         run_dir = run_manager.get_latest_run_dir()
@@ -83,7 +83,7 @@ def test_processing(
             output_name=run_config["output"]["dataset_version"]["name"],
         )
 
-    default_pipeline_params = piepline_config.extract_default_parameters()
+    default_pipeline_params = pipeline_config.extract_default_parameters()
     run_config = merge_with_default_parameters(
         run_config=run_config, default_parameters=default_pipeline_params
     )
@@ -96,7 +96,7 @@ def test_processing(
     )
 
     env_path = create_virtual_env(
-        requirements_path=piepline_config.get_requirements_path()
+        requirements_path=pipeline_config.get_requirements_path()
     )
     python_executable = (
         env_path / "Scripts" / "python.exe"
@@ -106,7 +106,7 @@ def test_processing(
 
     command = build_pipeline_command(
         python_executable=python_executable,
-        pipeline_script_path=piepline_config.get_script_path("pipeline_script"),
+        pipeline_script_path=pipeline_config.get_script_path("pipeline_script"),
         run_config_file=saved_run_config_path,
         mode="local",
     )
