@@ -11,46 +11,10 @@ from picsellia_cli.utils.env_utils import (
     ensure_env_vars,
     get_api_token_from_host,
 )
+from picsellia_cli.utils.logging import section, kv, bullet, hr
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 from datetime import datetime
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Small CLI formatting helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def _hr() -> None:
-    typer.echo(typer.style("─" * 72, dim=True))
-
-
-def _section(title: str) -> None:
-    _hr()
-    typer.echo(typer.style(f" {title}", bold=True))
-    _hr()
-
-
-def _kv(label: str, value: object, *, color: Optional[str] = None) -> None:
-    if value is None:
-        return
-    s = str(value).strip()
-    if not s:
-        return
-    label_txt = typer.style(f"{label}:", bold=True)
-    val_txt = typer.style(s, fg=color) if color else s
-    typer.echo(f"{label_txt} {val_txt}")
-
-
-def _bullet(text: str, *, accent: bool = False) -> None:
-    prefix = "•"
-    line = f"{prefix} {text}"
-    typer.echo(typer.style(line, fg=typer.colors.GREEN, bold=True) if accent else line)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Main
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 def launch_processing(
@@ -103,10 +67,10 @@ def launch_processing(
         typer.echo(f"❌ Error during launch: {e}")
         raise typer.Exit()
 
-    _section("🌍 Environment")
+    section("🌍 Environment")
     org_id = getattr(getattr(client, "connexion", None), "organization_id", None)
-    _kv("Workspace", f"{organization_name} ({org_id})" if org_id else organization_name)
-    _kv("Host", host_config["host"])
+    kv("Workspace", f"{organization_name} ({org_id})" if org_id else organization_name)
+    kv("Host", host_config["host"])
 
     payload = {
         "processing_id": str(processing.id),
@@ -117,7 +81,7 @@ def launch_processing(
     inputs = run_config.get("input", {}) or {}
     output = run_config.get("output", {}) or {}
 
-    _section("📥 Inputs / 📤 Outputs")
+    section("📥 Inputs / 📤 Outputs")
 
     if pipeline_type == "DATASET_VERSION_CREATION":
         ds_ver = inputs.get("dataset_version") or {}
@@ -127,14 +91,14 @@ def launch_processing(
             raise typer.Exit(code=1)
 
         endpoint = f"/api/dataset/version/{dataset_version_id}/processing/launch"
-        _kv("Input dataset version ID", dataset_version_id)
+        kv("Input dataset version ID", dataset_version_id)
 
         # Optional: target version name
         out_ds = output.get("dataset_version") or {}
         target_version_name = out_ds.get("name")
         if target_version_name:
             payload["target_version_name"] = target_version_name
-            _kv("Target dataset version name", target_version_name)
+            kv("Target dataset version name", target_version_name)
 
     elif pipeline_type == "PRE_ANNOTATION":
         ds_ver = inputs.get("dataset_version") or {}
@@ -152,8 +116,8 @@ def launch_processing(
         endpoint = f"/api/dataset/version/{dataset_version_id}/processing/launch"
         payload["model_version_id"] = model_version_id
 
-        _kv("Input dataset version ID", dataset_version_id)
-        _kv("Model version ID", model_version_id)
+        kv("Input dataset version ID", dataset_version_id)
+        kv("Model version ID", model_version_id)
 
     elif pipeline_type == "DATA_AUTO_TAGGING":
         dl = inputs.get("datalake") or {}
@@ -187,23 +151,23 @@ def launch_processing(
         if target_name:
             payload["target_datalake_name"] = target_name
 
-        _kv("Input datalake ID", datalake_id)
-        _kv("Model version ID", model_version_id)
-        _kv("Target datalake name", target_name)
+        kv("Input datalake ID", datalake_id)
+        kv("Model version ID", model_version_id)
+        kv("Target datalake name", target_name)
 
     else:
         typer.echo(f"❌ Unknown job type: {pipeline_type}")
         raise typer.Exit(code=1)
 
     # Resources preview
-    _section("⚙️ Resources")
-    _kv("CPU", payload["cpu"])
-    _kv("GPU", payload["gpu"])
+    section("⚙️ Resources")
+    kv("CPU", payload["cpu"])
+    kv("GPU", payload["gpu"])
 
     # Launch
     try:
-        _section("🟩 Launch")
-        _bullet(f"Submitting job for processing '{pipeline_name}'…", accent=True)
+        section("🟩 Launch")
+        bullet(f"Submitting job for processing '{pipeline_name}'…", accent=True)
         resp = client.connexion.post(endpoint, data=orjson.dumps(payload)).json()
 
         # Extract job & run IDs per your example response
@@ -226,7 +190,7 @@ def launch_processing(
             if not run_id:
                 run_id = resp.get("run_id") or (resp.get("run") or {}).get("id")
 
-        _kv("Status", "Launched ✅")
+        kv("Status", "Launched ✅")
 
         # Build URL(s)
         base = client.connexion.host.rstrip("/")
@@ -236,13 +200,13 @@ def launch_processing(
                 job_url = f"{base}/{org_id}/jobs/{job_id}/runs/{run_id}"
             else:
                 job_url = f"{base}/{org_id}/jobs/{job_id}"
-            _kv("Job URL", job_url, color=typer.colors.BLUE)
+            kv("Job URL", job_url, color=typer.colors.BLUE)
 
     except Exception as e:
         typer.echo(typer.style(f"❌ Error during launch: {e}", fg=typer.colors.RED))
         raise typer.Exit(code=1)
 
-    _hr()
+    hr()
 
 
 def _parse_dt(s: Optional[str]) -> Optional[datetime]:
