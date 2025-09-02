@@ -51,6 +51,7 @@ def launch_processing(
 
     # Load auth
     auth = run_config.get("auth", {})
+    host = auth.get("host") or host
     host_config = get_host_env_config(host=auth.get("host") or host)
     api_token = get_api_token_from_host(host=host_config["host"])
     organization_name = auth.get("organization_name", host_config["organization_name"])
@@ -64,7 +65,10 @@ def launch_processing(
     try:
         processing = client.get_processing(name=pipeline_name)
     except Exception as e:
-        typer.echo(f"❌ Error during launch: {e}")
+        effective_name = pipeline_config.get("metadata", "name")
+        typer.echo(
+            f"❌ Processing with name {effective_name} not found on {host}, please deploy it before with 'pxl-pipeline deploy {pipeline_name} --host {host}': {e}"
+        )
         raise typer.Exit()
 
     section("🌍 Environment")
