@@ -6,6 +6,10 @@ import typer
 from orjson import orjson
 from picsellia import Client
 
+from picsellia_cli.commands.processing.tester import (
+    check_output_dataset_version,
+    enrich_run_config_with_metadata,
+)
 from picsellia_cli.utils.env_utils import (
     get_host_env_config,
     ensure_env_vars,
@@ -15,6 +19,8 @@ from picsellia_cli.utils.logging import section, kv, bullet, hr
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 from datetime import datetime
+
+from picsellia_cli.utils.tester import merge_with_default_parameters
 
 
 def launch_processing(
@@ -41,13 +47,13 @@ def launch_processing(
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
     pipeline_type = pipeline_config.get("metadata", "type")
 
-    config_file_to_reuse = Path(run_config_file) if run_config_file else None
+    run_config_path = Path(run_config_file) if run_config_file else None
 
-    if not config_file_to_reuse:
-        typer.echo(f"❌ Config file not found: {run_config_file}")
+    if not run_config_path:
+        typer.echo(f"❌ Config file not found: {run_config_path}")
         raise typer.Exit(code=1)
 
-    run_config = toml.load(run_config_file)
+    run_config = toml.load(run_config_path)
 
     # Load auth
     auth = run_config.get("auth", {})
@@ -101,7 +107,18 @@ def launch_processing(
         out_ds = output.get("dataset_version") or {}
         target_version_name = out_ds.get("name")
         if target_version_name:
-            payload["target_version_name"] = target_version_name
+            run_config["output"]["dataset_version"]["name"] = (
+                check_output_dataset_version(
+                    client=client,
+                    input_dataset_version_id=dataset_version_id,
+                    output_name=target_version_name,
+                    override_outputs=bool(run_config.get("override_outputs", False)),
+                )
+            )
+
+            payload["target_version_name"] = run_config["output"]["dataset_version"][
+                "name"
+            ]
             kv("Target dataset version name", target_version_name)
 
     elif pipeline_type == "PRE_ANNOTATION":
@@ -167,6 +184,16 @@ def launch_processing(
     section("⚙️ Resources")
     kv("CPU", payload["cpu"])
     kv("GPU", payload["gpu"])
+
+    default_pipeline_params = pipeline_config.extract_default_parameters()
+    run_config = merge_with_default_parameters(
+        run_config=run_config, default_parameters=default_pipeline_params
+    )
+
+    enrich_run_config_with_metadata(client=client, run_config=run_config)
+
+    with run_config_path.open("w") as f:
+        toml.dump(run_config, f)
 
     # Launch
     try:
