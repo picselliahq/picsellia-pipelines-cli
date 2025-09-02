@@ -61,11 +61,11 @@ def launch_processing(
         organization_name=organization_name,
         host=host_config["host"],
     )
+    effective_name = pipeline_config.get("metadata", "name")
 
     try:
-        processing = client.get_processing(name=pipeline_name)
+        processing = client.get_processing(name=effective_name)
     except Exception:
-        effective_name = pipeline_config.get("metadata", "name")
         typer.echo(
             f"❌ Processing with name {effective_name} not found on {host}, please deploy it before with 'pxl-pipeline deploy {pipeline_name} --host {host}'"
         )

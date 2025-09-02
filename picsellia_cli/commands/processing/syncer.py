@@ -13,8 +13,9 @@ def sync_processing_params(
     pipeline_name: str = typer.Argument(
         ..., help="Name of the processing pipeline to sync"
     ),
+    host: str = "prod",
 ):
-    ensure_env_vars()
+    ensure_env_vars(host=host)
     config = PipelineConfig(pipeline_name)
 
     params = config.extract_default_parameters()
@@ -36,7 +37,7 @@ def sync_processing_params(
     )
 
     try:
-        processing = client.get_processing(name=config.pipeline_name)
+        processing = client.get_processing(name=config.get("metadata", "name"))
         processing.update(default_parameters=params)
         typer.echo(f"☁️ Updated processing '{config.pipeline_name}' on Picsellia.")
     except ResourceNotFoundError:
