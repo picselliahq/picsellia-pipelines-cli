@@ -27,7 +27,7 @@ def test_training(
     run_config_file: str | None = None,
     host: str = "prod",
 ):
-    ensure_env_vars()
+    ensure_env_vars(host=host)
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
     run_manager = RunManager(pipeline_dir=pipeline_config.pipeline_dir)
 

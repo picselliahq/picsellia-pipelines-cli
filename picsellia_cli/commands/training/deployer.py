@@ -19,7 +19,7 @@ def deploy_training(
     """
     🚀 Deploy a training pipeline: build & push its Docker image, then update the model version in Picsellia.
     """
-    ensure_env_vars()
+    ensure_env_vars(host=host)
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
 
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)

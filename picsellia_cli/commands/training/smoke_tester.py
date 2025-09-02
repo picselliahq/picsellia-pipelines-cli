@@ -12,8 +12,8 @@ from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 
-def smoke_test_training(pipeline_name: str):
-    ensure_env_vars()
+def smoke_test_training(pipeline_name: str, host: str = "prod"):
+    ensure_env_vars(host=host)
     config = PipelineConfig(pipeline_name)
     prompt_docker_image_if_missing(pipeline_config=config)
 
