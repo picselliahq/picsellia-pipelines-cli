@@ -81,6 +81,7 @@ def test_processing(
             client=client,
             input_dataset_version_id=run_config["input"]["dataset_version"]["id"],
             output_name=run_config["output"]["dataset_version"]["name"],
+            override_outputs=bool(run_config.get("override_outputs", False)),
         )
 
     default_pipeline_params = pipeline_config.extract_default_parameters()
@@ -269,14 +270,21 @@ def prompt_data_auto_tagging_params(stored_params: dict) -> dict:
 
 
 def check_output_dataset_version(
-    client: Client, input_dataset_version_id: str, output_name: str
+    client: Client,
+    input_dataset_version_id: str,
+    output_name: str,
+    override_outputs: bool = False,
 ) -> str:
     try:
         input_dataset_version = client.get_dataset_version_by_id(
-            input_dataset_version_id
+            id=input_dataset_version_id
         )
-        dataset = client.get_dataset_by_id(input_dataset_version.origin_id)
-        dataset.get_version(version=output_name)
+        dataset = client.get_dataset_by_id(id=input_dataset_version.origin_id)
+        existing = dataset.get_version(version=output_name)
+
+        if override_outputs:
+            existing.delete()
+            return output_name
 
         overwrite = typer.confirm(
             typer.style(
@@ -286,17 +294,17 @@ def check_output_dataset_version(
             default=False,
         )
         if overwrite:
-            dataset.get_version(version=output_name).delete()
+            existing.delete()
+            return output_name
         else:
-            output_name = typer.prompt(
+            return typer.prompt(
                 typer.style(
                     "📄 Enter a new output dataset version name", fg=typer.colors.CYAN
                 ),
                 default=f"{output_name}_new",
             )
     except ResourceNotFoundError:
-        pass
-    return output_name
+        return output_name
 
 
 def enrich_run_config_with_metadata(client: Client, run_config: dict):
