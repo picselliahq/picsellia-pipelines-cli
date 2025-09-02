@@ -14,54 +14,17 @@ from picsellia_cv_engine.steps.base.model.builder import build_model
 from steps import train
 from utils.parameters import TrainingHyperParameters
 
-context = create_picsellia_training_context(
-    hyperparameters_cls=TrainingHyperParameters,
-    augmentation_parameters_cls=AugmentationParameters,
-    export_parameters_cls=ExportParameters
-)
-
-@pipeline(context=context, log_folder_path="logs/", remove_logs_on_completion=False)
-def {pipeline_name}_pipeline():
-    picsellia_datasets = load_yolo_datasets()
-    picsellia_model = build_model(pretrained_weights_name="pretrained-weights")
-    train(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
-
-
-if __name__ == "__main__":
-    {pipeline_name}_pipeline()
-"""
-
-TRAINING_PIPELINE_LOCAL = """import argparse
-
-from picsellia_cv_engine import pipeline
-from picsellia_cv_engine.core.parameters import (
-    AugmentationParameters,
-    ExportParameters,
-)
-from picsellia_cv_engine.core.services.utils.local_context import create_local_training_context
-from picsellia_cv_engine.steps.base.dataset.loader import (
-    load_yolo_datasets
-)
-from picsellia_cv_engine.steps.base.model.builder import build_model
-
-from steps import train
-from utils.parameters import TrainingHyperParameters
-
 parser = argparse.ArgumentParser()
-parser.add_argument("--api_token", type=str, required=True)
-parser.add_argument("--organization_name", type=str, required=True)
-parser.add_argument("--experiment_id", type=str, required=True)
-parser.add_argument("--working_dir", type=str, required=True)
+parser.add_argument("--mode", choices=["local", "picsellia"], default="picsellia")
+parser.add_argument("--config-file", type=str, required=False)
 args = parser.parse_args()
 
-context = create_local_training_context(
+context = create_training_context_from_config(
     hyperparameters_cls=TrainingHyperParameters,
     augmentation_parameters_cls=AugmentationParameters,
     export_parameters_cls=ExportParameters,
-    api_token=args.api_token,
-    organization_name=args.organization_name,
-    experiment_id=args.experiment_id,
-    working_dir=args.working_dir,
+    mode=args.mode,
+    config_file_path=args.config_file,
 )
 
 @pipeline(context=context, log_folder_path="logs/", remove_logs_on_completion=False)
@@ -164,14 +127,12 @@ requires-python = ">=3.10"
 
 dependencies = [
     "picsellia-pipelines-cli",
+    "picsellia-cv-engine",
     "ultralytics>=8.3.145",
 ]
 
-[dependency-groups]
-dev = [
-    "picsellia-cv-engine",
-]
-
+[tool.uv.sources]
+picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main" }}
 """
 
 TRAINING_PIPELINE_DOCKERFILE = """FROM picsellia/cuda:11.8.0-cudnn8-ubuntu20.04-python3.10
@@ -221,11 +182,7 @@ class UltralyticsTrainingTemplate(BaseTemplate):
 
     def get_main_files(self) -> dict[str, str]:
         files = {
-            "picsellia_pipeline.py": TRAINING_PIPELINE_TRAINING.format(
-                pipeline_module=self.pipeline_module,
-                pipeline_name=self.pipeline_name,
-            ),
-            "local_pipeline.py": TRAINING_PIPELINE_LOCAL.format(
+            "pipeline.py": TRAINING_PIPELINE_TRAINING.format(
                 pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
