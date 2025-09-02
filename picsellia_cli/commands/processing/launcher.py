@@ -64,10 +64,10 @@ def launch_processing(
 
     try:
         processing = client.get_processing(name=pipeline_name)
-    except Exception as e:
+    except Exception:
         effective_name = pipeline_config.get("metadata", "name")
         typer.echo(
-            f"❌ Processing with name {effective_name} not found on {host}, please deploy it before with 'pxl-pipeline deploy {pipeline_name} --host {host}': {e}"
+            f"❌ Processing with name {effective_name} not found on {host}, please deploy it before with 'pxl-pipeline deploy {pipeline_name} --host {host}'"
         )
         raise typer.Exit()
 
