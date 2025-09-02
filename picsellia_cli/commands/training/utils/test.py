@@ -36,22 +36,34 @@ def prompt_training_params(stored_params: dict) -> dict:
 
 
 def get_training_params(
-    run_manager: RunManager,
+    run_manager: "RunManager | None",
     config_file: Path | None = None,
 ) -> dict:
-    if config_file and config_file.exists():
+    """
+    Charge un run-config pour le training.
+    Priorités :
+      1) Fichier explicite `config_file` s'il existe
+      2) Dernier run-config (si `run_manager` est fourni et qu'un fichier existe)
+      3) Prompt minimal (experiment_id)
+    """
+    # 1) Fichier explicite
+    if config_file is not None and config_file.exists():
         with config_file.open("r") as f:
             return toml.load(f)
-    else:
+
+    latest_config = None
+
+    # 2) Dernier run-config si possible
+    if run_manager is not None:
         latest_config_path = run_manager.get_latest_run_config_path()
         if latest_config_path:
-            with open(latest_config_path, "r") as f:
-                latest_config = toml.load(f)
-        else:
-            latest_config = None
+            p = Path(latest_config_path)
+            if p.exists():
+                with p.open("r") as f:
+                    latest_config = toml.load(f)
 
-    params = {}
-    stored_params = {}
+    params: dict = {}
+    stored_params: dict = latest_config or {}
 
     if latest_config:
         print_config_io_summary_for_training(latest_config)
@@ -59,13 +71,11 @@ def get_training_params(
             typer.style("📝 Do you want to reuse this config?", fg=typer.colors.CYAN),
             default=True,
         )
-        stored_params = latest_config
         if reuse:
-            params = latest_config
+            return latest_config
 
-    if not params:
-        params = prompt_training_params(stored_params)
-
+    # 3) Fallback prompt minimal
+    params = prompt_training_params(stored_params)
     return params
 
 
