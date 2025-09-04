@@ -221,7 +221,6 @@ def _ensure_experiment_has_model_version(
     - private : par id si fourni, sinon par (origin_name + version_name)
 
     Enrichit run_config["input"]["model_version"] avec id/name/origin_name/url/visibility.
-    Si override_outputs=True, on nettoie d'abord un éventuel binding existant.
     """
     inp = (run_config or {}).get("input") or {}
     mv = (inp.get("model_version") or {}).copy()
@@ -232,10 +231,6 @@ def _ensure_experiment_has_model_version(
         visibility = "public" if mv["public"] else "private"
     if visibility not in ("public", "private"):
         visibility = "private"
-
-    # Optionnel : on détache le modèle existant si override_outputs=True
-    if bool(run_config.get("override_outputs")):
-        _maybe_clear_experiment_model_version(experiment)
 
     def _enrich_and_attach(mv_obj, vis: str, origin_name: Optional[str] = None):
         # Enrichit le run_config
