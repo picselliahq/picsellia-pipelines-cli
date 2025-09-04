@@ -65,7 +65,8 @@ def deploy_processing(
         [env for env in all_envs if env["suffix"] == host.upper()] if host else all_envs
     )
     if host and not targets:
-        raise typer.Exit(f"❌ No environment found for host '{host}'")
+        typer.echo(f"❌ No environment found for host '{host}'")
+        raise typer.Exit()
 
     for env in targets:
         kv(env["suffix"], f"{env['organization_name']} @ {env['host']}")

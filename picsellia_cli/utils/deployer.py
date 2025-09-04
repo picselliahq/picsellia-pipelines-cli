@@ -186,7 +186,8 @@ def bump_pipeline_version(pipeline_config: PipelineConfig):
     elif bump_type == "final":
         new_version = str(version)
     else:
-        raise typer.Exit("❌ Invalid bump type")
+        typer.echo("❌ Invalid bump type")
+        raise typer.Exit()
 
     typer.echo(f"✅ Version bumped to: {new_version}")
 

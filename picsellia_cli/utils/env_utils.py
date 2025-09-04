@@ -139,6 +139,7 @@ def get_available_envs():
             )
 
     if not envs:
-        raise typer.Exit("❌ No valid deployment environments found in .env")
+        typer.echo("❌ No valid deployment environments found in .env")
+        raise typer.Exit()
 
     return envs

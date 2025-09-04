@@ -45,7 +45,8 @@ def smoke_test_training(
     if run_config_file:
         rc_path = Path(run_config_file)
         if not rc_path.exists():
-            raise typer.Exit(f"❌ Config file not found: {run_config_file}")
+            typer.echo(f"❌ Config file not found: {run_config_file}")
+            raise typer.Exit()
         run_config = toml.load(rc_path)
     else:
         run_config = get_training_params(run_manager=None, config_file=None)
@@ -64,7 +65,8 @@ def smoke_test_training(
     exp = (run_config.get("output") or {}).get("experiment") or {}
     experiment_id = exp.get("id")
     if not experiment_id:
-        raise typer.Exit("❌ Could not resolve an experiment id from the run config.")
+        typer.echo("❌ Could not resolve an experiment id from the run config.")
+        raise typer.Exit()
 
     # Build image
     image_name = config.get("docker", "image_name")

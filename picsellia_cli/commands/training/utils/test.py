@@ -268,7 +268,8 @@ def _ensure_experiment_has_model_version(
             pub_model = client.get_public_model(name=origin_name)
             pub_mv = pub_model.get_version(version=version_name)
         except Exception as e:
-            raise typer.Exit(f"❌ Unable to resolve public model/version: {e}")
+            typer.echo(f"❌ Unable to resolve public model/version: {e}")
+            raise typer.Exit()
 
         _enrich_and_attach(pub_mv, vis="public", origin_name=origin_name)
         return
@@ -295,7 +296,8 @@ def _ensure_experiment_has_model_version(
             model = client.get_model(name=origin_name)
             mv_obj = model.get_version(version=version_name)
         except Exception as e:
-            raise typer.Exit(f"❌ Unable to resolve private model/version: {e}")
+            typer.echo(f"❌ Unable to resolve private model/version: {e}")
+            raise typer.Exit()
 
     _enrich_and_attach(mv_obj, vis="private")
 
@@ -516,7 +518,8 @@ def _resolve_input_metadata(client: Client, run_config: dict):
             }
 
     except Exception as e:
-        raise typer.Exit(f"❌ Could not resolve model metadata: {e}")
+        typer.echo(f"❌ Could not resolve model metadata: {e}")
+        raise typer.Exit()
 
     run_config["input"] = input
 
