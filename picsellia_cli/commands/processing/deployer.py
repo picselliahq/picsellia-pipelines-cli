@@ -32,17 +32,12 @@ def deploy_processing(
     kv("Description", pipeline_config.get("metadata", "description"))
 
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)
-    bump_pipeline_version(pipeline_config=pipeline_config)
+    new_version = bump_pipeline_version(pipeline_config=pipeline_config)
     prompt_allocation_if_missing(pipeline_config=pipeline_config)
 
-    version = pipeline_config.get("metadata", "version")
     image_name = pipeline_config.get("docker", "image_name")
 
-    tags_to_push = [version]
-    if "-rc" in version:
-        tags_to_push.append("test")
-    else:
-        tags_to_push.append("latest")
+    tags_to_push = [new_version, "test" if "-rc" in new_version else "latest"]
 
     section("🐳 Docker")
     kv("Image", image_name)
@@ -58,6 +53,10 @@ def deploy_processing(
         force_login=True,
     )
     bullet("Image pushed ✅", accent=False)
+
+    pipeline_config.config["metadata"]["version"] = str(new_version)
+    pipeline_config.config["docker"]["image_tag"] = str(new_version)
+    pipeline_config.save()
 
     # ── Targets ──────────────────────────────────────────────────────────────
     section("🌍 Targets")

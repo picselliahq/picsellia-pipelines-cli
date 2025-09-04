@@ -36,12 +36,11 @@ def deploy_training(
 
     # ── Docker build & push ─────────────────────────────────────────────────
     prompt_docker_image_if_missing(pipeline_config=cfg)
-    bump_pipeline_version(pipeline_config=cfg)
+    new_version = bump_pipeline_version(pipeline_config=cfg)
 
-    version = cfg.get("metadata", "version")
     image_name = cfg.get("docker", "image_name")
 
-    tags_to_push = [version, "test" if "-rc" in version else "latest"]
+    tags_to_push = [new_version, "test" if "-rc" in new_version else "latest"]
 
     section("🐳 Docker")
     kv("Image", image_name)
@@ -55,6 +54,10 @@ def deploy_training(
         force_login=True,
     )
     bullet("Image pushed ✅")
+
+    cfg.config["metadata"]["version"] = str(new_version)
+    cfg.config["docker"]["image_tag"] = str(new_version)
+    cfg.save()
 
     # ── Targets ─────────────────────────────────────────────────────────────
     section("🌍 Targets")
