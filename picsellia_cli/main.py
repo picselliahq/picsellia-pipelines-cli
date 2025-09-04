@@ -8,6 +8,7 @@ from picsellia_cli.commands.processing.syncer import sync_processing_params
 from picsellia_cli.commands.processing.tester import test_processing
 from picsellia_cli.commands.training.deployer import deploy_training
 from picsellia_cli.commands.training.initializer import init_training
+from picsellia_cli.commands.training.launcher import launch_training
 from picsellia_cli.commands.training.smoke_tester import smoke_test_training
 from picsellia_cli.commands.training.tester import test_training
 from picsellia_cli.utils.pipeline_config import PipelineConfig
@@ -197,8 +198,14 @@ def launch(
         launch_processing(
             pipeline_name=pipeline_name, run_config_file=run_config_file, host=host
         )
+    elif pipeline_type == "TRAINING":
+        launch_training(
+            pipeline_name=pipeline_name,
+            run_config_file=run_config_file,
+            host=host,
+        )
     else:
-        typer.echo("❌ Launching is only implemented for processing pipelines.")
+        typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
         raise typer.Exit()
 
 
