@@ -22,7 +22,7 @@ from picsellia_cli.utils.tester import (
     get_saved_run_config_path,
     build_pipeline_command,
 )
-from picsellia_cli.utils.logging import section, kv, bullet, hr, step
+from picsellia_cli.utils.logging import section, kv, bullet, hr
 
 
 def test_training(
@@ -93,11 +93,6 @@ def test_training(
     run_config = merge_with_default_parameters(
         run_config=run_config, default_parameters=default_pipeline_params
     )
-    kv("Defaults merged", "yes")
-    kv(
-        "Keys (parameters)",
-        ", ".join(sorted((run_config.get("parameters") or {}).keys())) or "none",
-    )
 
     # ── Normalize IO (resolve IDs/URLs) ─────────────────────────────────────
     section("📥 Inputs / 📤 Outputs")
@@ -140,7 +135,7 @@ def test_training(
 
     api_token = get_api_token_from_host(host=run_config["auth"]["host"])
 
-    step(1, "Launching local pipeline…", accent=True)
+    typer.echo("Launching pipeline...")
     run_pipeline_command(
         command=command,
         working_dir=str(run_dir),

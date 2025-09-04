@@ -103,7 +103,8 @@ def launch_training(
     exp = (run_config.get("output") or {}).get("experiment") or {}
     exp_id = exp.get("id")
     if not exp_id:
-        raise typer.Exit("❌ Missing output.experiment.id after normalization.")
+        typer.echo("❌ Missing output.experiment.id after normalization.")
+        raise typer.Exit()
 
     kv("Experiment ID", exp_id)
     if exp.get("name"):
@@ -115,30 +116,21 @@ def launch_training(
     try:
         experiment = client.get_experiment_by_id(exp_id)
     except Exception as e:
-        raise typer.Exit(f"❌ Could not fetch experiment '{exp_id}': {e}")
+        typer.echo(f"❌ Could not fetch experiment '{exp_id}': {e}")
+        raise typer.Exit()
 
     try:
-        resp = experiment.launch()  # Picsellia SDK: start training
+        experiment.launch()
     except Exception as e:
-        raise typer.Exit(f"❌ Launch failed: {e}")
+        typer.echo(f"❌ Launch failed: {e}")
+        raise typer.Exit()
 
-    # Try extracting job/run and build URL
-    job_id, run_id = _extract_job_and_run(resp)
     org_id = getattr(getattr(client, "connexion", None), "organization_id", None)
     host_base = getattr(getattr(client, "connexion", None), "host", "").rstrip("/")
 
     kv("Status", "Launched ✅")
-    if job_id:
-        kv("Job ID", job_id)
-    if run_id:
-        kv("Run ID", run_id)
-    if job_id and org_id:
-        url = (
-            f"{host_base}/{org_id}/jobs/{job_id}/runs/{run_id}"
-            if run_id
-            else f"{host_base}/{org_id}/jobs/{job_id}"
-        )
-        kv("Job URL", url, color=typer.colors.BLUE)
+    url = f"{host_base}/{org_id}/jobs"
+    kv("Job URL", url, color=typer.colors.BLUE)
 
     hr()
 
