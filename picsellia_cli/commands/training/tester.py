@@ -61,10 +61,7 @@ def test_training(
         run_config["auth"]["host"] = env_config["host"]
 
     if "organization_name" not in run_config["auth"]:
-        org_env = os.getenv("PICSELLIA_ORGANIZATION_NAME")
-        run_config["auth"]["organization_name"] = (
-            org_env or env_config["organization_name"]
-        )
+        run_config["auth"]["organization_name"] = env_config["organization_name"]
 
     default_pipeline_params = pipeline_config.extract_default_parameters()
     run_config = merge_with_default_parameters(
