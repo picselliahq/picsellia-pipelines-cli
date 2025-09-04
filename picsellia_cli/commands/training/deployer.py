@@ -11,7 +11,7 @@ from picsellia_cli.utils.deployer import (
     bump_pipeline_version,
 )
 from picsellia_cli.utils.env_utils import ensure_env_vars, get_available_envs
-from picsellia_cli.utils.logging import kv, bullet, section, hr
+from picsellia_cli.utils.logging import kv, bullet, section
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 
@@ -73,7 +73,6 @@ def deploy_training(
 
     # ── Register/Update Model + Version on each host ────────────────────────
     section("📦 Model / Version (Create or Update)")
-    results: list[tuple[str, str]] = []
 
     for env in targets:
         bullet(f"→ {env['host']}", accent=True)
@@ -83,24 +82,14 @@ def deploy_training(
                 organization_name=env["organization_name"],
                 host=env["host"],
             )
-            status = _ensure_model_and_version_on_host(
+            _ensure_model_and_version_on_host(
                 client=client,
                 cfg=cfg,
                 image_name=image_name,
                 image_tag=cfg.get("docker", "image_tag"),
             )
-            kv("Result", status)
-            results.append((env["host"], status))
         except Exception as e:
-            kv("Result", "Error")
-            kv("Info", str(e))
-            results.append((env["host"], f"Error: {e}"))
-
-    # ── Summary ─────────────────────────────────────────────────────────────
-    section("✅ Summary")
-    for host_url, status in results:
-        bullet(f"{host_url} — {status}")
-    hr()
+            typer.echo(f"error: {e}", err=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -155,38 +144,19 @@ def _ensure_model_and_version_on_host(
     cfg: PipelineConfig,
     image_name: str,
     image_tag: str,
-) -> str:
+):
     """
     Ensure the model + version exist on the target host, then update the version with docker info.
-    Returns a status summary string.
     """
     model_settings = _get_model_settings(cfg)
     defaults = cfg.extract_default_parameters()
     docker_flags = _infer_docker_flags(cfg)
 
-    # Shortcut: update a specific version by id if provided
-    if model_settings["model_name"] and model_settings["version_name"]:
-        mv = client.get_model(name=model_settings["model_name"]).get_version(
-            version=model_settings["version_name"]
-        )
-        mv.update(
-            docker_image_name=image_name,
-            docker_tag=image_tag,
-            docker_flags=docker_flags,
-            base_parameters=defaults or {},
-        )
-        return f"Updated existing version {mv.name} (origin_name={mv.origin_name})"
-
-    # Ensure model
-    created_model = False
     try:
         model = client.get_model(name=model_settings["model_name"])
     except ResourceNotFoundError:
         model = client.create_model(name=model_settings["model_name"])
-        created_model = True
 
-    # Ensure version
-    created_version = False
     try:
         mv = model.get_version(version=model_settings["version_name"])
     except ResourceNotFoundError:
@@ -196,28 +166,10 @@ def _ensure_model_and_version_on_host(
             type=InferenceType[model_settings["inference_type"]],
             base_parameters=defaults or {},
         )
-        created_version = True
 
-    # Update docker infos (+ refresh base params on update too)
     mv.update(
         docker_image_name=image_name,
         docker_tag=image_tag,
         docker_flags=docker_flags,
         base_parameters=defaults or {},
     )
-
-    # Pretty status
-    parts = []
-    parts.append("Created model" if created_model else "Model ok")
-    parts.append("Created version" if created_version else "Version ok")
-    parts.append(f"image={image_name}:{image_tag}")
-
-    # Optional URL
-    try:
-        org_id = client.connexion.organization_id
-        url = f"{client.connexion.host}/{org_id}/model/{model.id}/version/{mv.id}"
-        parts.append(f"url={url}")
-    except Exception:
-        pass
-
-    return " · ".join(parts)
