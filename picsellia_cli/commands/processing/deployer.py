@@ -63,9 +63,7 @@ def deploy_processing(
     section("🌍 Targets")
     all_envs = get_available_envs()
     targets = (
-        [env for env in all_envs if env["suffix"] == (host or "").upper()]
-        if host
-        else all_envs
+        [env for env in all_envs if env["suffix"] == host.upper()] if host else all_envs
     )
     if host and not targets:
         raise typer.Exit(f"❌ No environment found for host '{host}'")

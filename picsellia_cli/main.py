@@ -162,7 +162,7 @@ def deploy(
 ):
     pipeline_type = get_pipeline_type(pipeline_name=pipeline_name)
     if pipeline_type == "TRAINING":
-        deploy_training(pipeline_name=pipeline_name)
+        deploy_training(pipeline_name=pipeline_name, host=host)
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
         deploy_processing(pipeline_name=pipeline_name, host=host)
     else:

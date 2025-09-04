@@ -59,12 +59,9 @@ def deploy_training(
     # ── Targets ─────────────────────────────────────────────────────────────
     section("🌍 Targets")
     all_envs = get_available_envs()
-    print(f"all_envs: {all_envs}")
-    print(f"host: {host}")
     targets = (
         [env for env in all_envs if env["suffix"] == host.upper()] if host else all_envs
     )
-    print(f"targets: {targets}")
     if host and not targets:
         raise typer.Exit(f"❌ No environment found for host '{host}'")
 
