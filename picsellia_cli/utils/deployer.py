@@ -191,4 +191,4 @@ def bump_pipeline_version(pipeline_config: PipelineConfig):
 
     typer.echo(f"✅ Version bumped to: {new_version}")
 
-    return new_version
+    return str(new_version)
