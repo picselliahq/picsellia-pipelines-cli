@@ -188,8 +188,6 @@ def bump_pipeline_version(pipeline_config: PipelineConfig):
     else:
         raise typer.Exit("❌ Invalid bump type")
 
-    pipeline_config.config["metadata"]["version"] = str(new_version)
-    pipeline_config.config["docker"]["image_tag"] = str(new_version)
-    pipeline_config.save()
-
     typer.echo(f"✅ Version bumped to: {new_version}")
+
+    return new_version
