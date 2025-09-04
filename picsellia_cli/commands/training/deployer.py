@@ -126,25 +126,19 @@ def _get_model_settings(cfg: PipelineConfig) -> dict:
       model_version_name = "..."
       framework = "ONNX" | "PYTORCH" | "TENSORFLOW" (optional, default ONNX)
       inference_type = "OBJECT_DETECTION" | "CLASSIFICATION" | ... (optional, default OBJECT_DETECTION)
-      # optional: model_version_id (if you want to force-update a specific version)
     """
-    model_name = cfg.get("model", "model_name")
-    version_name = cfg.get("model", "model_version_name")
-    framework = (cfg.get("model", "framework") or "ONNX").upper()
-    inference_type = (cfg.get("model", "inference_type") or "OBJECT_DETECTION").upper()
-    version_id = (
-        cfg.get("model", "model_version_id")
-        if "model" in cfg.config and "model_version_id" in cfg.config["model"]
-        else None
-    )
+    model_name = cfg.get("model_version", "name")
+    version_name = cfg.get("model_version", "origin_name")
+    framework = (cfg.get("model_version", "framework") or "ONNX").upper()
+    inference_type = (
+        cfg.get("model_version", "inference_type") or "OBJECT_DETECTION"
+    ).upper()
 
-    if not version_id and (not model_name or not version_name):
+    if not model_name or not version_name:
         raise typer.Exit(
             "❌ Missing model configuration.\n"
-            "Provide either:\n"
-            "  • model.model_version_id\n"
-            "OR\n"
-            "  • model.model_name and model.model_version_name (and optionally framework/inference_type)."
+            "Provide:\n"
+            "  model_version.name and model_version.origin_name and model_version.framework and model_version.inference_type)."
         )
 
     return {
@@ -152,7 +146,6 @@ def _get_model_settings(cfg: PipelineConfig) -> dict:
         "version_name": version_name,
         "framework": framework,
         "inference_type": inference_type,
-        "version_id": version_id,
     }
 
 
@@ -189,38 +182,40 @@ def _ensure_model_and_version_on_host(
     Ensure the model + version exist on the target host, then update the version with docker info.
     Returns a status summary string.
     """
-    settings = _get_model_settings(cfg)
+    model_settings = _get_model_settings(cfg)
     defaults = cfg.extract_default_parameters()
     docker_flags = _infer_docker_flags(cfg)
 
     # Shortcut: update a specific version by id if provided
-    if settings["version_id"]:
-        mv = client.get_model_version_by_id(settings["version_id"])
+    if model_settings["origin_name"] and model_settings["name"]:
+        mv = client.get_model(name=model_settings["origin_name"]).get_version(
+            version=model_settings["name"]
+        )
         mv.update(
             docker_image_name=image_name,
             docker_tag=image_tag,
             docker_flags=docker_flags,
             base_parameters=defaults or {},
         )
-        return f"Updated existing version {mv.name} (id={mv.id})"
+        return f"Updated existing version {mv.name} (origin_name={mv.origin_name})"
 
     # Ensure model
     created_model = False
     try:
-        model = client.get_model(name=settings["model_name"])
+        model = client.get_model(name=model_settings["model_name"])
     except ResourceNotFoundError:
-        model = client.create_model(name=settings["model_name"])
+        model = client.create_model(name=model_settings["model_name"])
         created_model = True
 
     # Ensure version
     created_version = False
     try:
-        mv = _model_get_version_safe(model, settings["version_name"])
+        mv = _model_get_version_safe(model, model_settings["version_name"])
     except ResourceNotFoundError:
         mv = model.create_version(
-            name=settings["version_name"],
-            framework=Framework[settings["framework"]],
-            type=InferenceType[settings["inference_type"]],
+            name=model_settings["version_name"],
+            framework=Framework[model_settings["framework"]],
+            type=InferenceType[model_settings["inference_type"]],
             base_parameters=defaults or {},
         )
         created_version = True
