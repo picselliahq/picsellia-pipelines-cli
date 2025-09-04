@@ -17,10 +17,8 @@ from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 
 def deploy_processing(
-    pipeline_name: str = typer.Argument(
-        ..., help="Name of the processing pipeline to deploy"
-    ),
-    host: str = typer.Option(None, help="If provided, deploy only to this host"),
+    pipeline_name: str,
+    host: str = "prod",
 ):
     """
     🚀 Deploy a processing pipeline to all available environments in the .env.
