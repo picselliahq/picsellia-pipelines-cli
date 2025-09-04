@@ -125,9 +125,9 @@ def _get_model_settings(cfg: PipelineConfig) -> dict:
       framework = "ONNX" | "PYTORCH" | "TENSORFLOW" (optional, default ONNX)
       inference_type = "OBJECT_DETECTION" | "CLASSIFICATION" | ... (optional, default OBJECT_DETECTION)
     """
-    model_name = cfg.get("model_version", "name")
-    version_name = cfg.get("model_version", "origin_name")
-    framework = (cfg.get("model_version", "framework") or "ONNX").upper()
+    model_name = cfg.get("model_version", "origin_name")
+    version_name = cfg.get("model_version", "name")
+    framework = (cfg.get("model_version", "framework") or "NOT_CONFIGURED").upper()
     inference_type = (
         cfg.get("model_version", "inference_type") or "OBJECT_DETECTION"
     ).upper()
@@ -135,8 +135,8 @@ def _get_model_settings(cfg: PipelineConfig) -> dict:
     if not model_name or not version_name:
         raise typer.Exit(
             "❌ Missing model configuration.\n"
-            "Provide:\n"
-            "  model_version.name and model_version.origin_name and model_version.framework and model_version.inference_type)."
+            "Please provide:\n"
+            "model_version.name and model_version.origin_name and model_version.framework and model_version.inference_type"
         )
 
     return {
@@ -145,29 +145,6 @@ def _get_model_settings(cfg: PipelineConfig) -> dict:
         "framework": framework,
         "inference_type": inference_type,
     }
-
-
-def _model_get_version_safe(model, version_name: str):
-    """
-    Try multiple signatures to fetch a model version by name.
-    """
-    for kwargs in (
-        {"version_name": version_name},
-        {"version": version_name},
-    ):
-        try:
-            return model.get_version(**kwargs)
-        except TypeError:
-            continue
-        except ResourceNotFoundError:
-            raise
-        except Exception:
-            continue
-    # last resort: positional (SDK-dependent)
-    try:
-        return model.get_version(version_name)  # type: ignore[arg-type]
-    except Exception:
-        raise ResourceNotFoundError("Model version not found")
 
 
 def _ensure_model_and_version_on_host(
@@ -185,9 +162,9 @@ def _ensure_model_and_version_on_host(
     docker_flags = _infer_docker_flags(cfg)
 
     # Shortcut: update a specific version by id if provided
-    if model_settings["origin_name"] and model_settings["name"]:
-        mv = client.get_model(name=model_settings["origin_name"]).get_version(
-            version=model_settings["name"]
+    if model_settings["model_name"] and model_settings["version_name"]:
+        mv = client.get_model(name=model_settings["model_name"]).get_version(
+            version=model_settings["version_name"]
         )
         mv.update(
             docker_image_name=image_name,
@@ -208,7 +185,7 @@ def _ensure_model_and_version_on_host(
     # Ensure version
     created_version = False
     try:
-        mv = _model_get_version_safe(model, model_settings["version_name"])
+        mv = model.get_version(version=model_settings["version_name"])
     except ResourceNotFoundError:
         mv = model.create_version(
             name=model_settings["version_name"],
