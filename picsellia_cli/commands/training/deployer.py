@@ -1,5 +1,4 @@
 import typer
-from typing import Optional
 
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
@@ -97,17 +96,6 @@ def deploy_training(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _infer_docker_flags(cfg: PipelineConfig) -> Optional[list[str]]:
-    """Derive docker flags from GPU needs."""
-    try:
-        gpu = int(cfg.get("docker", "gpu") or 0)
-        if gpu > 0:
-            return ["--gpus all", "--ipc host"]
-    except Exception:
-        pass
-    return None
-
-
 def _get_model_settings(cfg: PipelineConfig) -> dict:
     """
     Read model settings from config.toml:
@@ -150,7 +138,7 @@ def _ensure_model_and_version_on_host(
     """
     model_settings = _get_model_settings(cfg)
     defaults = cfg.extract_default_parameters()
-    docker_flags = _infer_docker_flags(cfg)
+    docker_flags = ["--gpus all", "--ipc host", "--name training"]
 
     try:
         model = client.get_model(name=model_settings["model_name"])
