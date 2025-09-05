@@ -110,7 +110,7 @@ def _get_model_settings(cfg: PipelineConfig) -> dict:
     version_name = cfg.get("model_version", "name")
     framework = (cfg.get("model_version", "framework") or "NOT_CONFIGURED").upper()
     inference_type = (
-        cfg.get("model_version", "inference_type") or "OBJECT_DETECTION"
+        cfg.get("model_version", "inference_type") or "NOT_CONFIGURED"
     ).upper()
 
     if not model_name or not version_name:
@@ -140,11 +140,13 @@ def _ensure_model_and_version_on_host(
     model_settings = _get_model_settings(cfg)
     defaults = cfg.extract_default_parameters()
     docker_flags = ["--gpus all", "--ipc host", "--name training"]
+    created = False
 
     try:
         model = client.get_model(name=model_settings["model_name"])
     except ResourceNotFoundError:
         model = client.create_model(name=model_settings["model_name"])
+        created = True
 
     try:
         mv = model.get_version(version=model_settings["version_name"])
@@ -153,12 +155,20 @@ def _ensure_model_and_version_on_host(
             name=model_settings["version_name"],
             framework=Framework[model_settings["framework"]],
             type=InferenceType[model_settings["inference_type"]],
+            docker_image_name=image_name,
+            docker_tag=image_tag,
+            docker_flags=docker_flags,
             base_parameters=defaults or {},
         )
+        created = True
 
-    mv.update(
-        docker_image_name=image_name,
-        docker_tag=image_tag,
-        docker_flags=docker_flags,
-        base_parameters=defaults or {},
-    )
+    if not created:
+        mv.update(
+            name=model_settings["version_name"],
+            framework=Framework[model_settings["framework"]],
+            type=InferenceType[model_settings["inference_type"]],
+            docker_image_name=image_name,
+            docker_tag=image_tag,
+            docker_flags=docker_flags,
+            base_parameters=defaults or {},
+        )
