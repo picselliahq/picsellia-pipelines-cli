@@ -112,7 +112,7 @@ def launch_training(
     if exp.get("url"):
         kv("Experiment URL", exp["url"])
 
-    step(1, "Submitting training job…", accent=True)
+    step(1, "Submitting training job…")
     try:
         experiment = client.get_experiment_by_id(exp_id)
     except Exception as e:

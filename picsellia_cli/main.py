@@ -140,15 +140,24 @@ def test(
 @app.command(name="smoke-test")
 def smoke_test(
     pipeline_name: str,
+    run_config_file: str = typer.Option(None, help="Path to a custom run config file"),
     host: str = typer.Option(
         "prod", help="Target host environment (prod, staging, local)"
     ),
+    python_version: str = typer.Option("3.10", help=""),
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
-        smoke_test_training(pipeline_name=pipeline_name)
+        smoke_test_training(
+            pipeline_name=pipeline_name,
+            run_config_file=run_config_file,
+            host=host,
+            python_version=python_version,
+        )
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
-        smoke_test_processing(pipeline_name=pipeline_name, host=host)
+        smoke_test_processing(
+            pipeline_name=pipeline_name, host=host, python_version=python_version
+        )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
         raise typer.Exit()

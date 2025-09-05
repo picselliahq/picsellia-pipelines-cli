@@ -3,13 +3,13 @@ from picsellia_cli.utils.deployer import (
     prompt_docker_image_if_missing,
 )
 from picsellia_cli.utils.env_utils import ensure_env_vars, get_host_env_config
+from picsellia_cli.utils.logging import section, kv
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.smoke_tester import run_smoke_test_container
 
 
 def smoke_test_processing(
-    pipeline_name: str,
-    host: str = "prod",
+    pipeline_name: str, host: str = "prod", python_version: str = "3.10"
 ):
     ensure_env_vars(host=host)
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
@@ -19,6 +19,10 @@ def smoke_test_processing(
     image_tag = pipeline_config.get("docker", "image_tag")
 
     full_image_name = f"{image_name}:{image_tag}"
+
+    section("🐳 Docker image")
+    kv("Image", image_name)
+    kv("Tag", image_tag)
 
     build_docker_image_only(
         pipeline_dir=pipeline_config.pipeline_dir,
@@ -37,7 +41,14 @@ def smoke_test_processing(
     pipeline_script = (
         f"{pipeline_name}/{pipeline_config.get('execution', 'pipeline_script')}"
     )
+    python_bin = f"python{python_version}"
+
+    section("🧪 Smoke test")
+    kv("Python", python_bin)
 
     run_smoke_test_container(
-        image=full_image_name, script=pipeline_script, env_vars=env_vars
+        image=full_image_name,
+        script=pipeline_script,
+        env_vars=env_vars,
+        python_bin=python_bin,
     )

@@ -4,21 +4,33 @@ import typer
 
 import os
 
+from picsellia_cli.utils.logging import bullet, hr
 
-def run_smoke_test_container(image: str, script: str, env_vars: dict):
+
+def run_smoke_test_container(image: str, script: str, env_vars: dict, python_bin: str):
+    """
+    Lance le conteneur en mode bash -c "run <python_bin> <script>"
+    et stop si on détecte "--ec-- 1" dans les logs.
+    """
     container_name = "smoke-test-temp"
-    log_cmd = f"run python3.10 {script}"
+    log_cmd = f"run {python_bin} {script}"
 
-    # Clean up old container if needed
+    # Cleanup éventuel
     subprocess.run(
         ["docker", "rm", "-f", container_name],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
     docker_command = [
         "docker",
         "run",
+        "--gpus",
+        "all",
+        "--shm-size",
+        "8g",
         "--name",
         container_name,
         "--entrypoint",
@@ -27,13 +39,12 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
         f"{os.getcwd()}:/workspace",
     ]
 
-    for key, value in env_vars.items():
-        docker_command += ["-e", f"{key}={value}"]
+    for k, v in env_vars.items():
+        docker_command += ["-e", f"{k}={v}"]
 
     docker_command += [image, "-c", log_cmd]
 
-    typer.echo("🚀 Launching Docker container...\n")
-
+    bullet("Launching Docker training container…", accent=True)
     proc = subprocess.Popen(
         docker_command,
         stdout=subprocess.PIPE,
@@ -51,12 +62,13 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
             print(line, end="")
             if "--ec-- 1" in line:
                 typer.echo(
-                    "\n❌ '--ec-- 1' detected! Something went wrong during execution."
+                    "\n❌ '--ec-- 1' detected! Something went wrong during training."
                 )
-                typer.echo("📥 Copying logs before stopping the container...\n")
+                typer.echo(
+                    "📥 Copying training logs before stopping the container...\n"
+                )
                 triggered = True
 
-                # Copy from /experiment instead of /workspace
                 subprocess.run(
                     [
                         "docker",
@@ -64,9 +76,10 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
                         f"{container_name}:/experiment/training.log",
                         "training.log",
                     ],
-                    check=True,
+                    check=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
-
                 subprocess.run(["docker", "stop", container_name], check=False)
                 break
     except Exception as e:
@@ -90,3 +103,5 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict):
         print("-" * 60 + "\n")
     else:
         typer.echo("✅ Docker pipeline ran successfully.")
+
+    hr()

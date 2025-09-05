@@ -105,7 +105,6 @@ def init_training(
         f"Open {typer.style(model_url, fg=typer.colors.BLUE)} and upload "
         + typer.style("'pretrained-weights'", bold=True)
         + " to this model version.",
-        accent=True,
     )
     step(
         2, "Edit training steps: " + typer.style(f"{template_dir}/steps.py", bold=True)

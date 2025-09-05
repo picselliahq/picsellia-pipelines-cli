@@ -1,5 +1,3 @@
-import os
-import subprocess
 from pathlib import Path
 import toml
 import typer
@@ -14,22 +12,21 @@ from picsellia_cli.utils.env_utils import (
     get_api_token_from_host,
 )
 from picsellia_cli.utils.pipeline_config import PipelineConfig
-from picsellia_cli.utils.logging import section, kv, bullet, hr
+from picsellia_cli.utils.logging import section, kv
 
 from picsellia_cli.commands.training.utils.test import (
     get_training_params,
     normalize_training_io,
 )
 from picsellia_cli.utils.initializer import init_client
+from picsellia_cli.utils.smoke_tester import run_smoke_test_container
 
 
 def smoke_test_training(
     pipeline_name: str,
-    host: str = typer.Option("prod", help="Target host (prod/staging/local or URL)"),
-    run_config_file: str | None = typer.Option(None, help="Path to run-config TOML"),
-    python_version: str = typer.Option(
-        "3.10", help="Python version to run inside the container, e.g. 3.10"
-    ),
+    run_config_file: str | None = None,
+    host: str = "prod",
+    python_version: str = "3.10",
 ):
     """
     Build l'image Docker et lance un smoke-test du script Picsellia dans un conteneur.
@@ -38,8 +35,8 @@ def smoke_test_training(
     - La version de Python utilisée dans le container est paramétrable via --python-version.
     """
     ensure_env_vars(host=host)
-    config = PipelineConfig(pipeline_name)
-    prompt_docker_image_if_missing(pipeline_config=config)
+    pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
+    prompt_docker_image_if_missing(pipeline_config=pipeline_config)
 
     # Charger / normaliser le run-config
     if run_config_file:
@@ -69,8 +66,8 @@ def smoke_test_training(
         raise typer.Exit()
 
     # Build image
-    image_name = config.get("docker", "image_name")
-    image_tag = config.get("docker", "image_tag")
+    image_name = pipeline_config.get("docker", "image_name")
+    image_tag = pipeline_config.get("docker", "image_tag")
     full_image_name = f"{image_name}:{image_tag}"
 
     section("🐳 Docker image")
@@ -78,7 +75,7 @@ def smoke_test_training(
     kv("Tag", image_tag)
 
     build_docker_image_only(
-        pipeline_dir=config.pipeline_dir,
+        pipeline_dir=pipeline_config.pipeline_dir,
         full_image_name=full_image_name,
     )
 
@@ -87,127 +84,27 @@ def smoke_test_training(
     env_vars = {
         "api_token": api_token,
         "organization_name": auth["organization_name"],
+        "host": host_cfg["host"],
         "experiment_id": str(experiment_id),
         "DEBUG": "True",
-        "PICSELLIA_HOST": host_cfg["host"],
     }
 
-    # Script & python
-    script_rel = (
-        f"{pipeline_name}/{config.get('execution', 'picsellia_pipeline_script')}"
+    pipeline_script = (
+        f"{pipeline_name}/{pipeline_config.get('execution', 'pipeline_script')}"
     )
+
     python_bin = f"python{python_version}"
 
     section("🧪 Smoke test")
     kv("Workspace", auth["organization_name"])
     kv("Host", host_cfg["host"])
     kv("Experiment ID", experiment_id)
-    kv("Script", script_rel)
+    kv("Script", pipeline_script)
     kv("Python", python_bin)
 
     run_smoke_test_container(
         image=full_image_name,
-        script=script_rel,
+        script=pipeline_script,
         env_vars=env_vars,
         python_bin=python_bin,
     )
-
-
-def run_smoke_test_container(image: str, script: str, env_vars: dict, python_bin: str):
-    """
-    Lance le conteneur en mode bash -c "run <python_bin> <script>"
-    et stop si on détecte "--ec-- 1" dans les logs.
-    """
-    container_name = "smoke-test-temp"
-    log_cmd = f"run {python_bin} {script}"
-
-    # Cleanup éventuel
-    subprocess.run(
-        ["docker", "rm", "-f", container_name],
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-
-    docker_command = [
-        "docker",
-        "run",
-        "--gpus",
-        "all",
-        "--shm-size",
-        "8g",
-        "--name",
-        container_name,
-        "--entrypoint",
-        "bash",
-        "-v",
-        f"{os.getcwd()}:/workspace",
-    ]
-
-    for k, v in env_vars.items():
-        docker_command += ["-e", f"{k}={v}"]
-
-    docker_command += [image, "-c", log_cmd]
-
-    bullet("Launching Docker training container…", accent=True)
-    proc = subprocess.Popen(
-        docker_command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        universal_newlines=True,
-    )
-
-    triggered = False
-    if proc.stdout is None:
-        typer.echo("❌ Failed to capture Docker logs.")
-        return
-
-    try:
-        for line in proc.stdout:
-            print(line, end="")
-            if "--ec-- 1" in line:
-                typer.echo(
-                    "\n❌ '--ec-- 1' detected! Something went wrong during training."
-                )
-                typer.echo(
-                    "📥 Copying training logs before stopping the container...\n"
-                )
-                triggered = True
-
-                subprocess.run(
-                    [
-                        "docker",
-                        "cp",
-                        f"{container_name}:/experiment/training.log",
-                        "training.log",
-                    ],
-                    check=False,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-                subprocess.run(["docker", "stop", container_name], check=False)
-                break
-    except Exception as e:
-        typer.echo(f"❌ Error while monitoring Docker: {e}")
-    finally:
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            typer.echo("⚠️ Timeout reached. Killing process.")
-            proc.kill()
-
-    print(f"\n🚦 Docker container exited with code: {proc.returncode}")
-
-    if triggered or proc.returncode != 0:
-        typer.echo("\n🧾 Captured training.log content:\n" + "-" * 60)
-        try:
-            with open("training.log") as f:
-                print(f.read())
-        except Exception as e:
-            typer.echo(f"⚠️ Could not read training.log: {e}")
-        print("-" * 60 + "\n")
-    else:
-        typer.echo("✅ Docker pipeline ran successfully.")
-
-    hr()
