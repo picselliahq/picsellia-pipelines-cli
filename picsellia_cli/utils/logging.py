@@ -69,7 +69,7 @@ def kv(
     level: str | None = None,
     align: int = _LABEL_ALIGN,
     width: int = _DEFAULT_WIDTH,
-    wrap: bool = True,
+    wrap: bool = False,
 ) -> None:
     """
     Affiche une paire clé/valeur avec alignement propre.

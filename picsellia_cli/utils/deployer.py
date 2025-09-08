@@ -122,7 +122,7 @@ def build_and_push_docker_image(
             pipeline_dir=pipeline_dir, full_image_name=full_image_name
         )
         push_docker_image_only(full_image_name=full_image_name)
-        typer.echo(f"✅ Docker image '{full_image_name}' pushed successfully!")
+        typer.echo(f"Docker image '{full_image_name}' pushed successfully!")
 
 
 def prompt_docker_image_if_missing(pipeline_config: PipelineConfig) -> None:
@@ -147,7 +147,7 @@ def prompt_docker_image_if_missing(pipeline_config: PipelineConfig) -> None:
 
     pipeline_config.config["docker"]["image_name"] = image_name
     pipeline_config.save()
-    typer.echo(f"✅ Docker image will be: {image_name}:<version>")
+    typer.echo(f"Docker image will be: {image_name}:<version>")
 
 
 def bump_pipeline_version(pipeline_config: PipelineConfig):

@@ -38,11 +38,6 @@ def test_training(
     section("🧩 Pipeline")
     kv("Name", pipeline_config.get("metadata", "name"))
     kv("Type", pipeline_config.get("metadata", "type"))
-    kv("Directory", str(pipeline_config.pipeline_dir))
-    try:
-        kv("Script", str(pipeline_config.get_script_path("pipeline_script")))
-    except Exception:
-        pass
 
     # ── Run directory ────────────────────────────────────────────────────────
     run_manager = RunManager(pipeline_dir=pipeline_config.pipeline_dir)
@@ -55,21 +50,17 @@ def test_training(
     kv("Working dir", str(run_dir))
 
     # ── Config source ────────────────────────────────────────────────────────
-    section("🧪 Run config")
     run_config_path = Path(run_config_file) if run_config_file else None
     if reuse_dir and run_config_path is None:
         run_config_path = run_manager.get_latest_run_config_path()
 
     if run_config_path and run_config_path.exists():
         run_config = toml.load(run_config_path)
-        kv("Source", f"{run_config_path}")
     else:
         run_config = get_training_params(run_manager=run_manager, config_file=None)
-        kv("Source", "interactive / last-known")
 
     run_config.setdefault("run", {})
     run_config["run"]["working_dir"] = str(run_dir)
-    kv("Mode", "local")
 
     # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
@@ -120,8 +111,6 @@ def test_training(
     python_executable = (
         Path(env_path) / ("Scripts" if os.name == "nt" else "bin") / "python"
     )
-    kv("Venv", str(env_path))
-    kv("Python", str(python_executable))
 
     # ── Build command ────────────────────────────────────────────────────────
     section("▶️ Run")
@@ -131,7 +120,6 @@ def test_training(
         run_config_file=saved_run_config_path,
         mode="local",
     )
-    kv("Command", " ".join(map(str, command)))
 
     api_token = get_api_token_from_host(host=run_config["auth"]["host"])
 
