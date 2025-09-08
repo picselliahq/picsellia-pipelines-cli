@@ -149,45 +149,12 @@ def _print_training_io_summary(run_config: dict) -> None:
     out = run_config.get("output", {}) or {}
     exp = out.get("experiment", {}) or {}
     if exp:
-        kv("Experiment", f"{exp.get('name') or exp.get('id')}")
-        if exp.get("project_name"):
-            kv("Project", exp["project_name"])
         if exp.get("url"):
             kv("Experiment URL", exp["url"])
 
     inp = run_config.get("input", {}) or {}
 
-    def _show_dsv(slot_key: str, label: str):
-        d = inp.get(slot_key) or {}
-        if not d:
-            return
-        name = d.get("version_name") or d.get("name")
-        origin = d.get("origin_name") or d.get("dataset_name")
-        ident = d.get("id")
-        txt = " / ".join([x for x in [origin, name, ident] if x])
-        kv(label, txt)
-        if d.get("url"):
-            kv(f"{label} URL", d["url"])
-
-    _show_dsv("train_dataset_version", "Train dataset")
-    _show_dsv("test_dataset_version", "Test dataset")
-    _show_dsv("validation_dataset_version", "Val dataset")
-
     mv = inp.get("model_version") or {}
     if mv:
-        base = " / ".join(
-            [
-                x
-                for x in [
-                    mv.get("origin_name"),
-                    mv.get("name") or mv.get("version_name"),
-                    mv.get("id"),
-                ]
-                if x
-            ]
-        )
-        if mv.get("visibility"):
-            base += f" ({mv['visibility']})"
-        kv("Model version", base)
         if mv.get("url"):
             kv("Model URL", mv["url"])
