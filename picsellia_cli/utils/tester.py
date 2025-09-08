@@ -25,7 +25,9 @@ def build_pipeline_command(
     ]
 
 
-def merge_with_default_parameters(run_config: dict, default_parameters: dict) -> dict:
+def merge_with_default_parameters(
+    run_config: dict, default_parameters: dict, parameters_name: str = "parameters"
+) -> dict:
     """
     Merge existing run config parameters with default parameters from the pipeline.
 
@@ -35,16 +37,17 @@ def merge_with_default_parameters(run_config: dict, default_parameters: dict) ->
     Args:
         run_config (dict): The current parameters dictionary (typically from run_config.toml)
         default_parameters (dict): The default parameters from the pipeline config
+        parameters_name (str, optional): The name of the parameter
 
     Returns:
         dict: The merged parameters dictionary (with all required defaults)
     """
-    run_config.setdefault("parameters", {})
+    run_config.setdefault(parameters_name, {})
     merged_params = default_parameters.copy()
 
     # Override defaults with existing values from run config
-    merged_params.update(run_config["parameters"])
+    merged_params.update(run_config[parameters_name])
 
     # Set back merged values into run_config
-    run_config["parameters"] = merged_params
+    run_config[parameters_name] = merged_params
     return run_config

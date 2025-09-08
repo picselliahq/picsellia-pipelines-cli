@@ -46,8 +46,6 @@ def test_training(
         bullet(f"Reusing last run dir if possible → {run_dir}", accent=False)
     else:
         run_dir = run_manager.get_next_run_dir()
-        bullet(f"New run dir → {run_dir}", accent=False)
-    kv("Working dir", str(run_dir))
 
     # ── Config source ────────────────────────────────────────────────────────
     run_config_path = Path(run_config_file) if run_config_file else None
@@ -82,7 +80,9 @@ def test_training(
     section("⚙️ Parameters")
     default_pipeline_params = pipeline_config.extract_default_parameters()
     run_config = merge_with_default_parameters(
-        run_config=run_config, default_parameters=default_pipeline_params
+        run_config=run_config,
+        default_parameters=default_pipeline_params,
+        parameters_name="hyperparameters",
     )
 
     # ── Normalize IO (resolve IDs/URLs) ─────────────────────────────────────
