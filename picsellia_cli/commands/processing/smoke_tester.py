@@ -92,10 +92,13 @@ def smoke_test_processing(
     enrich_run_config_with_metadata(client=client, run_config=run_config)
 
     run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
-    saved_run_config_path = get_saved_run_config_path(
+    host_run_config_path = get_saved_run_config_path(
         run_manager=run_manager, run_dir=run_dir
     )
-    # Build image
+    saved_run_config_path = Path("/workspace") / host_run_config_path.relative_to(
+        Path.cwd()
+    )
+
     image_name = pipeline_config.get("docker", "image_name")
     image_tag = pipeline_config.get("docker", "image_tag")
     full_image_name = f"{image_name}:{image_tag}"

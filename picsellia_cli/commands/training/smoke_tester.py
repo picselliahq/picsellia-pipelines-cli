@@ -101,12 +101,14 @@ def smoke_test_training(
 
     # ── Persist run config to run dir ────────────────────────────────────────
     run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
-    saved_run_config_path = get_saved_run_config_path(
+    host_run_config_path = get_saved_run_config_path(
         run_manager=run_manager, run_dir=run_dir
+    )
+    saved_run_config_path = Path("/workspace") / host_run_config_path.relative_to(
+        Path.cwd()
     )
     kv("Saved config", str(saved_run_config_path))
 
-    # Build image
     image_name = pipeline_config.get("docker", "image_name")
     image_tag = pipeline_config.get("docker", "image_tag")
     full_image_name = f"{image_name}:{image_tag}"
