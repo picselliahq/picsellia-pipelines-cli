@@ -20,7 +20,7 @@ def run_smoke_test_container(
     container_name = "smoke-test-temp"
 
     # Construire la commande bash finale
-    log_cmd = "run " + " ".join(
+    log_cmd = " ".join(
         quote(arg) for arg in command
     )  # 🛡️ sécurisé contre les espaces, etc.
 
