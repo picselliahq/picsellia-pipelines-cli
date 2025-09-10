@@ -136,4 +136,5 @@ def smoke_test_processing(
         image=full_image_name,
         command=command,
         env_vars=env_vars,
+        pipeline_name=pipeline_name,
     )

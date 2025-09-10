@@ -6,25 +6,14 @@ from picsellia_cli.utils.logging import bullet, hr
 
 
 def run_smoke_test_container(
-    image: str,
-    command: list[str],
-    env_vars: dict,
+    image: str, command: list[str], env_vars: dict, pipeline_name: str
 ):
-    """
-    Lance un conteneur Docker en mode `bash -c "<commande>"` avec les variables d'environnement données.
-
-    La commande est typiquement celle générée par `build_pipeline_command(...)`.
-
-    Si "--ec-- 1" est détecté dans les logs du conteneur, on copie les logs avant d'arrêter le conteneur.
-    """
     container_name = "smoke-test-temp"
 
-    # Construire la commande bash finale
-    log_cmd = " ".join(
+    log_cmd = f"source /experiment/{pipeline_name}/.venv/bin/activate &&" + " ".join(
         quote(arg) for arg in command
-    )  # 🛡️ sécurisé contre les espaces, etc.
+    )
 
-    # Cleanup éventuel
     subprocess.run(
         ["docker", "rm", "-f", container_name],
         check=False,
@@ -48,7 +37,6 @@ def run_smoke_test_container(
         f"{os.getcwd()}:/workspace",
     ]
 
-    # Ajout des variables d'env
     for k, v in env_vars.items():
         docker_command += ["-e", f"{k}={v}"]
 
