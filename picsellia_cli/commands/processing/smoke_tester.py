@@ -1,23 +1,103 @@
+from pathlib import Path
+import toml
+
 from picsellia_cli.utils.deployer import (
     build_docker_image_only,
     prompt_docker_image_if_missing,
 )
-from picsellia_cli.utils.env_utils import ensure_env_vars, get_host_env_config
-from picsellia_cli.utils.logging import section, kv
+from picsellia_cli.utils.env_utils import (
+    ensure_env_vars,
+    get_host_env_config,
+    get_api_token_from_host,
+)
 from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia_cli.utils.logging import section, kv
+
+from picsellia_cli.utils.initializer import init_client
 from picsellia_cli.utils.smoke_tester import run_smoke_test_container
+
+from picsellia_cli.utils.tester import (
+    build_pipeline_command,
+)
+
+
+from picsellia_cli.utils.run_manager import RunManager
+from picsellia_cli.utils.tester import (
+    merge_with_default_parameters,
+    get_saved_run_config_path,
+)
+
+from picsellia_cli.commands.processing.tester import (
+    get_processing_params,
+    check_output_dataset_version,
+    enrich_run_config_with_metadata,
+)
 
 
 def smoke_test_processing(
-    pipeline_name: str, host: str = "prod", python_version: str = "3.10"
+    pipeline_name: str,
+    run_config_file: str | None = None,
+    host: str = "prod",
+    python_version: str = "3.10",
 ):
     ensure_env_vars(host=host)
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)
+    pipeline_type = pipeline_config.get("metadata", "type")
+    run_manager = RunManager(pipeline_dir=pipeline_config.pipeline_dir)
 
+    run_dir = run_manager.get_next_run_dir()
+
+    run_config_path = Path(run_config_file) if run_config_file else None
+    if run_config_path and run_config_path.exists():
+        run_config = toml.load(run_config_path)
+        run_config.setdefault("run", {})
+        run_config["run"]["working_dir"] = str(run_dir)
+    else:
+        run_config = get_processing_params(
+            run_manager=run_manager,
+            pipeline_type=pipeline_type,
+            pipeline_name=pipeline_name,
+            config_file=None,
+        )
+        run_config.setdefault("run", {})
+        run_config["run"]["working_dir"] = str(run_dir)
+
+    if "auth" in run_config and "host" in run_config["auth"]:
+        host = run_config["auth"]["host"]
+        env_config = get_host_env_config(host=host)
+    else:
+        env_config = get_host_env_config(host=host.upper())
+        run_config.setdefault("auth", {})
+        run_config["auth"]["host"] = env_config["host"]
+
+    if "organization_name" not in run_config["auth"]:
+        run_config["auth"]["organization_name"] = env_config["organization_name"]
+
+    client = init_client(host=run_config["auth"]["host"])
+
+    if pipeline_type == "DATASET_VERSION_CREATION":
+        run_config["output"]["dataset_version"]["name"] = check_output_dataset_version(
+            client=client,
+            input_dataset_version_id=run_config["input"]["dataset_version"]["id"],
+            output_name=run_config["output"]["dataset_version"]["name"],
+            override_outputs=bool(run_config.get("override_outputs", False)),
+        )
+
+    default_pipeline_params = pipeline_config.extract_default_parameters()
+    run_config = merge_with_default_parameters(
+        run_config=run_config, default_parameters=default_pipeline_params
+    )
+
+    enrich_run_config_with_metadata(client=client, run_config=run_config)
+
+    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
+    saved_run_config_path = get_saved_run_config_path(
+        run_manager=run_manager, run_dir=run_dir
+    )
+    # Build image
     image_name = pipeline_config.get("docker", "image_name")
     image_tag = pipeline_config.get("docker", "image_tag")
-
     full_image_name = f"{image_name}:{image_tag}"
 
     section("🐳 Docker image")
@@ -29,26 +109,31 @@ def smoke_test_processing(
         full_image_name=full_image_name,
     )
 
-    env_config = get_host_env_config(host=host)
-
+    # Env vars
+    api_token = get_api_token_from_host(host=run_config["auth"]["host"])
     env_vars = {
-        "api_token": env_config["api_token"],
-        "organization_name": env_config["organization_name"],
-        "host": env_config["host"],
+        "api_token": api_token,
+        "organization_name": run_config["auth"]["organization_name"],
+        "host": run_config["auth"]["host"],
         "DEBUG": "True",
     }
 
     pipeline_script = (
         f"{pipeline_name}/{pipeline_config.get('execution', 'pipeline_script')}"
     )
+
     python_bin = f"python{python_version}"
 
-    section("🧪 Smoke test")
-    kv("Python", python_bin)
+    pipeline_script_path = Path(pipeline_script)
+    command = build_pipeline_command(
+        python_executable=Path(python_bin),
+        pipeline_script_path=pipeline_script_path,
+        run_config_file=saved_run_config_path,
+        mode="local",
+    )
 
     run_smoke_test_container(
         image=full_image_name,
-        script=pipeline_script,
+        command=command,
         env_vars=env_vars,
-        python_bin=python_bin,
     )

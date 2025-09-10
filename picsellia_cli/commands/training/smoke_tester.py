@@ -20,6 +20,17 @@ from picsellia_cli.commands.training.utils.test import (
 )
 from picsellia_cli.utils.initializer import init_client
 from picsellia_cli.utils.smoke_tester import run_smoke_test_container
+from picsellia_cli.utils.tester import (
+    build_pipeline_command,
+)
+
+
+from picsellia_cli.utils.run_manager import RunManager
+from picsellia_cli.utils.tester import (
+    merge_with_default_parameters,
+    get_saved_run_config_path,
+)
+from picsellia_cli.commands.training.tester import _print_training_io_summary
 
 
 def smoke_test_training(
@@ -28,42 +39,72 @@ def smoke_test_training(
     host: str = "prod",
     python_version: str = "3.10",
 ):
-    """
-    Build l'image Docker et lance un smoke-test du script Picsellia dans un conteneur.
-    - Si un run-config est fourni, on normalise + résout l'experiment_id via normalize_training_io.
-    - Sinon, fallback interactif: on demande un experiment_id minimal.
-    - La version de Python utilisée dans le container est paramétrable via --python-version.
-    """
     ensure_env_vars(host=host)
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)
 
-    # Charger / normaliser le run-config
-    if run_config_file:
-        rc_path = Path(run_config_file)
-        if not rc_path.exists():
-            typer.echo(f"❌ Config file not found: {run_config_file}")
-            raise typer.Exit()
-        run_config = toml.load(rc_path)
+    # ── Pipeline ─────────────────────────────────────────────────────────────
+    section("🧩 Pipeline")
+    kv("Name", pipeline_config.get("metadata", "name"))
+    kv("Type", pipeline_config.get("metadata", "type"))
+
+    # ── Run directory ────────────────────────────────────────────────────────
+    run_manager = RunManager(pipeline_dir=pipeline_config.pipeline_dir)
+    run_dir = run_manager.get_next_run_dir()
+
+    # ── Config source ────────────────────────────────────────────────────────
+    run_config_path = Path(run_config_file) if run_config_file else None
+
+    if run_config_path and run_config_path.exists():
+        run_config = toml.load(run_config_path)
     else:
-        run_config = get_training_params(run_manager=None, config_file=None)
+        run_config = get_training_params(run_manager=run_manager, config_file=None)
 
-    # Host/env pour normalisation
-    auth = run_config.setdefault("auth", {})
-    desired_host = auth.get("host") or host
-    host_cfg = get_host_env_config(host=desired_host)
-    auth.setdefault("host", host_cfg["host"])
-    auth.setdefault("organization_name", host_cfg["organization_name"])
+    run_config.setdefault("run", {})
+    run_config["run"]["working_dir"] = str(run_dir)
 
-    # Résoudre l'expérience + inputs
-    client = init_client(host=auth["host"])
-    normalize_training_io(client=client, run_config=run_config)
+    # ── Environment ─────────────────────────────────────────────────────────
+    section("🌍 Environment")
+    if "auth" in run_config and "host" in run_config["auth"]:
+        host = run_config["auth"]["host"]
+        env_config = get_host_env_config(host=host)
+    else:
+        env_config = get_host_env_config(host=host.upper())
+        run_config.setdefault("auth", {})
+        run_config["auth"]["host"] = env_config["host"]
 
-    exp = (run_config.get("output") or {}).get("experiment") or {}
-    experiment_id = exp.get("id")
-    if not experiment_id:
-        typer.echo("❌ Could not resolve an experiment id from the run config.")
-        raise typer.Exit()
+    if "organization_name" not in run_config["auth"]:
+        run_config["auth"]["organization_name"] = env_config["organization_name"]
+
+    kv("Host", run_config["auth"]["host"])
+    kv("Organization", run_config["auth"]["organization_name"])
+
+    # ── Defaults & parameters ────────────────────────────────────────────────
+    section("⚙️ Parameters")
+    default_pipeline_params = pipeline_config.extract_default_parameters()
+    run_config = merge_with_default_parameters(
+        run_config=run_config,
+        default_parameters=default_pipeline_params,
+        parameters_name="hyperparameters",
+    )
+
+    # ── Normalize IO (resolve IDs/URLs) ─────────────────────────────────────
+    section("📥 Inputs / 📤 Outputs")
+    client = init_client(host=run_config["auth"]["host"])
+    try:
+        normalize_training_io(client=client, run_config=run_config)
+    except typer.Exit as e:
+        kv("❌ IO normalization failed", str(e))
+        raise
+
+    _print_training_io_summary(run_config)
+
+    # ── Persist run config to run dir ────────────────────────────────────────
+    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
+    saved_run_config_path = get_saved_run_config_path(
+        run_manager=run_manager, run_dir=run_dir
+    )
+    kv("Saved config", str(saved_run_config_path))
 
     # Build image
     image_name = pipeline_config.get("docker", "image_name")
@@ -80,12 +121,12 @@ def smoke_test_training(
     )
 
     # Env vars
-    api_token = get_api_token_from_host(host=host_cfg["host"])
+    api_token = get_api_token_from_host(host=run_config["auth"]["host"])
     env_vars = {
         "api_token": api_token,
-        "organization_name": auth["organization_name"],
-        "host": host_cfg["host"],
-        "experiment_id": str(experiment_id),
+        "organization_name": run_config["auth"]["organization_name"],
+        "host": run_config["auth"]["host"],
+        "experiment_id": run_config["output"]["experiment"]["id"],
         "DEBUG": "True",
     }
 
@@ -95,16 +136,16 @@ def smoke_test_training(
 
     python_bin = f"python{python_version}"
 
-    section("🧪 Smoke test")
-    kv("Workspace", auth["organization_name"])
-    kv("Host", host_cfg["host"])
-    kv("Experiment ID", experiment_id)
-    kv("Script", pipeline_script)
-    kv("Python", python_bin)
+    pipeline_script_path = Path(pipeline_script)
+    command = build_pipeline_command(
+        python_executable=Path(python_bin),
+        pipeline_script_path=pipeline_script_path,
+        run_config_file=saved_run_config_path,
+        mode="local",
+    )
 
     run_smoke_test_container(
         image=full_image_name,
-        script=pipeline_script,
+        command=command,
         env_vars=env_vars,
-        python_bin=python_bin,
     )

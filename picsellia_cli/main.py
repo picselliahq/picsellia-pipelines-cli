@@ -156,7 +156,10 @@ def smoke_test(
         )
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
         smoke_test_processing(
-            pipeline_name=pipeline_name, host=host, python_version=python_version
+            pipeline_name=pipeline_name,
+            run_config_file=run_config_file,
+            host=host,
+            python_version=python_version,
         )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")

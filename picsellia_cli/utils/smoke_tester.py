@@ -1,19 +1,28 @@
 import subprocess
-
 import typer
-
 import os
-
+from shlex import quote  # 👈 pour échapper correctement les args shell
 from picsellia_cli.utils.logging import bullet, hr
 
 
-def run_smoke_test_container(image: str, script: str, env_vars: dict, python_bin: str):
+def run_smoke_test_container(
+    image: str,
+    command: list[str],
+    env_vars: dict,
+):
     """
-    Lance le conteneur en mode bash -c "run <python_bin> <script>"
-    et stop si on détecte "--ec-- 1" dans les logs.
+    Lance un conteneur Docker en mode `bash -c "<commande>"` avec les variables d'environnement données.
+
+    La commande est typiquement celle générée par `build_pipeline_command(...)`.
+
+    Si "--ec-- 1" est détecté dans les logs du conteneur, on copie les logs avant d'arrêter le conteneur.
     """
     container_name = "smoke-test-temp"
-    log_cmd = f"run {python_bin} {script}"
+
+    # Construire la commande bash finale
+    log_cmd = "run " + " ".join(
+        quote(arg) for arg in command
+    )  # 🛡️ sécurisé contre les espaces, etc.
 
     # Cleanup éventuel
     subprocess.run(
@@ -39,6 +48,7 @@ def run_smoke_test_container(image: str, script: str, env_vars: dict, python_bin
         f"{os.getcwd()}:/workspace",
     ]
 
+    # Ajout des variables d'env
     for k, v in env_vars.items():
         docker_command += ["-e", f"{k}={v}"]
 
