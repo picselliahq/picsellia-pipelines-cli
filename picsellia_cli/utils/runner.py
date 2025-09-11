@@ -62,9 +62,7 @@ def run_pipeline_command(command: list[str], working_dir: str, api_token: str):
     env["PYTHONPATH"] = str(Path.cwd())
     env["api_token"] = api_token
 
-    typer.echo(
-        f"🚀 Running pipeline with working_dir={working_dir} and PYTHONPATH={Path.cwd()}..."
-    )
+    typer.echo("🚀 Running pipeline...")
 
     try:
         subprocess.run(

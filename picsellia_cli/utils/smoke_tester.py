@@ -1,7 +1,7 @@
 import subprocess
 import typer
 import os
-from shlex import quote  # 👈 pour échapper correctement les args shell
+from shlex import quote
 from picsellia_cli.utils.logging import bullet, hr
 
 
