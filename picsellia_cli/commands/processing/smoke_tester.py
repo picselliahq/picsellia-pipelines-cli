@@ -39,6 +39,7 @@ def smoke_test_processing(
     run_config_file: str | None = None,
     host: str = "prod",
     python_version: str = "3.10",
+    use_gpu: bool = False,
 ):
     ensure_env_vars(host=host)
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
@@ -140,4 +141,5 @@ def smoke_test_processing(
         command=command,
         env_vars=env_vars,
         pipeline_name=pipeline_name,
+        use_gpu=use_gpu,
     )

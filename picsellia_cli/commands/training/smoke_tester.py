@@ -151,4 +151,5 @@ def smoke_test_training(
         command=command,
         env_vars=env_vars,
         pipeline_name=pipeline_name,
+        use_gpu=True,
     )

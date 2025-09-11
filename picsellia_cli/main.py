@@ -145,6 +145,7 @@ def smoke_test(
         "prod", help="Target host environment (prod, staging, local)"
     ),
     python_version: str = typer.Option("3.10", help=""),
+    use_gpu: bool = typer.Option(False),
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
@@ -160,6 +161,7 @@ def smoke_test(
             run_config_file=run_config_file,
             host=host,
             python_version=python_version,
+            use_gpu=use_gpu,
         )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
