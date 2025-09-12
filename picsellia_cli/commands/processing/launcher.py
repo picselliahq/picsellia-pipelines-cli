@@ -7,7 +7,6 @@ from orjson import orjson
 from picsellia import Client
 
 from picsellia_cli.commands.processing.tester import (
-    check_output_dataset_version,
     enrich_run_config_with_metadata,
 )
 from picsellia_cli.utils.env_utils import (
@@ -82,103 +81,19 @@ def launch_processing(
     kv("Workspace", f"{organization_name} ({org_id})" if org_id else organization_name)
     kv("Host", host_config["host"])
 
-    payload = {
-        "processing_id": str(processing.id),
-        "parameters": run_config.get("parameters", {}),
-        "cpu": int(pipeline_config.config["docker"].get("cpu", 4)),
-        "gpu": int(pipeline_config.config["docker"].get("gpu", 0)),
-    }
     inputs = run_config.get("input", {}) or {}
-    output = run_config.get("output", {}) or {}
+    outputs = run_config.get("output", {}) or {}
 
     section("📥 Inputs / 📤 Outputs")
 
-    if pipeline_type == "DATASET_VERSION_CREATION":
-        ds_ver = inputs.get("dataset_version") or {}
-        dataset_version_id = ds_ver.get("id")
-        if not dataset_version_id:
-            typer.echo("❌ DATASET_VERSION_CREATION requires input.dataset_version.id.")
-            raise typer.Exit(code=1)
-
-        endpoint = f"/api/dataset/version/{dataset_version_id}/processing/launch"
-        kv("Input dataset version ID", dataset_version_id)
-
-        # Optional: target version name
-        out_ds = output.get("dataset_version") or {}
-        target_version_name = out_ds.get("name")
-        if target_version_name:
-            run_config["output"]["dataset_version"]["name"] = (
-                check_output_dataset_version(
-                    client=client,
-                    input_dataset_version_id=dataset_version_id,
-                    output_name=target_version_name,
-                    override_outputs=bool(run_config.get("override_outputs", False)),
-                )
-            )
-
-            payload["target_version_name"] = run_config["output"]["dataset_version"][
-                "name"
-            ]
-            kv("Target dataset version name", target_version_name)
-
-    elif pipeline_type == "PRE_ANNOTATION":
-        ds_ver = inputs.get("dataset_version") or {}
-        dataset_version_id = ds_ver.get("id")
-        if not dataset_version_id:
-            typer.echo("❌ PRE_ANNOTATION requires input.dataset_version.id.")
-            raise typer.Exit(code=1)
-
-        mv = inputs.get("model_version") or {}
-        model_version_id = mv.get("id")
-        if not model_version_id:
-            typer.echo("❌ PRE_ANNOTATION requires input.model_version.id.")
-            raise typer.Exit(code=1)
-
-        endpoint = f"/api/dataset/version/{dataset_version_id}/processing/launch"
-        payload["model_version_id"] = model_version_id
-
-        kv("Input dataset version ID", dataset_version_id)
-        kv("Model version ID", model_version_id)
-
-    elif pipeline_type == "DATA_AUTO_TAGGING":
-        dl = inputs.get("datalake") or {}
-        datalake_id = dl.get("id")
-        if not datalake_id:
-            typer.echo("❌ DATA_AUTO_TAGGING requires input.datalake.id.")
-            raise typer.Exit(code=1)
-
-        mv = inputs.get("model_version") or {}
-        model_version_id = mv.get("id")
-        if not model_version_id:
-            typer.echo("❌ DATA_AUTO_TAGGING requires input.model_version.id.")
-            raise typer.Exit(code=1)
-
-        endpoint = f"/api/datalake/{datalake_id}/processing/launch"
-        payload["model_version_id"] = model_version_id
-
-        # Optional: data_ids (try multiple places)
-        data_ids = (
-            inputs.get("data_ids")
-            or (run_config.get("run_parameters") or {}).get("data_ids")
-            or (run_config.get("parameters") or {}).get("data_ids")
-        )
-        if data_ids:
-            payload["data_ids"] = data_ids
-
-        # Optional: target_datalake_name
-        target_name = (output.get("datalake") or {}).get("name") or run_config.get(
-            "target_datalake_name"
-        )
-        if target_name:
-            payload["target_datalake_name"] = target_name
-
-        kv("Input datalake ID", datalake_id)
-        kv("Model version ID", model_version_id)
-        kv("Target datalake name", target_name)
-
-    else:
-        typer.echo(f"❌ Unknown job type: {pipeline_type}")
-        raise typer.Exit(code=1)
+    endpoint, payload = build_processing_payload(
+        processing_id=processing.id,
+        pipeline_type=pipeline_type,
+        inputs=inputs,
+        outputs=outputs,
+        run_config=run_config,
+        client=client,
+    )
 
     # Resources preview
     section("⚙️ Resources")
@@ -263,3 +178,56 @@ def _pick_latest_run(runs: list[dict]) -> Optional[dict]:
         )
 
     return max(runs, key=key)
+
+
+def build_processing_payload(
+    processing_id: str,
+    pipeline_type: str,
+    inputs: dict,
+    outputs: dict,
+    run_config: dict,
+    client: Client,
+) -> tuple[str, dict]:
+    payload = {
+        "processing_id": processing_id,
+        "parameters": run_config.get("parameters", {}),
+        "cpu": run_config.get("docker", {}).get("cpu", 4),
+        "gpu": run_config.get("docker", {}).get("gpu", 0),
+    }
+
+    if pipeline_type == "DATASET_VERSION_CREATION":
+        dataset_version_id = inputs.get("dataset_version", {}).get("id")
+        if not dataset_version_id:
+            raise typer.Exit("Missing dataset_version.id for DATASET_VERSION_CREATION")
+        endpoint = f"/api/dataset/version/{dataset_version_id}/processing/launch"
+
+    elif pipeline_type == "PRE_ANNOTATION":
+        dataset_version_id = inputs.get("dataset_version", {}).get("id")
+        if not dataset_version_id:
+            raise typer.Exit("Missing dataset_version.id for PRE_ANNOTATION")
+        endpoint = f"/api/dataset/version/{dataset_version_id}/processing/launch"
+
+    elif pipeline_type == "DATA_AUTO_TAGGING":
+        datalake_id = inputs.get("datalake", {}).get("id")
+        if not datalake_id:
+            raise typer.Exit("Missing datalake.id for DATA_AUTO_TAGGING")
+        endpoint = f"/api/datalake/{datalake_id}/processing/launch"
+    else:
+        raise typer.Exit(f"Unsupported pipeline type: {pipeline_type}")
+
+    if "model_version" in inputs and "id" in inputs["model_version"]:
+        payload["model_version_id"] = inputs["model_version"]["id"]
+
+    if "dataset_version" in outputs and "name" in outputs["dataset_version"]:
+        payload["target_version_name"] = outputs["dataset_version"]["name"]
+
+    if "datalake" in outputs and "name" in outputs["datalake"]:
+        payload["target_datalake_name"] = outputs["datalake"]["name"]
+
+    data_ids = inputs.get("data_ids") or run_config.get("parameters", {}).get(
+        "data_ids"
+    )
+    if data_ids:
+        payload["data_ids"] = data_ids
+
+    return endpoint, payload
