@@ -1,6 +1,13 @@
+import os
 from pathlib import Path
 
+import toml
+import typer
+
+from picsellia_cli.utils.env_utils import get_env_config, Environment
+from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.run_manager import RunManager
+from picsellia_cli.utils.runner import create_virtual_env, run_pipeline_command
 
 
 def get_saved_run_config_path(run_manager: RunManager, run_dir: Path) -> Path:
@@ -73,3 +80,117 @@ def merge_with_default_parameters(
     # Update run_config with merged values
     run_config[parameters_name] = merged_params
     return run_config
+
+
+def prepare_auth_and_env(
+    run_config: dict,
+    organization: str | None,
+    env: Environment | None,
+) -> tuple[dict, dict]:
+    org = organization or run_config.get("auth", {}).get("organization_name")
+    selected_env = env or run_config.get("auth", {}).get("env") or Environment.PROD
+
+    if not org:
+        typer.echo(
+            "❌ Missing organization name. Please provide it in run_config or CLI args."
+        )
+        raise typer.Exit()
+
+    env_config = get_env_config(organization=org, env=selected_env)
+
+    run_config.setdefault("auth", {})
+    run_config["auth"].update(
+        {
+            "organization_name": env_config["organization_name"],
+            "env": env_config["env"],
+        }
+    )
+
+    return run_config, env_config
+
+
+def load_or_init_run_config(
+    run_config_path: Path | None,
+    run_manager,
+    pipeline_type: str,
+    pipeline_name: str,
+    get_params_func,
+    default_params: dict,
+    working_dir: Path,
+    parameters_name: str = "parameters",
+) -> dict:
+    if run_config_path and run_config_path.exists():
+        run_config = toml.load(run_config_path)
+    else:
+        run_config = get_params_func(
+            run_manager=run_manager,
+            pipeline_type=pipeline_type,
+            pipeline_name=pipeline_name,
+            config_file=None,
+        )
+
+    run_config.setdefault("run", {})
+    run_config["run"]["working_dir"] = str(working_dir)
+
+    run_config = merge_with_default_parameters(
+        run_config=run_config,
+        default_parameters=default_params,
+        parameters_name=parameters_name,
+    )
+    return run_config
+
+
+def select_run_dir(run_manager: RunManager, reuse_dir: bool) -> Path:
+    if reuse_dir:
+        run_dir = run_manager.get_latest_run_dir()
+        if not run_dir:
+            run_dir = run_manager.get_next_run_dir()
+    else:
+        run_dir = run_manager.get_next_run_dir()
+    return run_dir
+
+
+def resolve_run_config_path(
+    run_manager: RunManager, reuse_dir: bool, run_config_file: str | None
+) -> Path | None:
+    run_config_path = Path(run_config_file) if run_config_file else None
+    if reuse_dir and run_config_path is None:
+        run_config_path = run_manager.get_latest_run_config_path()
+    return run_config_path
+
+
+def save_and_get_run_config_path(
+    run_manager: RunManager, run_dir: Path, run_config: dict
+) -> Path:
+    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
+    return get_saved_run_config_path(run_manager=run_manager, run_dir=run_dir)
+
+
+def prepare_python_executable(pipeline_config: PipelineConfig) -> Path:
+    env_path = create_virtual_env(
+        requirements_path=pipeline_config.get_requirements_path()
+    )
+    return (
+        env_path / "Scripts" / "python.exe"
+        if os.name == "nt"
+        else env_path / "bin" / "python"
+    )
+
+
+def run_pipeline(
+    pipeline_config: PipelineConfig,
+    run_config_path: Path,
+    python_executable: Path,
+    api_token: str,
+):
+    command = build_pipeline_command(
+        python_executable=python_executable,
+        pipeline_script_path=pipeline_config.get_script_path("pipeline_script"),
+        run_config_file=run_config_path,
+        mode="local",
+    )
+
+    run_pipeline_command(
+        command=command,
+        api_token=api_token,
+    )

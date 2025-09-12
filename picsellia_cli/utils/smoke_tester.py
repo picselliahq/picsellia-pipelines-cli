@@ -1,8 +1,14 @@
 import subprocess
+from pathlib import Path
+
 import typer
 import os
 from shlex import quote
-from picsellia_cli.utils.logging import bullet, hr
+
+from picsellia_cli.utils.deployer import build_docker_image_only
+from picsellia_cli.utils.logging import bullet, hr, section, kv
+from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia_cli.utils.tester import build_pipeline_command
 
 
 def run_smoke_test_container(
@@ -155,3 +161,53 @@ def check_nvidia_runtime() -> bool:
     except Exception as e:
         typer.echo(f"⚠️ Could not verify Docker runtime: {e}")
         return False
+
+
+def prepare_docker_image(pipeline_config: PipelineConfig) -> str:
+    image_name = pipeline_config.get("docker", "image_name")
+    image_tag = pipeline_config.get("docker", "image_tag")
+    full_image_name = f"{image_name}:{image_tag}"
+
+    section("🐳 Docker image")
+    kv("Image", image_name)
+    kv("Tag", image_tag)
+
+    build_docker_image_only(
+        pipeline_dir=pipeline_config.pipeline_dir,
+        full_image_name=full_image_name,
+    )
+    return full_image_name
+
+
+def build_smoke_command(
+    pipeline_name: str,
+    pipeline_config: PipelineConfig,
+    run_config_path: Path,
+    python_version: str,
+) -> list[str]:
+    pipeline_script = (
+        f"{pipeline_name}/{pipeline_config.get('execution', 'pipeline_script')}"
+    )
+    python_bin = f"python{python_version}"
+    pipeline_script_path = Path(pipeline_script)
+
+    return build_pipeline_command(
+        python_executable=Path(python_bin),
+        pipeline_script_path=pipeline_script_path,
+        run_config_file=run_config_path,
+        mode="local",
+    )
+
+
+def build_env_vars(
+    env_config: dict, run_config: dict, include_experiment: bool = False
+) -> dict:
+    vars = {
+        "api_token": env_config["api_token"],
+        "organization_name": run_config["auth"]["organization_name"],
+        "host": run_config["auth"]["host"],
+        "DEBUG": "True",
+    }
+    if include_experiment:
+        vars["experiment_id"] = run_config["output"]["experiment"]["id"]
+    return vars

@@ -1,11 +1,8 @@
 import typer
 from picsellia import Client
 
-from picsellia_cli.utils.env_utils import get_host_env_config
 
-
-def init_client(host: str) -> Client:
-    env_config = get_host_env_config(host=host.upper())
+def init_client(env_config: dict) -> Client:
     return Client(
         api_token=env_config["api_token"],
         organization_name=env_config["organization_name"],

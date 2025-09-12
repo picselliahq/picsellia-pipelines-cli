@@ -1,12 +1,14 @@
-from pathlib import Path
 import json
+from pathlib import Path
+from typing import Optional
+
 import toml
 import typer
 from picsellia import Client, Experiment, Project
 from picsellia.exceptions import ResourceNotFoundError, ResourceConflictError
 
+from picsellia_cli.utils.logging import kv
 from picsellia_cli.utils.run_manager import RunManager
-from typing import Optional
 
 REQUIRED_TRAIN_INPUT_KEYS = ("train_dataset", "model_version")
 
@@ -36,24 +38,15 @@ def prompt_training_params(stored_params: dict) -> dict:
 
 
 def get_training_params(
-    run_manager: "RunManager | None",
+    run_manager: RunManager | None,
     config_file: Path | None = None,
 ) -> dict:
-    """
-    Charge un run-config pour le training.
-    Priorités :
-      1) Fichier explicite `config_file` s'il existe
-      2) Dernier run-config (si `run_manager` est fourni et qu'un fichier existe)
-      3) Prompt minimal (experiment_id)
-    """
-    # 1) Fichier explicite
     if config_file is not None and config_file.exists():
         with config_file.open("r") as f:
             return toml.load(f)
 
     latest_config = None
 
-    # 2) Dernier run-config si possible
     if run_manager is not None:
         latest_config_path = run_manager.get_latest_run_config_path()
         if latest_config_path:
@@ -535,3 +528,18 @@ def _get_or_create_experiment_in_project(
     except ResourceNotFoundError:
         experiment = project.create_experiment(name=experiment_name)
     return experiment
+
+
+def _print_training_io_summary(run_config: dict) -> None:
+    out = run_config.get("output", {}) or {}
+    exp = out.get("experiment", {}) or {}
+    if exp:
+        if exp.get("url"):
+            kv("Experiment URL", exp["url"])
+
+    inp = run_config.get("input", {}) or {}
+
+    mv = inp.get("model_version") or {}
+    if mv:
+        if mv.get("url"):
+            kv("Model URL", mv["url"])

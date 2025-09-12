@@ -57,7 +57,7 @@ def create_virtual_env(requirements_path: Path) -> Path:
     return env_path
 
 
-def run_pipeline_command(command: list[str], working_dir: str, api_token: str):
+def run_pipeline_command(command: list[str], api_token: str):
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path.cwd())
     env["api_token"] = api_token
