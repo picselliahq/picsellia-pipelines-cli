@@ -25,9 +25,9 @@ from picsellia_cli.utils.tester import (
 def test_processing(
     pipeline_name: str,
     run_config_file: str | None = None,
+    reuse_dir: bool = False,
     organization: str | None = None,
     env: Environment | None = None,
-    reuse_dir: bool = False,
 ):
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
     pipeline_type = pipeline_config.get("metadata", "type")

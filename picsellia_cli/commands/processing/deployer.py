@@ -11,19 +11,19 @@ from picsellia_cli.utils.deployer import (
     build_and_push_docker_image,
     bump_pipeline_version,
 )
-from picsellia_cli.utils.env_utils import ensure_env_vars, get_available_envs
+from picsellia_cli.utils.env_utils import get_env_config, Environment, resolve_env
 from picsellia_cli.utils.logging import kv, bullet, section, hr
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 
 def deploy_processing(
     pipeline_name: str,
-    host: str = "prod",
+    organization: str,
+    env: Environment,
 ):
     """
     🚀 Deploy a processing pipeline to all available environments in the .env.
     """
-    ensure_env_vars(host=host)
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
 
     # ── Pipeline details ─────────────────────────────────────────────────────
@@ -58,41 +58,32 @@ def deploy_processing(
     pipeline_config.config["docker"]["image_tag"] = str(new_version)
     pipeline_config.save()
 
-    # ── Targets ──────────────────────────────────────────────────────────────
-    section("🌍 Targets")
-    all_envs = get_available_envs()
-    targets = (
-        [env for env in all_envs if env["suffix"] == host.upper()] if host else all_envs
-    )
-    if host and not targets:
-        typer.echo(f"❌ No environment found for host '{host}'")
-        raise typer.Exit()
+    # ── Environment ─────────────────────────────────────────────────────────
+    section("🌍 Environment")
+    selected_env = resolve_env(env or Environment.PROD.value)
+    env_config = get_env_config(organization=organization, env=selected_env)
 
-    for env in targets:
-        kv(env["suffix"], f"{env['organization_name']} @ {env['host']}")
+    kv("Host", env_config["host"])
+    kv("Organization", env_config["organization_name"])
 
     # ── Register on each host ────────────────────────────────────────────────
     section("📦 Register / Update")
-    results: list[tuple[str, str, Optional[str]]] = []  # (host, status, message)
-
-    for env in targets:
-        host_url = env["host"]
-        bullet(f"→ {host_url}", accent=True)
-        try:
-            status, msg = _register_or_update(
-                cfg=pipeline_config,
-                api_token=env["api_token"],
-                organization_name=env["organization_name"],
-                host=host_url,
-            )
-            kv("Result", status)
-            if msg:
-                kv("Info", msg)
-            results.append((host_url, status, msg))
-        except Exception as e:
-            kv("Result", "Error")
-            kv("Info", str(e))
-            results.append((host_url, "Error", str(e)))
+    results: list[tuple[str, str, Optional[str]]] = []
+    try:
+        status, msg = _register_or_update(
+            cfg=pipeline_config,
+            api_token=env_config["api_token"],
+            organization_name=env_config["organization_name"],
+            host=env_config["host"],
+        )
+        kv("Result", status)
+        if msg:
+            kv("Info", msg)
+        results.append((env_config["host"], status, msg))
+    except Exception as e:
+        kv("Result", "Error")
+        kv("Info", str(e))
+        results.append((env_config["host"], "Error", str(e)))
 
     # ── Summary ──────────────────────────────────────────────────────────────
     section("✅ Summary")

@@ -37,10 +37,10 @@ from picsellia_cli.utils.tester import (
 def smoke_test_training(
     pipeline_name: str,
     run_config_file: str | None = None,
-    organization: str | None = None,
-    env: Environment = Environment.PROD,
     python_version: str = "3.10",
     reuse_dir: bool = False,
+    organization: str | None = None,
+    env: Environment | None = None,
 ):
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)

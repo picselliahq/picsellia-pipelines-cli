@@ -13,7 +13,6 @@ from picsellia_cli.commands.processing.templates.dataset_version_creation_templa
 )
 
 from picsellia_cli.utils.base_template import BaseTemplate
-from picsellia_cli.utils.env_utils import ensure_env_vars
 from picsellia_cli.utils.initializer import handle_pipeline_name
 
 
@@ -22,7 +21,6 @@ def init_processing(
     template: str,
     output_dir: Optional[str] = None,
     use_pyproject: Optional[bool] = True,
-    host: str = "prod",
 ):
     """
     Initialize a new **processing pipeline** project.
@@ -44,7 +42,6 @@ def init_processing(
         use_pyproject (Optional[bool], default=True): Whether to create a `pyproject.toml` for dependency management.
         host (str, default="prod"): Picsellia host environment to target (e.g., `"prod"`, `"staging"`).
     """
-    ensure_env_vars(host=host)
     output_dir = output_dir or "."
     use_pyproject = use_pyproject if use_pyproject is not None else True
 

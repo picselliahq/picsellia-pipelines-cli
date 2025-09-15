@@ -24,7 +24,7 @@ def launch_processing(
     pipeline_name: str,
     run_config_file: str,
     organization: str | None = None,
-    env: Environment = Environment.PROD,
+    env: Environment | None = None,
 ):
     """
     🚀 Launch a processing on Picsellia from a run-config TOML.
@@ -56,9 +56,10 @@ def launch_processing(
     try:
         processing = client.get_processing(name=effective_name)
     except Exception:
+        env_name = env_config["env"]
         typer.echo(
-            f"❌ Processing with name {effective_name} not found on {env.value}, "
-            f"please deploy it before with 'pxl-pipeline deploy {pipeline_name} --env {env.value}'"
+            f"❌ Processing with name {effective_name} not found on {env_name}, "
+            f"please deploy it before with 'pxl-pipeline deploy {pipeline_name} --env {env_name}'"
         )
         raise typer.Exit()
 

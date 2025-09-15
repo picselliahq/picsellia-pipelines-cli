@@ -8,10 +8,7 @@ from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
-from picsellia_cli.utils.env_utils import (
-    get_host_env_config,
-    ensure_env_vars,
-)
+from picsellia_cli.utils.env_utils import Environment, get_env_config
 from picsellia_cli.utils.initializer import handle_pipeline_name, init_client
 from picsellia_cli.utils.logging import section, kv, bullet, step, hr
 from picsellia_cli.utils.pipeline_config import PipelineConfig
@@ -20,34 +17,47 @@ from picsellia_cli.utils.pipeline_config import PipelineConfig
 def init_training(
     pipeline_name: str,
     template: str,
+    env: Environment,
+    organization: str | None = None,
     output_dir: Optional[str] = None,
     use_pyproject: Optional[bool] = True,
-    host: str = "prod",
 ):
-    ensure_env_vars(host=host)
+    """Initialize a training pipeline with the selected template.
 
-    # Guaranteed env config (prompted if missing)
-    env_cfg = get_host_env_config(host=host)
+    This function:
+    - Ensures environment variables are set for the given host.
+    - Initializes a Picsellia client and retrieves workspace information.
+    - Scaffolds a pipeline project from the chosen template.
+    - Prompts the user to create or reuse a model version.
+    - Registers pipeline metadata in the configuration.
+    - Displays clear next steps to guide the user.
+
+    Args:
+        pipeline_name: Name of the pipeline project.
+        template: Template type (e.g., "ultralytics").
+        output_dir: Output directory where the project will be created. Defaults to current directory.
+        use_pyproject: Whether to generate a `pyproject.toml` for dependency management. Defaults to True.
+        host: Target environment (e.g., "prod", "staging"). Defaults to "prod".
+    """
+    if not organization:
+        typer.echo("❌ Organization name is required for training initialization.")
+        raise typer.Exit(code=1)
 
     output_dir = output_dir or "."
     use_pyproject = True if use_pyproject is None else use_pyproject
     pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
 
-    # Init client on chosen host
-    client = init_client(host=env_cfg["host"])
+    # ── Environment ─────────────────────────────────────────────────────────
+    section("🌍 Environment")
+    selected_env = env or Environment.PROD
+    env_config = get_env_config(organization=organization, env=selected_env)
 
-    # HEADER
-    section("👋 Welcome")
-    org_name = (
-        getattr(getattr(client, "connexion", None), "organization_name", None)
-        or env_cfg["organization_name"]
-    )
-    org_id = getattr(getattr(client, "connexion", None), "organization_id", None)
-    host_url = env_cfg["host"]
-    kv("Workspace", f"{org_name} ({org_id})" if org_id else org_name)
-    kv("Host", host_url)
+    kv("Host", env_config["host"])
+    kv("Organization", env_config["organization_name"])
 
-    # TEMPLATE + PROJECT ENV
+    client = init_client(env_config=env_config)
+
+    # Template setup
     template_instance = get_template_instance(
         template_name=template,
         pipeline_name=pipeline_name,
@@ -55,27 +65,22 @@ def init_training(
         use_pyproject=use_pyproject,
     )
 
-    section("📦 Project setup")
-    # ► ce bloc donne un résumé clair et non verbeux
+    section("Project setup")
     kv("Template", template)
     template_dir = template_instance.pipeline_dir
-    bullet(
-        typer.style("Template scaffold generated", bold=True) + f" at {template_dir}",
-        accent=True,
-    )
+    bullet(f"Template scaffold generated at {template_dir}", accent=True)
     bullet("Key files:")
     typer.echo("  • steps.py")
     typer.echo("  • pipeline.toml")
     if use_pyproject:
         typer.echo("  • pyproject.toml")
-    # actions effectuées par le template
     template_instance.write_all_files()
     template_instance.post_init_environment()
     bullet(f"Virtual environment: {template_dir}/.venv")
     bullet("Dependencies installed and locked")
 
-    # MODEL (single section: prompt + summary)
-    section("🧠 Model")
+    # Model setup
+    section("Model")
     model_name, model_version_name, model_id, model_version_id, model_url = (
         choose_or_create_model_version(client=client)
     )
@@ -89,7 +94,7 @@ def init_training(
         accent=True,
     )
 
-    # Pipeline metadata (after we know the model)
+    # Pipeline metadata
     config = PipelineConfig(pipeline_name=pipeline_name)
     register_pipeline_metadata(
         config=config,
@@ -98,8 +103,8 @@ def init_training(
         model_version_id=model_version_id,
     )
 
-    # NEXT STEPS — numérotés
-    section("🧭 Next steps")
+    # Next steps
+    section("Next steps")
     step(
         1,
         f"Open {typer.style(model_url, fg=typer.colors.BLUE)} and upload "
@@ -135,7 +140,6 @@ def init_training(
             ),
         )
     else:
-        # fallback si pas de pyproject (rare ici, mais propre)
         step(
             3,
             "Adjust pipeline config: "
@@ -161,6 +165,20 @@ def init_training(
 def get_template_instance(
     template_name: str, pipeline_name: str, output_dir: str, use_pyproject: bool = True
 ):
+    """Return a training template instance based on the template name.
+
+    Args:
+        template_name: Name of the template (e.g., "ultralytics").
+        pipeline_name: Name of the pipeline.
+        output_dir: Output directory for the pipeline project.
+        use_pyproject: Whether to use `pyproject.toml` for dependency management.
+
+    Returns:
+        A template instance.
+
+    Raises:
+        typer.Exit: If the template name is not recognized.
+    """
     match template_name:
         case "ultralytics":
             return UltralyticsTrainingTemplate(
@@ -171,7 +189,7 @@ def get_template_instance(
         case _:
             typer.echo(
                 typer.style(
-                    f"❌ Unknown template '{template_name}'",
+                    f"Unknown template '{template_name}'",
                     fg=typer.colors.RED,
                     bold=True,
                 )
@@ -180,15 +198,19 @@ def get_template_instance(
 
 
 def choose_or_create_model_version(client: Client) -> Tuple[str, str, str, str, str]:
-    """
-    Prompt to reuse an existing model version or create a new one.
+    """Prompt the user to select or create a model version.
 
     Returns:
-        (model_name, model_version_name, model_id, model_version_id, model_url)
+        Tuple containing:
+            - model_name
+            - model_version_name
+            - model_id
+            - model_version_id
+            - model_url
     """
     if typer.confirm("Reuse an existing model version?", default=False):
         model_version_id = typer.prompt("Model version ID")
-        mv = client.get_model_version_by_id(id=model_version_id)  # raises if not found
+        mv = client.get_model_version_by_id(id=model_version_id)
         return _pack_model_version(
             client=client,
             model_name=mv.origin_name,
@@ -197,7 +219,7 @@ def choose_or_create_model_version(client: Client) -> Tuple[str, str, str, str, 
             version_id=str(mv.id),
         )
 
-    # create new
+    # Create a new model version
     model_name = typer.prompt("Model name")
     model_version_name = typer.prompt("Version name", default="v1")
 
@@ -219,12 +241,11 @@ def choose_or_create_model_version(client: Client) -> Tuple[str, str, str, str, 
     except ResourceNotFoundError:
         model = client.create_model(name=model_name)
 
-    # Ensure the version does not already exist
     try:
         _ = model.get_version(model_version_name)
         typer.echo(
             typer.style(
-                f"❌ Model version '{model_version_name}' already exists in '{model_name}'.",
+                f"Model version '{model_version_name}' already exists in '{model_name}'.",
                 fg=typer.colors.RED,
             )
         )
@@ -250,6 +271,7 @@ def choose_or_create_model_version(client: Client) -> Tuple[str, str, str, str, 
 def _pack_model_version(
     client: Client, model_name: str, model_id: str, version_name: str, version_id: str
 ) -> Tuple[str, str, str, str, str]:
+    """Format model version information with a URL."""
     org_id = client.connexion.organization_id
     host = client.connexion.host
     url = f"{host}/{org_id}/model/{model_id}/version/{version_id}"
@@ -262,6 +284,14 @@ def register_pipeline_metadata(
     model_version_name: str,
     model_version_id: str,
 ):
+    """Register model metadata in the pipeline configuration file.
+
+    Args:
+        config: Pipeline configuration object.
+        model_name: Name of the model.
+        model_version_name: Version name of the model.
+        model_version_id: ID of the model version.
+    """
     config.config.setdefault("model", {})
     config.config["model"]["model_name"] = model_name
     config.config["model"]["model_version_name"] = model_version_name

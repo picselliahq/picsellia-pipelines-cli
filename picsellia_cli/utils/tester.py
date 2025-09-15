@@ -4,7 +4,7 @@ from pathlib import Path
 import toml
 import typer
 
-from picsellia_cli.utils.env_utils import get_env_config, Environment
+from picsellia_cli.utils.env_utils import get_env_config, Environment, resolve_env
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.run_manager import RunManager
 from picsellia_cli.utils.runner import create_virtual_env, run_pipeline_command
@@ -85,24 +85,28 @@ def merge_with_default_parameters(
 def prepare_auth_and_env(
     run_config: dict,
     organization: str | None,
-    env: Environment | None,
+    env: str | None,
 ) -> tuple[dict, dict]:
-    org = organization or run_config.get("auth", {}).get("organization_name")
-    selected_env = env or run_config.get("auth", {}).get("env") or Environment.PROD
+    org = run_config.get("auth", {}).get("organization_name") or organization
+    selected_env = (
+        run_config.get("auth", {}).get("env") or env or Environment.PROD.value
+    )
 
     if not org:
         typer.echo(
             "❌ Missing organization name. Please provide it in run_config or CLI args."
         )
-        raise typer.Exit()
+        raise typer.Exit(code=1)
 
-    env_config = get_env_config(organization=org, env=selected_env)
+    selected_env_enum = resolve_env(selected_env)
+    env_config = get_env_config(organization=org, env=selected_env_enum)
 
     run_config.setdefault("auth", {})
     run_config["auth"].update(
         {
             "organization_name": env_config["organization_name"],
-            "env": env_config["env"],
+            "env": selected_env_enum.value,
+            "host": env_config["host"],
         }
     )
 
@@ -153,10 +157,17 @@ def select_run_dir(run_manager: RunManager, reuse_dir: bool) -> Path:
 def resolve_run_config_path(
     run_manager: RunManager, reuse_dir: bool, run_config_file: str | None
 ) -> Path | None:
-    run_config_path = Path(run_config_file) if run_config_file else None
-    if reuse_dir and run_config_path is None:
-        run_config_path = run_manager.get_latest_run_config_path()
-    return run_config_path
+    if run_config_file:
+        run_config_path = Path(run_config_file)
+        if not run_config_path.exists():
+            typer.echo(f"❌ Run config file not found: {run_config_path}")
+            raise typer.Exit(code=1)
+        return run_config_path
+
+    if reuse_dir:
+        return run_manager.get_latest_run_config_path()
+
+    return None
 
 
 def save_and_get_run_config_path(

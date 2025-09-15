@@ -1,5 +1,4 @@
 import typer
-
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
@@ -9,14 +8,15 @@ from picsellia_cli.utils.deployer import (
     build_and_push_docker_image,
     bump_pipeline_version,
 )
-from picsellia_cli.utils.env_utils import ensure_env_vars, get_available_envs
+from picsellia_cli.utils.env_utils import get_env_config, Environment, resolve_env
 from picsellia_cli.utils.logging import kv, bullet, section
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 
 def deploy_training(
     pipeline_name: str,
-    host: str = "prod",
+    organization: str,
+    env: Environment,
 ):
     """Deploy a training pipeline to Picsellia.
 
@@ -29,91 +29,81 @@ def deploy_training(
 
     Args:
         pipeline_name: The name of the pipeline project to deploy.
-        host: Target environment (e.g., "prod", "staging"). Defaults to "prod".
 
     Raises:
         typer.Exit: If no environment matches the provided host.
     """
-    ensure_env_vars(host=host)
-    cfg = PipelineConfig(pipeline_name=pipeline_name)
+    pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
 
     # ── Pipeline details ─────────────────────────────────────────────────────
-    section("Pipeline")
-    kv("Name", cfg.get("metadata", "name"))
-    kv("Type", cfg.get("metadata", "type"))
-    kv("Description", cfg.get("metadata", "description"))
+    section("🧩 Pipeline")
+    kv("Type", pipeline_config.get("metadata", "type"))
+    kv("Description", pipeline_config.get("metadata", "description"))
 
-    # ── Targets ─────────────────────────────────────────────────────────────
-    section("Targets")
-    all_envs = get_available_envs()
-    targets = (
-        [env for env in all_envs if env["suffix"] == host.upper()] if host else all_envs
-    )
-    if host and not targets:
-        typer.echo(f"No environment found for host '{host}'")
-        raise typer.Exit()
+    prompt_docker_image_if_missing(pipeline_config=pipeline_config)
+    new_version = bump_pipeline_version(pipeline_config=pipeline_config)
 
-    for env in targets:
-        kv(env["suffix"], f"{env['organization_name']} @ {env['host']}")
+    image_name = pipeline_config.get("docker", "image_name")
+
+    tags_to_push = [new_version, "test" if "-rc" in new_version else "latest"]
+
+    # ── Environment ─────────────────────────────────────────────────────────
+    section("🌍 Environment")
+    selected_env = resolve_env(env or Environment.PROD.value)
+    env_config = get_env_config(organization=organization, env=selected_env)
+
+    kv("Host", env_config["host"])
+    kv("Organization", env_config["organization_name"])
 
     # ── Ensure model/version exist before build ──────────────────────────────
     section("Model / Version (Pre-check)")
-    for env in targets:
-        bullet(f"Checking {env['host']}...", accent=True)
-        client = Client(
-            api_token=env["api_token"],
-            organization_name=env["organization_name"],
-            host=env["host"],
-        )
-        _ensure_model_and_version_on_host(
-            client=client,
-            cfg=cfg,
-            image_name="placeholder",
-            image_tag="placeholder",
-        )
-
-    # ── Docker build & push ─────────────────────────────────────────────────
-    prompt_docker_image_if_missing(pipeline_config=cfg)
-    new_version = bump_pipeline_version(pipeline_config=cfg)
-
-    image_name = cfg.get("docker", "image_name")
-    tags_to_push = [new_version, "test" if "-rc" in new_version else "latest"]
+    bullet(f"Checking {env_config['host']}...", accent=True)
+    client = Client(
+        api_token=env_config["api_token"],
+        organization_name=env_config["organization_name"],
+        host=env_config["host"],
+    )
+    _ensure_model_and_version_on_host(
+        client=client,
+        cfg=pipeline_config,
+        image_name="placeholder",
+        image_tag="placeholder",
+    )
 
     section("Docker")
     kv("Image", image_name)
     kv("Will push tags", ", ".join(tags_to_push))
 
-    bullet("Building and pushing image...", accent=True)
+    bullet("Building and pushing image…", accent=True)
     build_and_push_docker_image(
-        pipeline_dir=cfg.pipeline_dir,
+        pipeline_dir=pipeline_config.pipeline_dir,
         image_name=image_name,
         image_tags=tags_to_push,
         force_login=True,
     )
-    bullet("Image pushed successfully")
+    bullet("Image pushed ✅", accent=False)
 
-    cfg.config["metadata"]["version"] = str(new_version)
-    cfg.config["docker"]["image_tag"] = str(new_version)
-    cfg.save()
+    pipeline_config.config["metadata"]["version"] = str(new_version)
+    pipeline_config.config["docker"]["image_tag"] = str(new_version)
+    pipeline_config.save()
 
     # ── Register/Update Model + Version with Docker info ────────────────────
     section("Model / Version (Update)")
-    for env in targets:
-        bullet(f"→ {env['host']}", accent=True)
-        try:
-            client = Client(
-                api_token=env["api_token"],
-                organization_name=env["organization_name"],
-                host=env["host"],
-            )
-            _ensure_model_and_version_on_host(
-                client=client,
-                cfg=cfg,
-                image_name=image_name,
-                image_tag=cfg.get("docker", "image_tag"),
-            )
-        except Exception as e:
-            typer.echo(f"Error: {e}", err=True)
+    bullet(f"→ {env_config['host']}", accent=True)
+    try:
+        client = Client(
+            api_token=env_config["api_token"],
+            organization_name=env_config["organization_name"],
+            host=env_config["host"],
+        )
+        _ensure_model_and_version_on_host(
+            client=client,
+            cfg=pipeline_config,
+            image_name=image_name,
+            image_tag=pipeline_config.get("docker", "image_tag"),
+        )
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -50,23 +50,42 @@ def _require_env_var(key: str, prompt: str, hide_input=False) -> str:
     return value
 
 
+def resolve_env(selected_env: str) -> Environment:
+    """
+    Convert a string environment into an Environment enum,
+    with validation and error handling.
+
+    Args:
+        selected_env: Environment name as string (e.g. "prod", "staging", "local").
+
+    Returns:
+        Environment: Enum value (Environment.PROD, STAGING, LOCAL).
+
+    Raises:
+        typer.Exit: If the environment is invalid.
+    """
+    try:
+        return Environment(selected_env.upper())
+    except ValueError:
+        typer.echo(
+            f"❌ Invalid environment '{selected_env}'. Must be one of {[e.value for e in Environment]}"
+        )
+        raise typer.Exit(code=1)
+
+
 def get_env_config(organization: str, env: Environment) -> dict[str, str]:
     env_name = env.value.upper()
 
     api_token_key = _env_key(organization, env_name, "API_TOKEN")
-    host_key = _env_key(organization, env_name, "HOST")
 
     api_token = _require_env_var(
         api_token_key, f"🔐 API token for {organization}@{env_name}", hide_input=True
-    )
-    host = _require_env_var(
-        host_key, f"🌍 Host URL for {organization}@{env_name} (default: {env.url})"
     )
 
     return {
         "organization_name": organization,
         "api_token": api_token,
-        "host": host,
+        "host": env.url,
         "env": env_name,
     }
 

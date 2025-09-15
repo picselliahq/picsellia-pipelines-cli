@@ -210,14 +210,15 @@ def enrich_run_config_with_metadata(client: Client, run_config: dict):
     ):
         model_version_id = run_config["input"]["model_version"]["id"]
         try:
-            print(f"Resolving model version id: {model_version_id}")
-            print(f"Client connexion: {client.connexion.organization_id}")
             model_version = client.get_model_version_by_id(model_version_id)
             run_config["input"]["model_version"] = {
                 "id": model_version_id,
                 "name": model_version.name,
                 "origin_name": model_version.origin_name,
                 "url": f"{client.connexion.host}/{client.connexion.organization_id}/model/{model_version.origin_id}/version/{model_version.id}",
+                "visibility": run_config["input"]["model_version"]["visibility"]
+                if "visibility" in run_config["input"]["model_version"]
+                else "private",
             }
         except Exception as e:
             typer.echo(f"⚠️ Could not resolve model metadata: {e}")
