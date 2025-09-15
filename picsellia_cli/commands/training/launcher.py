@@ -1,89 +1,64 @@
-from pathlib import Path
-from datetime import datetime
-from typing import Optional, Any
-
-import toml
 import typer
 
 from picsellia_cli.commands.training.utils.test import (
     normalize_training_io,
     get_training_params,
+    _print_training_io_summary,
 )
-from picsellia_cli.utils.env_utils import (
-    get_host_env_config,
-    ensure_env_vars,
-)
+from picsellia_cli.utils.env_utils import Environment
 from picsellia_cli.utils.initializer import init_client
 from picsellia_cli.utils.logging import hr, section, kv, step
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.run_manager import RunManager
-from picsellia_cli.utils.tester import merge_with_default_parameters
+from picsellia_cli.utils.tester import (
+    select_run_dir,
+    resolve_run_config_path,
+    save_and_get_run_config_path,
+    prepare_auth_and_env,
+    load_or_init_run_config,
+)
 
 
 def launch_training(
     pipeline_name: str,
-    run_config_file: str,
-    host: str = "prod",
+    run_config_file: str | None = None,
+    organization: str | None = None,
+    env: Environment | None = None,
+    reuse_dir: bool = False,
 ):
-    ensure_env_vars(host=host)
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
+    pipeline_type = pipeline_config.get("metadata", "type")
     run_manager = RunManager(pipeline_dir=pipeline_config.pipeline_dir)
 
-    # ── Pipeline
-    section("🧩 Pipeline")
-    kv("Name", pipeline_config.get("metadata", "name"))
-    kv("Type", pipeline_config.get("metadata", "type"))
-    kv("Directory", str(pipeline_config.pipeline_dir))
+    # ── Run directory ────────────────────────────────────────────────────────
+    run_dir = select_run_dir(run_manager=run_manager, reuse_dir=reuse_dir)
+    run_config_path = resolve_run_config_path(
+        run_manager=run_manager, reuse_dir=reuse_dir, run_config_file=run_config_file
+    )
 
-    # ── Run dir
-    run_dir = run_manager.get_next_run_dir()
-    kv("Working dir", str(run_dir))
-
-    # ── Run config (source)
-    section("🧪 Run config")
-    run_config_path = Path(run_config_file) if run_config_file else None
-
-    if run_config_path and run_config_path.exists():
-        run_config = toml.load(run_config_path)
-        kv("Source", str(run_config_path))
-    else:
-        run_config = get_training_params(run_manager=run_manager, config_file=None)
-        kv("Source", "interactive / last-known")
-
-    run_config.setdefault("run", {})
-    run_config["run"]["working_dir"] = str(run_dir)
+    run_config = load_or_init_run_config(
+        run_config_path=run_config_path,
+        run_manager=run_manager,
+        pipeline_type=pipeline_type,
+        pipeline_name=pipeline_name,
+        get_params_func=get_training_params,
+        default_params=pipeline_config.extract_default_parameters(),
+        working_dir=run_dir,
+        parameters_name="hyperparameters",
+    )
 
     # ── Environment
     section("🌍 Environment")
-    if "auth" in run_config and "host" in run_config["auth"]:
-        host = run_config["auth"]["host"]
-        env_config = get_host_env_config(host=host)
-    else:
-        env_config = get_host_env_config(host=host.upper())
-        run_config.setdefault("auth", {})
-        run_config["auth"]["host"] = env_config["host"]
-
-    if "organization_name" not in run_config["auth"]:
-        run_config["auth"]["organization_name"] = env_config["organization_name"]
-
-    kv("Host", run_config["auth"]["host"])
-    kv("Organization", run_config["auth"]["organization_name"])
-
-    # ── Merge defaults
-    section("⚙️ Parameters")
-    default_pipeline_params = pipeline_config.extract_default_parameters()
-    run_config = merge_with_default_parameters(
-        run_config=run_config, default_parameters=default_pipeline_params
+    run_config, env_config = prepare_auth_and_env(
+        run_config=run_config, organization=organization, env=env
     )
-    kv("Defaults merged", "yes")
-    kv(
-        "Parameter keys",
-        ", ".join(sorted((run_config.get("parameters") or {}).keys())) or "none",
-    )
+
+    kv("Host", env_config["host"])
+    kv("Organization", env_config["organization_name"])
 
     # ── Normalize IO (resolve IDs, URLs, ensure bindings)
     section("📥 Inputs / 📤 Outputs")
-    client = init_client(host=run_config["auth"]["host"])
+    client = init_client(env_config=env_config)
     try:
         normalize_training_io(client=client, run_config=run_config)
     except typer.Exit as e:
@@ -92,9 +67,10 @@ def launch_training(
 
     _print_training_io_summary(run_config)
 
-    # Persist config to run dir
-    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
-    kv("Saved config", str(run_manager.get_latest_run_config_path()))
+    # ── Persist run config to run dir ────────────────────────────────────────
+    _ = save_and_get_run_config_path(
+        run_manager=run_manager, run_dir=run_dir, run_config=run_config
+    )
 
     # ── Launch
     section("🟩 Launch")
@@ -133,126 +109,3 @@ def launch_training(
     kv("Job URL", url, color=typer.colors.BLUE)
 
     hr()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers (display & parsing)
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def _print_training_io_summary(run_config: dict) -> None:
-    out = run_config.get("output", {}) or {}
-    exp = out.get("experiment", {}) or {}
-    if exp:
-        kv("Experiment", f"{exp.get('name') or exp.get('id')}")
-        if exp.get("project_name"):
-            kv("Project", exp["project_name"])
-        if exp.get("url"):
-            kv("Experiment URL", exp["url"])
-
-    inp = run_config.get("input", {}) or {}
-
-    def _show_dsv(slot_key: str, label: str):
-        d = inp.get(slot_key) or {}
-        if not d:
-            return
-        name = d.get("version_name") or d.get("name")
-        origin = d.get("origin_name")
-        ident = d.get("id")
-        txt = " / ".join([x for x in [origin, name, ident] if x])
-        kv(label, txt)
-        if d.get("url"):
-            kv(f"{label} URL", d["url"])
-
-    _show_dsv("train_dataset_version", "Train dataset")
-    _show_dsv("test_dataset_version", "Test dataset")
-    _show_dsv("validation_dataset_version", "Val dataset")
-
-    mv = inp.get("model_version") or {}
-    if mv:
-        base = " / ".join(
-            [
-                x
-                for x in [
-                    mv.get("origin_name"),
-                    mv.get("name") or mv.get("version_name"),
-                    mv.get("id"),
-                ]
-                if x
-            ]
-        )
-        if mv.get("visibility"):
-            base += f" ({mv['visibility']})"
-        kv("Model version", base)
-        if mv.get("url"):
-            kv("Model URL", mv["url"])
-
-
-def _extract_job_and_run(resp: Any) -> tuple[Optional[str], Optional[str]]:
-    """
-    Best-effort extraction of job_id / run_id from various SDK response shapes.
-    """
-    job_id: Optional[str] = None
-    run_id: Optional[str] = None
-
-    if resp is None:
-        return job_id, run_id
-
-    # dict-like
-    if isinstance(resp, dict):
-        job_id = (
-            resp.get("job_id") or resp.get("id") or (resp.get("job") or {}).get("id")
-        )
-        runs = resp.get("runs") or []
-        if isinstance(runs, list) and runs:
-            latest = _pick_latest_run(runs)
-            if latest and isinstance(latest, dict):
-                run_id = latest.get("id")
-        if not run_id:
-            run_id = resp.get("run_id") or (resp.get("run") or {}).get("id")
-        return job_id, run_id
-
-    # object-like
-    jid = getattr(resp, "id", None) or getattr(resp, "job_id", None)
-    if jid:
-        job_id = str(jid)
-
-    # maybe resp.runs or resp.run
-    runs = getattr(resp, "runs", None)
-    if isinstance(runs, list) and runs:
-        latest = _pick_latest_run(runs)
-        rid = (
-            latest.get("id")
-            if isinstance(latest, dict)
-            else getattr(latest, "id", None)
-        )
-        run_id = str(rid) if rid else None
-    else:
-        run = getattr(resp, "run", None)
-        if run is not None:
-            rid = getattr(run, "id", None)
-            run_id = str(rid) if rid else None
-
-    return job_id, run_id
-
-
-def _pick_latest_run(runs: list[dict]) -> Optional[dict]:
-    if not runs:
-        return None
-
-    def _parse_dt(s: Optional[str]) -> Optional[datetime]:
-        if not s:
-            return None
-        try:
-            return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
-        except Exception:
-            return None
-
-    def key(r: dict) -> datetime:
-        return (
-            _parse_dt(r.get("updated_at"))
-            or _parse_dt(r.get("created_at"))
-            or datetime.min
-        )
-
-    return max(runs, key=key)
