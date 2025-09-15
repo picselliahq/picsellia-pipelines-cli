@@ -171,7 +171,7 @@ class ProcessingParameters(Parameters):
 
         self.tags_list = [
             tag.strip()
-            for tag in self.extract_parameter(["tags_list"], expected_type=str).split(",")
+            for tag in self.extract_parameter(["tags_list"], expected_type=str, default="women, men").split(",")
             if tag.strip()
         ]
 

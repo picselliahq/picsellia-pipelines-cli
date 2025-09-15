@@ -1,11 +1,13 @@
 from picsellia_cli.utils.base_template import BaseTemplate
 
-TRAINING_PIPELINE_TRAINING = """from picsellia_cv_engine import pipeline
+TRAINING_PIPELINE_TRAINING = """import argparse
+
+from picsellia_cv_engine import pipeline
 from picsellia_cv_engine.core.parameters import (
     AugmentationParameters,
     ExportParameters,
 )
-from picsellia_cv_engine.core.services.utils.picsellia_context import create_picsellia_training_context
+from picsellia_cv_engine.core.services.context.unified_context import create_training_context_from_config
 from picsellia_cv_engine.steps.base.dataset.loader import (
     load_yolo_datasets
 )
@@ -171,7 +173,7 @@ runs/
 """
 
 
-class UltralyticsTrainingTemplate(BaseTemplate):
+class YOLOV8TrainingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
         super().__init__(
             pipeline_name=pipeline_name,
@@ -211,12 +213,11 @@ class UltralyticsTrainingTemplate(BaseTemplate):
             "metadata": {
                 "name": self.pipeline_name,
                 "version": "1.0",
-                "description": "Training pipeline using YOLO and Ultralytics.",
+                "description": "Training pipeline using YOLOV8.",
                 "type": self.pipeline_type,
             },
             "execution": {
-                "picsellia_pipeline_script": "picsellia_pipeline.py",
-                "local_pipeline_script": "local_pipeline.py",
+                "pipeline_script": "pipeline.py",
                 "requirements_file": "pyproject.toml"
                 if self.use_pyproject
                 else "requirements.txt",
