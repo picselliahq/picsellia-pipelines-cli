@@ -1,8 +1,8 @@
 from typing import Optional, Tuple
 import typer
 
-from picsellia_cli.commands.training.templates.ultralytics_template import (
-    UltralyticsTrainingTemplate,
+from picsellia_cli.commands.training.templates.yolov8_template import (
+    YOLOV8TrainingTemplate,
 )
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
@@ -22,22 +22,25 @@ def init_training(
     output_dir: Optional[str] = None,
     use_pyproject: Optional[bool] = True,
 ):
-    """Initialize a training pipeline with the selected template.
+    """Initialize and scaffold a training pipeline project.
 
-    This function:
-    - Ensures environment variables are set for the given host.
-    - Initializes a Picsellia client and retrieves workspace information.
-    - Scaffolds a pipeline project from the chosen template.
-    - Prompts the user to create or reuse a model version.
-    - Registers pipeline metadata in the configuration.
-    - Displays clear next steps to guide the user.
+    Steps performed:
+        1. Validate environment and organization inputs.
+        2. Create a new pipeline project directory from the chosen template.
+        3. Prompt the user to reuse or create a new model version.
+        4. Store model metadata (name, version, framework, inference type, IDs) in `config.toml`.
+        5. Print next steps for editing, testing, and deploying the pipeline.
 
     Args:
-        pipeline_name: Name of the pipeline project.
-        template: Template type (e.g., "ultralytics").
-        output_dir: Output directory where the project will be created. Defaults to current directory.
-        use_pyproject: Whether to generate a `pyproject.toml` for dependency management. Defaults to True.
-        host: Target environment (e.g., "prod", "staging"). Defaults to "prod".
+        pipeline_name: Name of the new pipeline project.
+        template: Template to scaffold (e.g., "ultralytics").
+        env: Target environment (PROD, STAGING, LOCAL).
+        organization: Picsellia organization name.
+        output_dir: Directory where the pipeline will be created (default: current dir).
+        use_pyproject: Whether to generate a `pyproject.toml` (default: True).
+
+    Raises:
+        typer.Exit: If required arguments are missing or invalid.
     """
     if not organization:
         typer.echo("❌ Organization name is required for training initialization.")
@@ -180,8 +183,8 @@ def get_template_instance(
         typer.Exit: If the template name is not recognized.
     """
     match template_name:
-        case "ultralytics":
-            return UltralyticsTrainingTemplate(
+        case "yolov8":
+            return YOLOV8TrainingTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,
