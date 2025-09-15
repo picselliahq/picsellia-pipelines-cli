@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Any
 import typer
 
 from picsellia_cli.commands.training.templates.yolov8_template import (
@@ -84,12 +84,11 @@ def init_training(
 
     # Model setup
     section("Model")
-    model_name, model_version_name, model_id, model_version_id, model_url = (
+    model_name, model_version_name, model_url, framework, inference_type = (
         choose_or_create_model_version(client=client)
     )
     kv("Name", model_name)
     kv("Version", model_version_name)
-    kv("Version ID", model_version_id)
     kv("URL", model_url, color=typer.colors.BLUE)
     typer.echo("")
     bullet(
@@ -101,9 +100,10 @@ def init_training(
     config = PipelineConfig(pipeline_name=pipeline_name)
     register_pipeline_metadata(
         config=config,
-        model_name=model_name,
         model_version_name=model_version_name,
-        model_version_id=model_version_id,
+        origin_name=model_name,
+        framework=framework,
+        inference_type=inference_type,
     )
 
     # Next steps
@@ -200,26 +200,28 @@ def get_template_instance(
             raise typer.Exit(code=1)
 
 
-def choose_or_create_model_version(client: Client) -> Tuple[str, str, str, str, str]:
+def choose_or_create_model_version(
+    client: Client,
+) -> tuple[str, str, str, str, str] | tuple[str, str, str, Any, Any]:
     """Prompt the user to select or create a model version.
 
     Returns:
         Tuple containing:
             - model_name
             - model_version_name
-            - model_id
-            - model_version_id
             - model_url
+            - framework
+            - inference_type
     """
     if typer.confirm("Reuse an existing model version?", default=False):
         model_version_id = typer.prompt("Model version ID")
         mv = client.get_model_version_by_id(id=model_version_id)
-        return _pack_model_version(
-            client=client,
-            model_name=mv.origin_name,
-            model_id=str(mv.origin_id),
-            version_name=mv.name,
-            version_id=str(mv.id),
+        return (
+            mv.origin_name,
+            mv.name,
+            f"{client.connexion.host}/{client.connexion.organization_id}/model/{mv.origin_id}/version/{mv.id}",
+            mv.framework,
+            mv.type,
         )
 
     # Create a new model version
@@ -262,45 +264,30 @@ def choose_or_create_model_version(client: Client) -> Tuple[str, str, str, str, 
         type=InferenceType(inference_type_input),
         base_parameters={"epochs": 2, "batch_size": 8, "image_size": 640},
     )
-    return _pack_model_version(
-        client=client,
-        model_name=model.name,
-        model_id=str(model.id),
-        version_name=mv.name,
-        version_id=str(mv.id),
+    return (
+        model.name,
+        mv.name,
+        f"{client.connexion.host}/{client.connexion.organization_id}/model/{model.id}/version/{mv.id}",
+        framework_input,
+        inference_type_input,
     )
-
-
-def _pack_model_version(
-    client: Client, model_name: str, model_id: str, version_name: str, version_id: str
-) -> Tuple[str, str, str, str, str]:
-    """Format model version information with a URL."""
-    org_id = client.connexion.organization_id
-    host = client.connexion.host
-    url = f"{host}/{org_id}/model/{model_id}/version/{version_id}"
-    return model_name, version_name, str(model_id), str(version_id), url
 
 
 def register_pipeline_metadata(
     config: PipelineConfig,
-    model_name: str,
     model_version_name: str,
-    model_version_id: str,
+    origin_name: str,
+    framework: str,
+    inference_type: str,
 ):
-    """Register model metadata in the pipeline configuration file.
-
-    Args:
-        config: Pipeline configuration object.
-        model_name: Name of the model.
-        model_version_name: Version name of the model.
-        model_version_id: ID of the model version.
-    """
-    config.config.setdefault("model", {})
-    config.config["model"]["model_name"] = model_name
-    config.config["model"]["model_version_name"] = model_version_name
-    config.config["model"]["model_version_id"] = model_version_id
-
-    with open(config.config_path, "w") as f:
-        import toml
-
-        toml.dump(config.config, f)
+    """Register model metadata in the pipeline configuration file."""
+    config.config.setdefault("model_version", {})
+    config.config["model_version"].update(
+        {
+            "name": model_version_name,
+            "origin_name": origin_name,
+            "framework": framework,
+            "inference_type": inference_type,
+        }
+    )
+    config.save()
