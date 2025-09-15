@@ -165,7 +165,7 @@ def check_nvidia_runtime() -> bool:
 
 def prepare_docker_image(pipeline_config: PipelineConfig) -> str:
     image_name = pipeline_config.get("docker", "image_name")
-    image_tag = pipeline_config.get("docker", "image_tag")
+    image_tag = "test"
     full_image_name = f"{image_name}:{image_tag}"
 
     section("🐳 Docker image")

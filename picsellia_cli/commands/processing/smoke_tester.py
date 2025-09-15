@@ -17,9 +17,9 @@ from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.run_manager import RunManager
 from picsellia_cli.utils.smoke_tester import (
     run_smoke_test_container,
-    prepare_docker_image,
     build_env_vars,
     build_smoke_command,
+    prepare_docker_image,
 )
 from picsellia_cli.utils.tester import (
     select_run_dir,
@@ -48,7 +48,6 @@ def smoke_test_processing(
     run_config_path = resolve_run_config_path(
         run_manager=run_manager, reuse_dir=reuse_dir, run_config_file=run_config_file
     )
-
     run_config = load_or_init_run_config(
         run_config_path=run_config_path,
         run_manager=run_manager,
@@ -60,7 +59,7 @@ def smoke_test_processing(
         parameters_name="parameters",
     )
 
-    # ── Environment ─────────────────────────────────────────────────────────
+    # Environment
     section("🌍 Environment")
     run_config, env_config = prepare_auth_and_env(
         run_config=run_config, organization=organization, env=env
@@ -78,12 +77,10 @@ def smoke_test_processing(
             output_name=run_config["output"]["dataset_version"]["name"],
             override_outputs=bool(run_config.get("override_outputs", False)),
         )
-
     enrich_run_config_with_metadata(client=client, run_config=run_config)
     saved_run_config_path = save_and_get_run_config_path(
         run_manager=run_manager, run_dir=run_dir, run_config=run_config
     )
-
     saved_run_config_path = Path("/workspace") / saved_run_config_path.relative_to(
         Path.cwd()
     )
@@ -91,7 +88,6 @@ def smoke_test_processing(
     full_image_name = prepare_docker_image(pipeline_config=pipeline_config)
 
     env_vars = build_env_vars(env_config=env_config, run_config=run_config)
-
     command = build_smoke_command(
         pipeline_name=pipeline_name,
         pipeline_config=pipeline_config,
