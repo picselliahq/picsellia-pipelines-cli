@@ -1,0 +1,12 @@
+[job]
+type = "PRE_ANNOTATION"
+
+[auth]
+organization_name = "test-account"
+env = "STAGING"
+
+[input.dataset_version]
+id = "0198e049-b98a-7bb6-b043-7cc3c8eeb5e3"
+
+[input.model_version]
+id = "0196a0ec-e802-775f-818a-4d3482f31d31"
