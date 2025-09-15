@@ -22,7 +22,7 @@ PROCESSING_TEMPLATES = [
     "pre_annotation",
     "data_auto_tagging",
 ]
-TRAINING_TEMPLATES = ["ultralytics"]
+TRAINING_TEMPLATES = ["yolov8"]
 PROCESSING_TYPES_MAPPING = {
     "dataset_version_creation": "DATASET_VERSION_CREATION",
     "pre_annotation": "PRE_ANNOTATION",
