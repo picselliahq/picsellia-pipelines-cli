@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ORGANIZATION="test-account"
-ENVIRONMENT="staging"
+ENVIRONMENT="STAGING"
 
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 PIPELINES_DIR="$BASE_DIR/pipelines"
@@ -29,8 +29,8 @@ run_tests_for_type() {
       cd "$PIPELINES_DIR"
 
       # ---- Init ----
-      echo "▶️  pxl-pipeline init $TEMPLATE --type $TYPE --template $TEMPLATE"
-      pxl-pipeline init "$TEMPLATE" --type "$TYPE" --template "$TEMPLATE"
+      echo "▶️  pxl-pipeline init $TEMPLATE --type $TYPE --template $TEMPLATE --organization $ORGANIZATION --env $ENVIRONMENT"
+      pxl-pipeline init "$TEMPLATE" --type "$TYPE" --template "$TEMPLATE" --organization $ORGANIZATION --env $ENVIRONMENT
 
       # ---- Test ----
       echo "▶️  pxl-pipeline test $TEMPLATE --run-config-file $RUN_CONFIG"
