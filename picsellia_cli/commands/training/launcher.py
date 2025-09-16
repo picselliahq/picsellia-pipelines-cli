@@ -1,27 +1,25 @@
 import typer
 
 from picsellia_cli.commands.training.utils.test import (
-    get_training_params,
     normalize_training_io,
+    get_training_params,
     _print_training_io_summary,
 )
 from picsellia_cli.utils.env_utils import Environment
 from picsellia_cli.utils.initializer import init_client
-from picsellia_cli.utils.logging import section, kv, bullet, hr
+from picsellia_cli.utils.logging import hr, section, kv, step
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.run_manager import RunManager
 from picsellia_cli.utils.tester import (
     select_run_dir,
     resolve_run_config_path,
-    load_or_init_run_config,
-    prepare_auth_and_env,
     save_and_get_run_config_path,
-    prepare_python_executable,
-    run_pipeline,
+    prepare_auth_and_env,
+    load_or_init_run_config,
 )
 
 
-def test_training(
+def launch_training(
     pipeline_name: str,
     run_config_file: str | None = None,
     reuse_dir: bool = False,
@@ -49,7 +47,7 @@ def test_training(
         parameters_name="hyperparameters",
     )
 
-    # ── Environment ─────────────────────────────────────────────────────────
+    # ── Environment
     section("🌍 Environment")
     run_config, env_config = prepare_auth_and_env(
         run_config=run_config, organization=organization, env=env
@@ -58,7 +56,7 @@ def test_training(
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
 
-    # ── Normalize IO (resolve IDs/URLs) ─────────────────────────────────────
+    # ── Normalize IO (resolve IDs, URLs, ensure bindings)
     section("📥 Inputs / 📤 Outputs")
     client = init_client(env_config=env_config)
     try:
@@ -70,27 +68,44 @@ def test_training(
     _print_training_io_summary(run_config)
 
     # ── Persist run config to run dir ────────────────────────────────────────
-    saved_run_config_path = save_and_get_run_config_path(
+    _ = save_and_get_run_config_path(
         run_manager=run_manager, run_dir=run_dir, run_config=run_config
     )
 
-    # ── Virtualenv / Python ─────────────────────────────────────────────────
-    section("🐍 Virtual env")
-    python_executable = prepare_python_executable(pipeline_config=pipeline_config)
+    # ── Launch
+    section("🟩 Launch")
 
-    # ── Build command ────────────────────────────────────────────────────────
-    section("▶️ Run")
-    run_pipeline(
-        pipeline_config=pipeline_config,
-        run_config_path=saved_run_config_path,
-        python_executable=python_executable,
-        api_token=env_config["api_token"],
-    )
+    # Experiment target (from normalized config)
+    exp = (run_config.get("output") or {}).get("experiment") or {}
+    exp_id = exp.get("id")
+    if not exp_id:
+        typer.echo("❌ Missing output.experiment.id after normalization.")
+        raise typer.Exit()
 
-    # ── Save final config (enriched after run if needed) ─────────────────────
-    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
+    kv("Experiment ID", exp_id)
+    if exp.get("name"):
+        kv("Experiment", exp["name"])
+    if exp.get("url"):
+        kv("Experiment URL", exp["url"])
 
-    section("✅ Done")
-    bullet(f"Training pipeline '{pipeline_name}' completed.", accent=True)
-    kv("Run dir", run_dir.name)
+    step(1, "Submitting training job…")
+    try:
+        experiment = client.get_experiment_by_id(exp_id)
+    except Exception as e:
+        typer.echo(f"❌ Could not fetch experiment '{exp_id}': {e}")
+        raise typer.Exit()
+
+    try:
+        experiment.launch()
+    except Exception as e:
+        typer.echo(f"❌ Launch failed: {e}")
+        raise typer.Exit()
+
+    org_id = getattr(getattr(client, "connexion", None), "organization_id", None)
+    host_base = getattr(getattr(client, "connexion", None), "host", "").rstrip("/")
+
+    kv("Status", "Launched ✅")
+    url = f"{host_base}/{org_id}/jobs"
+    kv("Job URL", url, color=typer.colors.BLUE)
+
     hr()

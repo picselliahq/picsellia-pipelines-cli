@@ -1,16 +1,12 @@
-import os
-
 import typer
 from picsellia import Client
 
-from picsellia_cli.utils.env_utils import require_env_var
 
-
-def init_client() -> Client:
+def init_client(env_config: dict) -> Client:
     return Client(
-        api_token=require_env_var("PICSELLIA_API_TOKEN"),
-        organization_name=require_env_var("PICSELLIA_ORGANIZATION_NAME"),
-        host=os.getenv("PICSELLIA_HOST", "https://app.picsellia.com"),
+        api_token=env_config["api_token"],
+        organization_name=env_config["organization_name"],
+        host=env_config["host"],
     )
 
 

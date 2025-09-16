@@ -1,70 +1,95 @@
-import os
-from pathlib import Path
-from typing import Any
-
 import typer
-from picsellia import Client
-from picsellia.exceptions import ResourceNotFoundError
 
-from picsellia_cli.utils.env_utils import require_env_var, ensure_env_vars
+from picsellia_cli.commands.processing.utils.tester import (
+    get_processing_params,
+    check_output_dataset_version,
+    enrich_run_config_with_metadata,
+    enrich_output_metadata_after_run,
+)
+from picsellia_cli.utils.env_utils import Environment
 from picsellia_cli.utils.initializer import init_client
+from picsellia_cli.utils.logging import section, kv
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.run_manager import RunManager
-from picsellia_cli.utils.runner import (
-    create_virtual_env,
-    run_pipeline_command,
+from picsellia_cli.utils.tester import (
+    select_run_dir,
+    resolve_run_config_path,
+    load_or_init_run_config,
+    prepare_auth_and_env,
+    save_and_get_run_config_path,
+    prepare_python_executable,
+    run_pipeline,
 )
 
 
 def test_processing(
     pipeline_name: str,
-    reuse_dir: bool,
+    run_config_file: str | None = None,
+    reuse_dir: bool = False,
+    organization: str | None = None,
+    env: Environment | None = None,
 ):
-    ensure_env_vars()
-    config = PipelineConfig(pipeline_name=pipeline_name)
-    pipeline_type = config.get(
-        "metadata", "type"
-    )  # Ex: "PRE_ANNOTATION" or "DATASET_VERSION_CREATION"
-    run_manager = RunManager(config.pipeline_dir)
+    pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
+    pipeline_type = pipeline_config.get("metadata", "type")
+    run_manager = RunManager(pipeline_dir=pipeline_config.pipeline_dir)
 
-    stored_params: dict[str, Any] = {}
-    params, run_dir = get_processing_params_and_run_dir(
+    run_dir = select_run_dir(run_manager=run_manager, reuse_dir=reuse_dir)
+    run_config_path = resolve_run_config_path(
+        run_manager=run_manager, reuse_dir=reuse_dir, run_config_file=run_config_file
+    )
+
+    run_config = load_or_init_run_config(
+        run_config_path=run_config_path,
         run_manager=run_manager,
-        reuse_dir=reuse_dir,
         pipeline_type=pipeline_type,
         pipeline_name=pipeline_name,
-        stored_params=stored_params,
+        get_params_func=get_processing_params,
+        default_params=pipeline_config.extract_default_parameters(),
+        working_dir=run_dir,
+        parameters_name="parameters",
     )
 
-    client = init_client()
+    # ── Environment ─────────────────────────────────────────────────────────
+    section("🌍 Environment")
+    run_config, env_config = prepare_auth_and_env(
+        run_config=run_config, organization=organization, env=env
+    )
 
-    # Only ask output name confirmation for non-pre-annotation
+    kv("Host", env_config["host"])
+    kv("Organization", env_config["organization_name"])
+
+    # ── Normalize IO (resolve IDs/URLs) ─────────────────────────────────────
+    section("📥 Inputs / 📤 Outputs")
+    client = init_client(env_config=env_config)
+
     if pipeline_type == "DATASET_VERSION_CREATION":
-        params["output_dataset_version_name"] = check_output_dataset_version(
+        run_config["output"]["dataset_version"]["name"] = check_output_dataset_version(
             client=client,
-            input_dataset_version_id=params["input_dataset_version_id"],
-            output_name=params["output_dataset_version_name"],
+            input_dataset_version_id=run_config["input"]["dataset_version"]["id"],
+            output_name=run_config["output"]["dataset_version"]["name"],
+            override_outputs=bool(run_config.get("override_outputs", False)),
         )
 
-    run_dir = run_manager.get_next_run_dir()
-    run_manager.save_run_config(run_dir=run_dir, config_data=params)
-
-    env_path = create_virtual_env(requirements_path=config.get_requirements_path())
-    python_executable = (
-        env_path / "Scripts" / "python.exe"
-        if os.name == "nt"
-        else env_path / "bin" / "python"
+    enrich_run_config_with_metadata(client=client, run_config=run_config)
+    saved_run_config_path = save_and_get_run_config_path(
+        run_manager=run_manager, run_dir=run_dir, run_config=run_config
     )
 
-    command = build_processing_command(
+    # ── Virtualenv / Python ─────────────────────────────────────────────────
+    section("🐍 Virtual env")
+    python_executable = prepare_python_executable(pipeline_config=pipeline_config)
+
+    # ── Build command ────────────────────────────────────────────────────────
+    section("▶️ Run")
+    run_pipeline(
+        pipeline_config=pipeline_config,
+        run_config_path=saved_run_config_path,
         python_executable=python_executable,
-        config=config,
-        pipeline_type=pipeline_type,
-        run_dir=run_dir,
-        params=params,
+        api_token=env_config["api_token"],
     )
 
-    run_pipeline_command(command, str(run_dir))
+    enrich_output_metadata_after_run(client=client, run_config=run_config)
+    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
 
     typer.echo(
         typer.style(
@@ -72,201 +97,3 @@ def test_processing(
             fg=typer.colors.GREEN,
         )
     )
-
-
-def get_processing_params_and_run_dir(
-    run_manager: RunManager,
-    reuse_dir: bool,
-    pipeline_type: str,
-    pipeline_name: str,
-    stored_params: dict[str, Any],
-) -> tuple[dict, Path]:
-    latest_config = run_manager.get_latest_run_config()
-
-    if reuse_dir:
-        run_dir = run_manager.get_latest_run_dir()
-        if not latest_config or not run_dir:
-            typer.echo(
-                typer.style(
-                    "❌ No existing run/config found to reuse.", fg=typer.colors.RED
-                )
-            )
-            raise typer.Exit(code=1)
-        typer.echo(
-            typer.style(
-                f"🔁 Reusing latest run: {run_dir.name}", fg=typer.colors.YELLOW
-            )
-        )
-        return latest_config, run_dir
-
-    params = {}
-    if latest_config:
-        summary = " / ".join(f"{k}={v}" for k, v in latest_config.items())
-        reuse = typer.confirm(f"📝 Reuse previous config? {summary}", default=True)
-        if reuse:
-            params = latest_config
-
-    if not params:
-        if pipeline_type == "PRE_ANNOTATION":
-            params = prompt_preannotation_params(stored_params)
-        elif pipeline_type == "DATA_AUTO_TAGGING":
-            params = prompt_data_auto_tagging_params(stored_params)
-        else:
-            params = prompt_default_params(pipeline_name, stored_params)
-
-    run_dir = run_manager.get_next_run_dir()
-    run_manager.save_run_config(run_dir, params)
-
-    return params, run_dir
-
-
-def prompt_default_params(pipeline_name: str, stored_params: dict) -> dict:
-    input_dataset_version_id = typer.prompt(
-        typer.style("📥 Input dataset version ID", fg=typer.colors.CYAN),
-        default=stored_params.get("input_dataset_version_id", ""),
-    )
-    output_dataset_version_name = typer.prompt(
-        typer.style("📤 Output dataset version name", fg=typer.colors.CYAN),
-        default=stored_params.get(
-            "output_dataset_version_name", f"processed_{pipeline_name}"
-        ),
-    )
-    return {
-        "input_dataset_version_id": input_dataset_version_id,
-        "output_dataset_version_name": output_dataset_version_name,
-    }
-
-
-def prompt_preannotation_params(stored_params: dict) -> dict:
-    input_dataset_version_id = typer.prompt(
-        typer.style("📥 Input dataset version ID", fg=typer.colors.CYAN),
-        default=stored_params.get("input_dataset_version_id", ""),
-    )
-    model_version_id = typer.prompt(
-        typer.style("🧠 Model version ID", fg=typer.colors.CYAN),
-        default=stored_params.get("model_version_id", ""),
-    )
-    return {
-        "input_dataset_version_id": input_dataset_version_id,
-        "model_version_id": model_version_id,
-    }
-
-
-def prompt_data_auto_tagging_params(stored_params: dict) -> dict:
-    input_datalake_id = typer.prompt(
-        typer.style("📥 Input datalake ID", fg=typer.colors.CYAN),
-        default=stored_params.get("input_datalake_id", ""),
-    )
-    output_datalake_id = typer.prompt(
-        typer.style("📤 Output datalake ID", fg=typer.colors.CYAN),
-        default=stored_params.get("output_datalake_id", ""),
-    )
-    model_version_id = typer.prompt(
-        typer.style("🧠 Model version ID", fg=typer.colors.CYAN),
-        default=stored_params.get("model_version_id", ""),
-    )
-    tags_list = typer.prompt(
-        typer.style("🏷️ Tags to use (comma-separated)", fg=typer.colors.CYAN),
-        default=stored_params.get("tags_list", ""),
-    )
-    offset = typer.prompt(
-        typer.style("↪ Offset", fg=typer.colors.CYAN),
-        default=stored_params.get("offset", "0"),
-    )
-    limit = typer.prompt(
-        typer.style("🔢 Limit", fg=typer.colors.CYAN),
-        default=stored_params.get("limit", "100"),
-    )
-
-    return {
-        "input_datalake_id": input_datalake_id,
-        "output_datalake_id": output_datalake_id,
-        "model_version_id": model_version_id,
-        "tags_list": tags_list,
-        "offset": offset,
-        "limit": limit,
-    }
-
-
-def check_output_dataset_version(
-    client: Client, input_dataset_version_id: str, output_name: str
-) -> str:
-    try:
-        input_dataset_version = client.get_dataset_version_by_id(
-            input_dataset_version_id
-        )
-        dataset = client.get_dataset_by_id(input_dataset_version.origin_id)
-        dataset.get_version(version=output_name)
-
-        overwrite = typer.confirm(
-            typer.style(
-                f"⚠️ A dataset version named '{output_name}' already exists. Overwrite?",
-                fg=typer.colors.YELLOW,
-            ),
-            default=False,
-        )
-        if overwrite:
-            dataset.get_version(version=output_name).delete()
-        else:
-            output_name = typer.prompt(
-                typer.style(
-                    "📤 Enter a new output dataset version name", fg=typer.colors.CYAN
-                ),
-                default=f"{output_name}_new",
-            )
-    except ResourceNotFoundError:
-        pass
-    return output_name
-
-
-def build_processing_command(
-    python_executable: Path,
-    config: PipelineConfig,
-    pipeline_type: str,
-    run_dir: Path,
-    params: dict[str, str],
-) -> list:
-    command = [
-        str(python_executable),
-        str(config.get_script_path("local_pipeline_script")),
-        "--api_token",
-        require_env_var("PICSELLIA_API_TOKEN"),
-        "--organization_name",
-        require_env_var("PICSELLIA_ORGANIZATION_NAME"),
-        "--working_dir",
-        str(run_dir),
-        "--job_type",
-        pipeline_type,
-    ]
-
-    if pipeline_type == "DATASET_VERSION_CREATION":
-        command += [
-            "--input_dataset_version_id",
-            params["input_dataset_version_id"],
-            "--output_dataset_version_name",
-            params["output_dataset_version_name"],
-        ]
-    elif pipeline_type == "PRE_ANNOTATION":
-        command += [
-            "--input_dataset_version_id",
-            params["input_dataset_version_id"],
-            "--model_version_id",
-            params["model_version_id"],
-        ]
-    elif pipeline_type == "DATA_AUTO_TAGGING":
-        command += [
-            "--input_datalake_id",
-            params["input_datalake_id"],
-            "--output_datalake_id",
-            params["output_datalake_id"],
-            "--model_version_id",
-            params["model_version_id"],
-            "--tags_list",
-            params["tags_list"],
-            "--offset",
-            str(params["offset"]),
-            "--limit",
-            str(params["limit"]),
-        ]
-
-    return command

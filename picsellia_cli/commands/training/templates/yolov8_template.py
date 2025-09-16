@@ -1,44 +1,13 @@
 from picsellia_cli.utils.base_template import BaseTemplate
 
-TRAINING_PIPELINE_TRAINING = """from picsellia_cv_engine import pipeline
-from picsellia_cv_engine.core.parameters import (
-    AugmentationParameters,
-    ExportParameters,
-)
-from picsellia_cv_engine.core.services.utils.picsellia_context import create_picsellia_training_context
-from picsellia_cv_engine.steps.base.dataset.loader import (
-    load_yolo_datasets
-)
-from picsellia_cv_engine.steps.base.model.builder import build_model
-
-from steps import train
-from utils.parameters import TrainingHyperParameters
-
-context = create_picsellia_training_context(
-    hyperparameters_cls=TrainingHyperParameters,
-    augmentation_parameters_cls=AugmentationParameters,
-    export_parameters_cls=ExportParameters
-)
-
-@pipeline(context=context, log_folder_path="logs/", remove_logs_on_completion=False)
-def {pipeline_name}_pipeline():
-    picsellia_datasets = load_yolo_datasets()
-    picsellia_model = build_model(pretrained_weights_name="pretrained-weights")
-    train(picsellia_model=picsellia_model, picsellia_datasets=picsellia_datasets)
-
-
-if __name__ == "__main__":
-    {pipeline_name}_pipeline()
-"""
-
-TRAINING_PIPELINE_LOCAL = """import argparse
+TRAINING_PIPELINE_TRAINING = """import argparse
 
 from picsellia_cv_engine import pipeline
 from picsellia_cv_engine.core.parameters import (
     AugmentationParameters,
     ExportParameters,
 )
-from picsellia_cv_engine.core.services.utils.local_context import create_local_training_context
+from picsellia_cv_engine.core.services.context.unified_context import create_training_context_from_config
 from picsellia_cv_engine.steps.base.dataset.loader import (
     load_yolo_datasets
 )
@@ -48,20 +17,16 @@ from steps import train
 from utils.parameters import TrainingHyperParameters
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--api_token", type=str, required=True)
-parser.add_argument("--organization_name", type=str, required=True)
-parser.add_argument("--experiment_id", type=str, required=True)
-parser.add_argument("--working_dir", type=str, required=True)
+parser.add_argument("--mode", choices=["local", "picsellia"], default="picsellia")
+parser.add_argument("--config-file", type=str, required=False)
 args = parser.parse_args()
 
-context = create_local_training_context(
+context = create_training_context_from_config(
     hyperparameters_cls=TrainingHyperParameters,
     augmentation_parameters_cls=AugmentationParameters,
     export_parameters_cls=ExportParameters,
-    api_token=args.api_token,
-    organization_name=args.organization_name,
-    experiment_id=args.experiment_id,
-    working_dir=args.working_dir,
+    mode=args.mode,
+    config_file_path=args.config_file,
 )
 
 @pipeline(context=context, log_folder_path="logs/", remove_logs_on_completion=False)
@@ -164,14 +129,9 @@ requires-python = ">=3.10"
 
 dependencies = [
     "picsellia-pipelines-cli",
+    "picsellia-cv-engine",
     "ultralytics>=8.3.145",
 ]
-
-[dependency-groups]
-dev = [
-    "picsellia-cv-engine",
-]
-
 """
 
 TRAINING_PIPELINE_DOCKERFILE = """FROM picsellia/cuda:11.8.0-cudnn8-ubuntu20.04-python3.10
@@ -196,7 +156,7 @@ RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
 ENV PYTHONPATH=":/experiment"
 
-ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/picsellia_pipeline.py"]
+ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/pipeline.py"]
 """
 
 TRAINING_PIPELINE_DOCKERIGNORE = """.venv/
@@ -209,8 +169,28 @@ __pycache__/
 runs/
 """
 
+TRAINING_RUN_CONFIG = """override_outputs = true
 
-class UltralyticsTrainingTemplate(BaseTemplate):
+[job]
+type = "TRAINING"
+
+[auth]
+organization_name = ""
+env = "PROD"
+
+[input.train_dataset_version]
+id = ""
+
+[input.model_version]
+id = ""
+
+[output.experiment]
+name = "{pipeline_name}_exp1"
+project_name = "{pipeline_name}"
+"""
+
+
+class YOLOV8TrainingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
         super().__init__(
             pipeline_name=pipeline_name,
@@ -221,11 +201,7 @@ class UltralyticsTrainingTemplate(BaseTemplate):
 
     def get_main_files(self) -> dict[str, str]:
         files = {
-            "picsellia_pipeline.py": TRAINING_PIPELINE_TRAINING.format(
-                pipeline_module=self.pipeline_module,
-                pipeline_name=self.pipeline_name,
-            ),
-            "local_pipeline.py": TRAINING_PIPELINE_LOCAL.format(
+            "pipeline.py": TRAINING_PIPELINE_TRAINING.format(
                 pipeline_module=self.pipeline_module,
                 pipeline_name=self.pipeline_name,
             ),
@@ -254,12 +230,11 @@ class UltralyticsTrainingTemplate(BaseTemplate):
             "metadata": {
                 "name": self.pipeline_name,
                 "version": "1.0",
-                "description": "Training pipeline using YOLO and Ultralytics.",
+                "description": "Training pipeline using YOLOV8.",
                 "type": self.pipeline_type,
             },
             "execution": {
-                "picsellia_pipeline_script": "picsellia_pipeline.py",
-                "local_pipeline_script": "local_pipeline.py",
+                "pipeline_script": "pipeline.py",
                 "requirements_file": "pyproject.toml"
                 if self.use_pyproject
                 else "requirements.txt",
@@ -269,9 +244,11 @@ class UltralyticsTrainingTemplate(BaseTemplate):
                 "image_name": "",
                 "image_tag": "",
             },
-            "model": {
-                "model_name": "",
-                "model_version_id": "",
+            "model_version": {
+                "name": "",
+                "origin_name": "",
+                "framework": "",
+                "inference_type": "",
             },
         }
 
@@ -283,3 +260,6 @@ class UltralyticsTrainingTemplate(BaseTemplate):
                 "uv sync --python=$(which python3.10) --project {pipeline_dir}",
                 "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
             ).format(pipeline_dir=self.pipeline_dir)
+
+    def get_run_config_toml(self) -> str:
+        return TRAINING_RUN_CONFIG.format(pipeline_name=self.pipeline_name)

@@ -1,6 +1,9 @@
 from picsellia_cli.utils.base_template import BaseTemplate
 
-PREANNOTATION_PIPELINE_PICSELLIA = """from picsellia_cv_engine.core.services.utils.picsellia_context import create_picsellia_processing_context
+PREANNOTATION_PIPELINE_PICSELLIA = """import argparse
+
+from picsellia.types.enums import ProcessingType
+from picsellia_cv_engine.core.services.context.unified_context import create_processing_context_from_config
 from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
 from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
 from picsellia_cv_engine.steps.base.dataset.uploader import upload_dataset_annotations
@@ -9,57 +12,16 @@ from picsellia_cv_engine.steps.base.model.builder import build_model
 from steps import process
 from utils.parameters import ProcessingParameters
 
-context = create_picsellia_processing_context(
-    processing_parameters_cls=ProcessingParameters
-)
-
-@pipeline(
-    context=context,
-    log_folder_path="logs/",
-    remove_logs_on_completion=False,
-)
-def {pipeline_name}_pipeline():
-    picsellia_dataset = load_coco_datasets()
-    picsellia_model = build_model(
-        pretrained_weights_name="pretrained-weights", config_name="config"
-    )
-    picsellia_dataset = process(
-        picsellia_model=picsellia_model, picsellia_dataset=picsellia_dataset
-    )
-    upload_dataset_annotations(dataset=picsellia_dataset, use_id=True)
-
-if __name__ == "__main__":
-    {pipeline_name}_pipeline()
-"""
-
-PREANNOTATION_PIPELINE_LOCAL = """import argparse
-
-from picsellia_cv_engine.core.services.utils.local_context import create_local_dataset_processing_context
-from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
-from picsellia_cv_engine.steps.base.dataset.loader import load_coco_datasets
-from picsellia_cv_engine.steps.base.dataset.uploader import upload_dataset_annotations
-from picsellia_cv_engine.steps.base.model.builder import build_model
-
-from steps import process
-from utils.parameters import ProcessingParameters
-
-parser = argparse.ArgumentParser(description="Run the local preannotation pipeline")
-parser.add_argument("--api_token", required=True, type=str, help="Picsellia API token")
-parser.add_argument("--organization_name", required=True, type=str, help="Picsellia organization name")
-parser.add_argument("--job_type", required=True, type=str, choices=["DATASET_VERSION_CREATION", "PRE_ANNOTATION", "TRAINING"], help="Job type")
-parser.add_argument("--input_dataset_version_id", required=True, type=str, help="Input dataset version ID")
-parser.add_argument("--model_version_id", required=True, type=str, help="Model version ID")
-parser.add_argument("--working_dir", required=False, type=str, help="Working directory", default=None)
+parser = argparse.ArgumentParser()
+parser.add_argument("--mode", choices=["local", "picsellia"], default="picsellia")
+parser.add_argument("--config-file", type=str, required=False)
 args = parser.parse_args()
 
-context = create_local_dataset_processing_context(
+context = create_processing_context_from_config(
+    processing_type=ProcessingType.PRE_ANNOTATION,
     processing_parameters_cls=ProcessingParameters,
-    api_token=args.api_token,
-    organization_name=args.organization_name,
-    job_type=args.job_type,
-    input_dataset_version_id=args.input_dataset_version_id,
-    model_version_id=args.model_version_id,
-    working_dir=args.working_dir,
+    mode=args.mode,
+    config_file_path=args.config_file,
 )
 
 @pipeline(
@@ -85,7 +47,7 @@ PREANNOTATION_PIPELINE_STEPS = """import json
 
 from picsellia.types.enums import InferenceType
 from picsellia_cv_engine.core import CocoDataset, Model
-from picsellia_cv_engine.core.contexts import PicselliaProcessingContext
+from picsellia_cv_engine.core.contexts import PicselliaDatasetProcessingContext
 from picsellia_cv_engine.decorators.pipeline_decorator import Pipeline
 from picsellia_cv_engine.decorators.step_decorator import step
 
@@ -110,7 +72,7 @@ def process(picsellia_model: Model, picsellia_dataset: CocoDataset):
     \"\"\"
 
     # Get processing parameters from the user-defined configuration
-    context: PicselliaProcessingContext = Pipeline.get_active_context()
+    context: PicselliaDatasetProcessingContext = Pipeline.get_active_context()
     parameters = context.processing_parameters.to_dict()
 
     if picsellia_dataset.dataset_version.type == InferenceType.NOT_CONFIGURED:
@@ -253,13 +215,11 @@ class ProcessingParameters(Parameters):
         self.threshold = self.extract_parameter(["threshold"], expected_type=float, default=0.1)
 """
 
-PREANNOTATION_PIPELINE_REQUIREMENTS = """# Required for GroundingDINO preannotation
-torch>=2.0.0
-torchvision
+PREANNOTATION_PIPELINE_REQUIREMENTS = """# Add your dependencies here
+picsellia-pipelines-cli
+picsellia-cv-engine
+ultralytics
 opencv-python
-Pillow
-# GroundingDINO must be installed manually or via script
-# See: https://github.com/IDEA-Research/GroundingDINO
 """
 
 PREANNOTATION_PIPELINE_PYPROJECT = """[project]
@@ -274,8 +234,6 @@ dependencies = [
     "ultralytics",
     "opencv-python"
 ]
-
-
 """
 
 PREANNOTATION_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10
@@ -299,7 +257,7 @@ RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
 ENV PYTHONPATH="/experiment"
 
-ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/picsellia_pipeline.py"]
+ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/pipeline.py"]
 """
 
 PREANNOTATION_PIPELINE_DOCKERIGNORE = """# Exclude virtual environments
@@ -311,6 +269,21 @@ __pycache__/
 .DS_Store
 *.log
 runs/
+"""
+
+PROCESSING_RUN_CONFIG = """
+[job]
+type = "PRE_ANNOTATION"
+
+[auth]
+organization_name = ""
+env = "PROD"
+
+[input.dataset_version]
+id = ""
+
+[input.model_version]
+id = ""
 """
 
 
@@ -325,10 +298,7 @@ class PreAnnotationTemplate(BaseTemplate):
 
     def get_main_files(self) -> dict[str, str]:
         files = {
-            "picsellia_pipeline.py": PREANNOTATION_PIPELINE_PICSELLIA.format(
-                pipeline_name=self.pipeline_name,
-            ),
-            "local_pipeline.py": PREANNOTATION_PIPELINE_LOCAL.format(
+            "pipeline.py": PREANNOTATION_PIPELINE_PICSELLIA.format(
                 pipeline_name=self.pipeline_name,
             ),
             "steps.py": PREANNOTATION_PIPELINE_STEPS,
@@ -361,8 +331,7 @@ class PreAnnotationTemplate(BaseTemplate):
                 "type": self.pipeline_type,
             },
             "execution": {
-                "picsellia_pipeline_script": "picsellia_pipeline.py",
-                "local_pipeline_script": "local_pipeline.py",
+                "pipeline_script": "pipeline.py",
                 "requirements_file": "pyproject.toml"
                 if self.use_pyproject
                 else "requirements.txt",
@@ -381,3 +350,6 @@ class PreAnnotationTemplate(BaseTemplate):
                 "uv sync --python=$(which python3.10) --project {pipeline_dir}",
                 "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
             ).format(pipeline_dir=self.pipeline_dir)
+
+    def get_run_config_toml(self) -> str:
+        return PROCESSING_RUN_CONFIG.format(pipeline_name=self.pipeline_name)

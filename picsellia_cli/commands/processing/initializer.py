@@ -13,7 +13,6 @@ from picsellia_cli.commands.processing.templates.dataset_version_creation_templa
 )
 
 from picsellia_cli.utils.base_template import BaseTemplate
-from picsellia_cli.utils.env_utils import ensure_env_vars
 from picsellia_cli.utils.initializer import handle_pipeline_name
 
 
@@ -24,9 +23,25 @@ def init_processing(
     use_pyproject: Optional[bool] = True,
 ):
     """
-    Initialize a new dataset processing pipeline.
+    Initialize a new **processing pipeline** project.
+
+    This command will:
+    - Validate environment variables required for Picsellia.
+    - Generate a pipeline scaffold from a chosen template.
+    - Write all necessary configuration and step files.
+    - Set up the environment (e.g., pyproject / requirements).
+
+    Args:
+        pipeline_name (str): The name of the pipeline to initialize.
+        template (str): The processing template to use.
+            Supported values:
+              - `"dataset_version_creation"`
+              - `"pre_annotation"`
+              - `"data_auto_tagging"`
+        output_dir (Optional[str], default="."): Target directory where the pipeline will be created.
+        use_pyproject (Optional[bool], default=True): Whether to create a `pyproject.toml` for dependency management.
+        host (str, default="prod"): Picsellia host environment to target (e.g., `"prod"`, `"staging"`).
     """
-    ensure_env_vars()
     output_dir = output_dir or "."
     use_pyproject = use_pyproject if use_pyproject is not None else True
 
@@ -49,7 +64,22 @@ def init_processing(
 
 def get_template_instance(
     template_name: str, pipeline_name: str, output_dir: str, use_pyproject: bool = True
-):
+) -> BaseTemplate:
+    """
+    Resolve the appropriate template class based on the provided name.
+
+    Args:
+        template_name (str): The template identifier.
+        pipeline_name (str): Name of the pipeline to generate.
+        output_dir (str): Output directory path.
+        use_pyproject (bool, default=True): Whether to create a `pyproject.toml`.
+
+    Returns:
+        BaseTemplate: An instantiated template class.
+
+    Raises:
+        typer.Exit: If the template name is not recognized.
+    """
     match template_name:
         case "dataset_version_creation":
             return DatasetVersionCreationProcessingTemplate(
@@ -89,16 +119,20 @@ def _show_success_message(pipeline_name, template_instance: BaseTemplate):
             bold=True,
         )
     )
-    typer.echo(f"📁 Structure created at: {template_instance.pipeline_dir}")
+    typer.echo(f"📁 Files generated at: {template_instance.pipeline_dir}")
     typer.echo("")
     typer.echo("Next steps:")
-    typer.echo("- Edit your steps in: " + typer.style("steps.py", bold=True))
+    typer.echo("1. Edit your custom steps in: " + typer.style("steps.py", bold=True))
     typer.echo(
-        "- Test locally with: "
-        + typer.style(f"pxl-pipeline test {pipeline_name}", fg=typer.colors.GREEN)
+        "2. Test locally with: "
+        + typer.style(
+            f"pxl-pipeline test {pipeline_name}", fg=typer.colors.GREEN, bold=True
+        )
     )
     typer.echo(
-        "- Deploy to Picsellia with: "
-        + typer.style(f"pxl-pipeline deploy {pipeline_name}", fg=typer.colors.GREEN)
+        "3. Deploy to Picsellia with: "
+        + typer.style(
+            f"pxl-pipeline deploy {pipeline_name}", fg=typer.colors.GREEN, bold=True
+        )
     )
     typer.echo("")

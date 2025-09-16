@@ -22,16 +22,15 @@ class RunManager:
         run_dir.mkdir()
         return run_dir
 
-    def get_latest_run_config(self) -> Optional[dict]:
-        latest = sorted(
+    def get_latest_run_config_path(self) -> Optional[Path]:
+        candidates = sorted(
             [p for p in self.runs_dir.glob("run*/run_config.toml")],
             key=lambda p: int(p.parent.name[3:]),
             reverse=True,
         )
-        if latest:
-            with latest[0].open("r") as f:
-                return toml.load(f)
-        return None
+        if not candidates:
+            return None
+        return candidates[0]
 
     def save_run_config(self, run_dir: Path, config_data: dict):
         config_path = run_dir / "run_config.toml"

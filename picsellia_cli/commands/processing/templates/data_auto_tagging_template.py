@@ -1,88 +1,28 @@
 from picsellia_cli.utils.base_template import BaseTemplate
 
 
-PROCESSING_PIPELINE_PICSELLIA = """
+PROCESSING_PIPELINE = """import argparse
+
+from picsellia.types.enums import ProcessingType
+from picsellia_cv_engine.core.services.context.unified_context import create_processing_context_from_config
 from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
 from picsellia_cv_engine.steps.base.datalake.loader import load_datalake
-from picsellia_cv_engine.core.services.utils.picsellia_context import create_picsellia_datalake_processing_context
 
-from utils.parameters import ProcessingParameters
 from steps import get_hugging_face_model, load_clip_model, autotag_datalake_with_clip
-
-
-
-context = create_picsellia_datalake_processing_context(
-    processing_parameters_cls=ProcessingParameters,
-)
-
-
-@pipeline(
-    context=context,
-    log_folder_path="logs/",
-    remove_logs_on_completion=False,
-)
-def {pipeline_name}_processing_pipeline() -> None:
-    datalake = load_datalake()
-    model = get_hugging_face_model(hugging_face_model_name="openai/clip-vit-large-patch14-336")
-    model = load_clip_model(model=model, device="cuda:0")
-    autotag_datalake_with_clip(datalake=datalake, model=model, device="cuda:0")
-
-
-
-if __name__ == "__main__":
-    import os
-
-    import torch
-
-    cpu_count = os.cpu_count()
-    if cpu_count is not None and cpu_count > 1:
-        torch.set_num_threads(cpu_count - 1)
-
-    {pipeline_name}_processing_pipeline()
-"""
-
-PROCESSING_PIPELINE_LOCAL = """
-
-from argparse import ArgumentParser
-
-from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
-from picsellia_cv_engine.steps.base.datalake.loader import load_datalake
-from picsellia_cv_engine.core.services.utils.local_context import create_local_datalake_processing_context
-
 from utils.parameters import ProcessingParameters
-from steps import get_hugging_face_model, load_clip_model, autotag_datalake_with_clip
 
 
-parser = ArgumentParser()
-parser.add_argument("--api_token", required=True, type=str, help="Picsellia API token")
-parser.add_argument("--organization_name", required=True, type=str, help="Picsellia organization name")
-parser.add_argument("--job_type", required=True, type=str, choices=["DATASET_VERSION_CREATION", "PRE_ANNOTATION", "TRAINING", "DATA_AUTO_TAGGING"], help="Job type")
-parser.add_argument("--input_datalake_id", type=str)
-parser.add_argument("--output_datalake_id", type=str, required=False)
-parser.add_argument("--model_version_id", type=str)
-parser.add_argument("--tags_list", type=str, help="Comma-separated list of tags")
-parser.add_argument("--offset", type=int, default=0)
-parser.add_argument("--limit", type=int, default=100)
-parser.add_argument("--device", type=str, default="cuda:0")
-parser.add_argument("--batch_size", type=int, default=8)
-parser.add_argument("--working_dir", required=False, type=str, help="Working directory", default=None)
+parser = argparse.ArgumentParser()
+parser.add_argument("--mode", choices=["local", "picsellia"], default="picsellia")
+parser.add_argument("--config-file", type=str, required=False)
 args = parser.parse_args()
 
-
-context = create_local_datalake_processing_context(
+context = create_processing_context_from_config(
+    processing_type=ProcessingType.DATA_AUTO_TAGGING,
     processing_parameters_cls=ProcessingParameters,
-    processing_parameters={{"batch_size": args.batch_size, "tags_list": args.tags_list}},
-    api_token=args.api_token,
-    organization_name=args.organization_name,
-    job_type=args.job_type,
-    input_datalake_id=args.input_datalake_id,
-    output_datalake_id=args.output_datalake_id,
-    model_version_id=args.model_version_id,
-    offset=args.offset,
-    limit=args.limit,
-    working_dir=args.working_dir,
+    mode=args.mode,
+    config_file_path=args.config_file,
 )
-
 
 @pipeline(
     context=context,
@@ -95,7 +35,6 @@ def {pipeline_name}_processing_pipeline() -> None:
     model = load_clip_model(model=model, device="cuda:0")
     autotag_datalake_with_clip(datalake=datalake, model=model, device="cuda:0")
 
-
 if __name__ == "__main__":
     import os
 
@@ -106,7 +45,6 @@ if __name__ == "__main__":
         torch.set_num_threads(cpu_count - 1)
 
     {pipeline_name}_processing_pipeline()
-
 """
 
 PROCESSING_PIPELINE_STEPS = """import logging
@@ -233,7 +171,7 @@ class ProcessingParameters(Parameters):
 
         self.tags_list = [
             tag.strip()
-            for tag in self.extract_parameter(["tags_list"], expected_type=str).split(",")
+            for tag in self.extract_parameter(["tags_list"], expected_type=str, default="women, men").split(",")
             if tag.strip()
         ]
 
@@ -586,15 +524,8 @@ requires-python = ">=3.10"
 dependencies = [
     "picsellia-pipelines-cli",
     "transformers[torch]",
+    "picsellia-cv-engine"
 ]
-
-[dependency-groups]
-dev = [
-    "picsellia-cv-engine",
-]
-
-[tool.uv.sources]
-picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "fix/datalake-context" }}
 """
 
 PROCESSING_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10
@@ -619,7 +550,7 @@ RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
 ENV PYTHONPATH="/experiment"
 
-ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/picsellia_pipeline.py"]
+ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/pipeline.py"]
 """
 
 PROCESSING_PIPELINE_DOCKERIGNORE = """# Exclude virtual environments
@@ -631,6 +562,34 @@ __pycache__/
 .DS_Store
 *.log
 runs/
+"""
+
+PROCESSING_RUN_CONFIG = """override_outputs = true
+
+[job]
+type = "DATA_AUTO_TAGGING"
+
+[auth]
+organization_name = ""
+env = "PROD"
+
+[input.datalake]
+id = ""
+
+[input.model_version]
+id = ""
+visibility = "private"
+
+[output.datalake]
+id = ""
+
+[run_parameters]
+offset = 0
+limit = 10
+
+[parameters]
+batch_size = 8
+tags_list = "women, men"
 """
 
 
@@ -645,10 +604,7 @@ class DataAutoTaggingProcessingTemplate(BaseTemplate):
 
     def get_main_files(self) -> dict[str, str]:
         files = {
-            "picsellia_pipeline.py": PROCESSING_PIPELINE_PICSELLIA.format(
-                pipeline_name=self.pipeline_name,
-            ),
-            "local_pipeline.py": PROCESSING_PIPELINE_LOCAL.format(
+            "pipeline.py": PROCESSING_PIPELINE.format(
                 pipeline_name=self.pipeline_name,
             ),
             "steps.py": PROCESSING_PIPELINE_STEPS,
@@ -682,8 +638,7 @@ class DataAutoTaggingProcessingTemplate(BaseTemplate):
                 "type": self.pipeline_type,
             },
             "execution": {
-                "picsellia_pipeline_script": "picsellia_pipeline.py",
-                "local_pipeline_script": "local_pipeline.py",
+                "pipeline_script": "pipeline.py",
                 "requirements_file": "pyproject.toml"
                 if self.use_pyproject
                 else "requirements.txt",
@@ -700,3 +655,6 @@ class DataAutoTaggingProcessingTemplate(BaseTemplate):
                 "uv sync --python=$(which python3.10) --project {pipeline_dir}",
                 "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
             ).format(pipeline_dir=self.pipeline_dir)
+
+    def get_run_config_toml(self) -> str:
+        return PROCESSING_RUN_CONFIG
