@@ -29,8 +29,8 @@ run_tests_for_type() {
       cd "$PIPELINES_DIR"
 
       # ---- Init ----
-      echo "▶️  pxl-pipeline init $TEMPLATE --type $TYPE --template $TEMPLATE --organization $ORGANIZATION --env $ENVIRONMENT"
-      pxl-pipeline init "$TEMPLATE" --type "$TYPE" --template "$TEMPLATE" --organization $ORGANIZATION --env $ENVIRONMENT
+      echo "▶️  pxl-pipeline init $TEMPLATE --type $TYPE --template $TEMPLATE"
+      pxl-pipeline init "$TEMPLATE" --type "$TYPE" --template "$TEMPLATE"
 
       # ---- Test ----
       echo "▶️  pxl-pipeline test $TEMPLATE --run-config-file $RUN_CONFIG"
