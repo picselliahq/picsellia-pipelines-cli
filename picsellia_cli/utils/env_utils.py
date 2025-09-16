@@ -30,7 +30,7 @@ class Environment(str, Enum):
 
 
 def _env_key(organization: str, env: str, key: str) -> str:
-    return f"PICSELLIA_{organization}_{env}_{key}".upper()
+    return f"PICSELLIA_{organization}_{env.upper()}_{key.upper()}"
 
 
 def _write_env_var(key: str, value: str):
@@ -94,15 +94,78 @@ def get_available_configs() -> list[dict[str, str]]:
     configs = []
     for line in ENV_FILE.read_text().splitlines():
         if "API_TOKEN" in line:
-            parts = line.split("=")[0].split("_")
-            _, org, env_str, _ = parts
+            key = line.split("=")[0]
+            parts = key.split("_")
+
+            if len(parts) < 4 or parts[0] != "PICSELLIA":
+                continue
+
+            org = "_".join(parts[1:-2])  # tout ce qui est entre PICSELLIA et ENV
+            env_str = parts[-2]
+
             try:
                 env = Environment(env_str.upper())
                 config = get_env_config(org, env)
                 configs.append(config)
             except Exception:
                 continue
+
     if not configs:
         typer.echo("❌ No valid Picsellia configurations found.")
         raise typer.Exit()
+
     return configs
+
+
+def parse_env_key(key: str) -> tuple[str, str] | None:
+    """
+    Parse a PICSELLIA env key of the form:
+    PICSELLIA_{organization}_{ENV}_API_TOKEN
+
+    Returns:
+        (organization, env_str) if valid, else None
+    """
+    parts = key.split("_")
+    if len(parts) < 4 or parts[0] != "PICSELLIA" or parts[-2:] != ["API", "TOKEN"]:
+        return None
+
+    # Chercher l'env dans les parties
+    for i, part in enumerate(parts):
+        if part.upper() in [e.value for e in Environment]:
+            org = "_".join(parts[1:i])  # tout ce qui est entre PICSELLIA et ENV
+            return org, part.upper()
+
+    return None
+
+
+def get_organization_for_env(env: Environment) -> str:
+    env_name = env.value.upper()
+    orgs_for_env = []
+
+    if not ENV_FILE.exists():
+        typer.echo("❌ No .env file found with Picsellia credentials.")
+        raise typer.Exit(code=1)
+
+    for line in ENV_FILE.read_text().splitlines():
+        if line.strip() and "API_TOKEN" in line:
+            key = line.split("=")[0]
+            parsed = parse_env_key(key)
+            if not parsed:
+                continue
+            org, env_str = parsed
+
+            if env_str == env_name:
+                orgs_for_env.append(org)
+
+    if not orgs_for_env:
+        typer.echo(f"❌ No organization found for environment {env_name}.")
+        raise typer.Exit(code=1)
+
+    if len(orgs_for_env) > 1:
+        typer.echo(
+            f"❌ Multiple organizations found for environment {env_name}: {', '.join(orgs_for_env)}. "
+            f"Please specify one with --organization."
+        )
+        raise typer.Exit(code=1)
+
+    return orgs_for_env[0]

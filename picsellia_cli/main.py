@@ -185,10 +185,10 @@ def smoke_test(
 @app.command(name="deploy")
 def deploy(
     pipeline_name: str,
-    organization: str = typer.Option(
-        ...,
+    organization: str | None = typer.Option(
+        None,
         "--organization",
-        help="Organization name",  # <-- `...` le rend obligatoire
+        help="Organization name",
     ),
     env: Environment = typer.Option(
         Environment.PROD, "--env", help="Target environment"

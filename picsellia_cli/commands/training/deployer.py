@@ -8,15 +8,20 @@ from picsellia_cli.utils.deployer import (
     build_and_push_docker_image,
     bump_pipeline_version,
 )
-from picsellia_cli.utils.env_utils import get_env_config, Environment, resolve_env
+from picsellia_cli.utils.env_utils import (
+    get_env_config,
+    Environment,
+    resolve_env,
+    get_organization_for_env,
+)
 from picsellia_cli.utils.logging import kv, bullet, section
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 
 def deploy_training(
     pipeline_name: str,
-    organization: str,
     env: Environment,
+    organization: str | None = None,
 ):
     """Deploy a training pipeline to Picsellia.
 
@@ -35,6 +40,16 @@ def deploy_training(
     """
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
 
+    # ── Environment ─────────────────────────────────────────────────────────
+    section("🌍 Environment")
+    selected_env = resolve_env(env or Environment.PROD.value)
+    if not organization:
+        organization = get_organization_for_env(env=selected_env)
+    env_config = get_env_config(organization=organization, env=selected_env)
+
+    kv("Host", env_config["host"])
+    kv("Organization", env_config["organization_name"])
+
     # ── Pipeline details ─────────────────────────────────────────────────────
     section("🧩 Pipeline")
     kv("Type", pipeline_config.get("metadata", "type"))
@@ -46,14 +61,6 @@ def deploy_training(
     image_name = pipeline_config.get("docker", "image_name")
 
     tags_to_push = [new_version, "test" if "-rc" in new_version else "latest"]
-
-    # ── Environment ─────────────────────────────────────────────────────────
-    section("🌍 Environment")
-    selected_env = resolve_env(env or Environment.PROD.value)
-    env_config = get_env_config(organization=organization, env=selected_env)
-
-    kv("Host", env_config["host"])
-    kv("Organization", env_config["organization_name"])
 
     # ── Ensure model/version exist before build ──────────────────────────────
     section("Model / Version (Pre-check)")

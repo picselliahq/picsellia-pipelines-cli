@@ -4,7 +4,12 @@ from pathlib import Path
 import toml
 import typer
 
-from picsellia_cli.utils.env_utils import get_env_config, Environment, resolve_env
+from picsellia_cli.utils.env_utils import (
+    get_env_config,
+    Environment,
+    resolve_env,
+    get_organization_for_env,
+)
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 from picsellia_cli.utils.run_manager import RunManager
 from picsellia_cli.utils.runner import create_virtual_env, run_pipeline_command
@@ -91,14 +96,11 @@ def prepare_auth_and_env(
     selected_env = (
         run_config.get("auth", {}).get("env") or env or Environment.PROD.value
     )
+    selected_env_enum = resolve_env(selected_env)
 
     if not org:
-        typer.echo(
-            "❌ Missing organization name. Please provide it in run_config or CLI args."
-        )
-        raise typer.Exit(code=1)
+        org = get_organization_for_env(env=selected_env_enum)
 
-    selected_env_enum = resolve_env(selected_env)
     env_config = get_env_config(organization=org, env=selected_env_enum)
 
     run_config.setdefault("auth", {})

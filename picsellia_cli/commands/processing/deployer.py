@@ -11,20 +11,35 @@ from picsellia_cli.utils.deployer import (
     build_and_push_docker_image,
     bump_pipeline_version,
 )
-from picsellia_cli.utils.env_utils import get_env_config, Environment, resolve_env
+from picsellia_cli.utils.env_utils import (
+    get_env_config,
+    Environment,
+    resolve_env,
+    get_organization_for_env,
+)
 from picsellia_cli.utils.logging import kv, bullet, section, hr
 from picsellia_cli.utils.pipeline_config import PipelineConfig
 
 
 def deploy_processing(
     pipeline_name: str,
-    organization: str,
     env: Environment,
+    organization: str | None = None,
 ):
     """
     🚀 Deploy a processing pipeline to all available environments in the .env.
     """
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
+
+    # ── Environment ─────────────────────────────────────────────────────────
+    section("🌍 Environment")
+    selected_env = resolve_env(env or Environment.PROD.value)
+    if not organization:
+        organization = get_organization_for_env(env=selected_env)
+    env_config = get_env_config(organization=organization, env=selected_env)
+
+    kv("Host", env_config["host"])
+    kv("Organization", env_config["organization_name"])
 
     # ── Pipeline details ─────────────────────────────────────────────────────
     section("🧩 Pipeline")
@@ -56,14 +71,6 @@ def deploy_processing(
     pipeline_config.config["metadata"]["version"] = str(new_version)
     pipeline_config.config["docker"]["image_tag"] = str(new_version)
     pipeline_config.save()
-
-    # ── Environment ─────────────────────────────────────────────────────────
-    section("🌍 Environment")
-    selected_env = resolve_env(env or Environment.PROD.value)
-    env_config = get_env_config(organization=organization, env=selected_env)
-
-    kv("Host", env_config["host"])
-    kv("Organization", env_config["organization_name"])
 
     # ── Register on each host ────────────────────────────────────────────────
     section("📦 Register / Update")
