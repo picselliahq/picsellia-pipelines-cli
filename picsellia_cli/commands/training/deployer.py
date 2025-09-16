@@ -66,8 +66,6 @@ def deploy_training(
     _ensure_model_and_version_on_host(
         client=client,
         cfg=pipeline_config,
-        image_name="placeholder",
-        image_tag="placeholder",
     )
 
     section("Docker")
@@ -155,8 +153,8 @@ def _get_model_settings(cfg: PipelineConfig) -> dict:
 def _ensure_model_and_version_on_host(
     client: Client,
     cfg: PipelineConfig,
-    image_name: str,
-    image_tag: str,
+    image_name: str | None = None,
+    image_tag: str | None = None,
 ):
     """Ensure the model and version exist on the target host, and update them with Docker info.
 
