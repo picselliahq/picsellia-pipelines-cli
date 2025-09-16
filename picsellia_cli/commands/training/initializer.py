@@ -52,9 +52,7 @@ def init_training(
 
     selected_env = os.getenv("PICSELLIA_ENV")
     if not selected_env:
-        selected_env = typer.prompt(
-            "Picsellia environment (prod/staging/local)", default="prod"
-        ).upper()
+        selected_env = "PROD"
 
     env = resolve_env(selected_env)
     env_config = get_env_config(organization=organization, env=env)
