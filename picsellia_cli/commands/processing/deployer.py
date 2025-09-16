@@ -76,24 +76,30 @@ def deploy_processing(
             organization_name=env_config["organization_name"],
             host=env_config["host"],
         )
-        kv("Result", status)
+        kv("Status", status)
         if msg:
-            kv("Info", msg)
+            kv("Details", msg)
         results.append((env_config["host"], status, msg))
     except Exception as e:
-        kv("Result", "Error")
-        kv("Info", str(e))
+        kv("Status", "Error")
+        kv("Details", str(e))
         results.append((env_config["host"], "Error", str(e)))
 
     # ── Summary ──────────────────────────────────────────────────────────────
     section("✅ Summary")
     for host_url, status, msg in results:
-        line = f"{host_url} — {status}"
+        kv("Host", host_url)
+        kv("Status", status)
         if msg:
-            line += f" · {msg}"
-        bullet(line)
+            kv("Info", msg)
+        typer.echo("")
 
     hr()
+    typer.secho(
+        f"Processing pipeline '{pipeline_name}' deployed successfully",
+        fg=typer.colors.GREEN,
+        bold=True,
+    )
 
 
 def prompt_allocation_if_missing(pipeline_config: PipelineConfig):
@@ -107,13 +113,13 @@ def prompt_allocation_if_missing(pipeline_config: PipelineConfig):
         kv("Current CPU", cpu)
         kv("Current GPU", gpu)
         if not typer.confirm("Keep the current Docker defaults?", default=True):
-            cpu = typer.prompt("🧠 CPU (default)", default=cpu)
-            gpu = typer.prompt("💻 GPU (default)", default=gpu)
+            cpu = typer.prompt("CPU (default)", default=cpu)
+            gpu = typer.prompt("GPU (default)", default=gpu)
     else:
         if not cpu:
-            cpu = typer.prompt("🧠 CPU (default)")
+            cpu = typer.prompt("CPU (default)")
         if not gpu:
-            gpu = typer.prompt("💻 GPU (default)")
+            gpu = typer.prompt("GPU (default)")
 
     pipeline_config.config["docker"]["cpu"] = cpu
     pipeline_config.config["docker"]["gpu"] = gpu
@@ -169,7 +175,7 @@ def _register_or_update(
             docker_tag=docker_tag,
             docker_flags=docker_flags,
         )
-        return "Created", f"name='{name}', image='{docker_image}:{docker_tag}'"
+        return "Created", f"{name} ({docker_image}:{docker_tag})"
 
     except ResourceConflictError:
         # already exists → update
@@ -182,4 +188,4 @@ def _register_or_update(
             docker_image=docker_image,
             docker_tag=docker_tag,
         )
-        return "Updated", f"name='{name}', image='{docker_image}:{docker_tag}'"
+        return "Updated", f"{name} ({docker_image}:{docker_tag})"
