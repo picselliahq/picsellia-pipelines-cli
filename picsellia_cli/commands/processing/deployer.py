@@ -45,7 +45,6 @@ def deploy_processing(
     kv("CPU (default)", pipeline_config.get("docker", "cpu"))
     kv("GPU (default)", pipeline_config.get("docker", "gpu"))
 
-    bullet("Building and pushing image…", accent=True)
     build_and_push_docker_image(
         pipeline_dir=pipeline_config.pipeline_dir,
         image_name=image_name,
