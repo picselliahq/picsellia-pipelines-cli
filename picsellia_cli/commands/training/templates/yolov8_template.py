@@ -159,7 +159,7 @@ RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
 ENV PYTHONPATH=":/experiment"
 
-ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/picsellia_pipeline.py"]
+ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/pipeline.py"]
 """
 
 TRAINING_PIPELINE_DOCKERIGNORE = """.venv/
