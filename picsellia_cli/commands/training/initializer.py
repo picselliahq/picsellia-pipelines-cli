@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 import typer
 
@@ -8,7 +9,7 @@ from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
-from picsellia_cli.utils.env_utils import Environment, get_env_config
+from picsellia_cli.utils.env_utils import get_env_config, resolve_env
 from picsellia_cli.utils.initializer import handle_pipeline_name, init_client
 from picsellia_cli.utils.logging import section, kv, bullet, step, hr
 from picsellia_cli.utils.pipeline_config import PipelineConfig
@@ -17,8 +18,6 @@ from picsellia_cli.utils.pipeline_config import PipelineConfig
 def init_training(
     pipeline_name: str,
     template: str,
-    env: Environment,
-    organization: str | None = None,
     output_dir: Optional[str] = None,
     use_pyproject: Optional[bool] = True,
 ):
@@ -34,26 +33,31 @@ def init_training(
     Args:
         pipeline_name: Name of the new pipeline project.
         template: Template to scaffold (e.g., "ultralytics").
-        env: Target environment (PROD, STAGING, LOCAL).
-        organization: Picsellia organization name.
         output_dir: Directory where the pipeline will be created (default: current dir).
         use_pyproject: Whether to generate a `pyproject.toml` (default: True).
 
     Raises:
         typer.Exit: If required arguments are missing or invalid.
     """
-    if not organization:
-        typer.echo("❌ Organization name is required for training initialization.")
-        raise typer.Exit(code=1)
-
     output_dir = output_dir or "."
     use_pyproject = True if use_pyproject is None else use_pyproject
     pipeline_name = handle_pipeline_name(pipeline_name=pipeline_name)
 
     # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
-    selected_env = env or Environment.PROD
-    env_config = get_env_config(organization=organization, env=selected_env)
+
+    organization = os.getenv("PICSELLIA_ORGANIZATION")
+    if not organization:
+        organization = typer.prompt("Organization name")
+
+    selected_env = os.getenv("PICSELLIA_ENV")
+    if not selected_env:
+        selected_env = typer.prompt(
+            "Picsellia environment (prod/staging/local)", default="prod"
+        ).upper()
+
+    env = resolve_env(selected_env)
+    env_config = get_env_config(organization=organization, env=env)
 
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
@@ -214,17 +218,32 @@ def choose_or_create_model_version(
             - inference_type: Inference type (e.g., "OBJECT_DETECTION")
     """
     if typer.confirm("Reuse an existing model version?", default=False):
-        model_version_id = typer.prompt("Model version ID")
-        mv = client.get_model_version_by_id(id=model_version_id)
+        is_public = typer.confirm("Is it a public model?", default=False)
+        if is_public:
+            model_name = typer.prompt("Public model name")
+            model_version_name = typer.prompt("Model version name")
+
+            try:
+                model = client.get_public_model(name=model_name)
+                mv = model.get_version(version=model_version_name)
+            except ResourceNotFoundError:
+                typer.echo(
+                    typer.style(
+                        f"❌ Could not find public model '{model_name}' with version '{model_version_name}'.",
+                        fg=typer.colors.RED,
+                    )
+                )
+                raise typer.Exit(code=1)
+        else:
+            model_version_id = typer.prompt("Private model version ID")
+            mv = client.get_model_version_by_id(id=model_version_id)
 
         return (
             mv.origin_name,
             mv.name,
             f"{client.connexion.host}/{client.connexion.organization_id}/model/{mv.origin_id}/version/{mv.id}",
-            mv.framework.name
-            if isinstance(mv.framework, Framework)
-            else str(mv.framework),
-            mv.type.name if isinstance(mv.type, InferenceType) else str(mv.type),
+            mv.framework.name,
+            mv.type.name,
         )
 
     # Create a new model version
