@@ -188,7 +188,7 @@ id = ""
 id = ""
 
 [output.experiment]
-name = "{pipeline_name}-exp1"
+name = "{pipeline_name}_exp1"
 project_name = "{pipeline_name}"
 """
 
