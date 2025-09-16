@@ -227,9 +227,11 @@ class YOLOV8TrainingTemplate(BaseTemplate):
                 "image_name": "",
                 "image_tag": "",
             },
-            "model": {
-                "model_name": "",
-                "model_version_id": "",
+            "model_version": {
+                "name": "",
+                "origin_name": "",
+                "framework": "",
+                "inference_type": "",
             },
         }
 
