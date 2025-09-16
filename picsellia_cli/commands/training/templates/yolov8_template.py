@@ -172,6 +172,26 @@ __pycache__/
 runs/
 """
 
+TRAINING_RUN_CONFIG = """override_outputs = true
+
+[job]
+type = "TRAINING"
+
+[auth]
+organization_name = ""
+env = "PROD"
+
+[input.train_dataset_version]
+id = ""
+
+[input.model_version]
+id = ""
+
+[output.experiment]
+name = "{pipeline_name}-exp1"
+project_name = "{pipeline_name}"
+"""
+
 
 class YOLOV8TrainingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
@@ -243,3 +263,6 @@ class YOLOV8TrainingTemplate(BaseTemplate):
                 "uv sync --python=$(which python3.10) --project {pipeline_dir}",
                 "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
             ).format(pipeline_dir=self.pipeline_dir)
+
+    def get_run_config_toml(self) -> str:
+        return TRAINING_RUN_CONFIG.format(pipeline_name=self.pipeline_name)

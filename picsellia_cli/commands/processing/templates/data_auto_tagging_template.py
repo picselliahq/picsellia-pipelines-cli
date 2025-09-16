@@ -567,6 +567,34 @@ __pycache__/
 runs/
 """
 
+PROCESSING_RUN_CONFIG = """override_outputs = true
+
+[job]
+type = "DATA_AUTO_TAGGING"
+
+[auth]
+organization_name = ""
+env = "PROD"
+
+[input.datalake]
+id = ""
+
+[input.model_version]
+id = ""
+visibility = "private"
+
+[output.datalake]
+id = ""
+
+[run_parameters]
+offset = 0
+limit = 10
+
+[parameters]
+batch_size = 8
+tags_list = "women, men"
+"""
+
 
 class DataAutoTaggingProcessingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
@@ -630,3 +658,6 @@ class DataAutoTaggingProcessingTemplate(BaseTemplate):
                 "uv sync --python=$(which python3.10) --project {pipeline_dir}",
                 "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
             ).format(pipeline_dir=self.pipeline_dir)
+
+    def get_run_config_toml(self) -> str:
+        return PROCESSING_RUN_CONFIG

@@ -37,6 +37,8 @@ class BaseTemplate(ABC):
 
         self.write_config_toml()
 
+        self.write_run_config_toml()
+
     def _write_file(self, path: Path, content: str):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
@@ -53,6 +55,16 @@ class BaseTemplate(ABC):
     def get_config_toml(self) -> dict:
         """Return the pipeline-specific configuration that will be written to config.toml."""
         pass
+
+    @abstractmethod
+    def get_run_config_toml(self) -> str:
+        """Return the default run_config.toml content, customized per pipeline type."""
+        pass
+
+    def write_run_config_toml(self):
+        run_config_content = self.get_run_config_toml()
+        run_config_path = self.pipeline_dir / "runs" / "run_config.toml"
+        self._write_file(run_config_path, run_config_content)
 
     def write_config_toml(self):
         config_data = self.get_config_toml()

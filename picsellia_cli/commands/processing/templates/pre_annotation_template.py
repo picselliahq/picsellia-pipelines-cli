@@ -274,6 +274,21 @@ __pycache__/
 runs/
 """
 
+PROCESSING_RUN_CONFIG = """
+[job]
+type = "PRE_ANNOTATION"
+
+[auth]
+organization_name = ""
+env = "PROD"
+
+[input.dataset_version]
+id = ""
+
+[input.model_version]
+id = ""
+"""
+
 
 class PreAnnotationTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
@@ -338,3 +353,6 @@ class PreAnnotationTemplate(BaseTemplate):
                 "uv sync --python=$(which python3.10) --project {pipeline_dir}",
                 "uv pip install --python=$(which python3.10) -r ./{pipeline_dir}/requirements.txt",
             ).format(pipeline_dir=self.pipeline_dir)
+
+    def get_run_config_toml(self) -> str:
+        return PROCESSING_RUN_CONFIG.format(pipeline_name=self.pipeline_name)
