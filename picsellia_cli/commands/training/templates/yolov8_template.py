@@ -132,9 +132,6 @@ dependencies = [
     "picsellia-cv-engine",
     "ultralytics>=8.3.145",
 ]
-
-[tool.uv.sources]
-picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "main" }}
 """
 
 TRAINING_PIPELINE_DOCKERFILE = """FROM picsellia/cuda:11.8.0-cudnn8-ubuntu20.04-python3.10
