@@ -39,12 +39,6 @@ def init(
     template: str = typer.Option(None, help="Template to use"),
     output_dir: str = typer.Option(".", help="Where to create the pipeline"),
     use_pyproject: bool = typer.Option(True, help="Use pyproject.toml"),
-    organization: str | None = typer.Option(
-        None, "--organization", help="Organization name"
-    ),
-    env: Environment = typer.Option(
-        Environment.PROD, "--env", help="Target environment"
-    ),
 ):
     if type is None:
         typer.secho(
@@ -84,8 +78,6 @@ def init(
             template=template,
             output_dir=output_dir,
             use_pyproject=use_pyproject,
-            organization=organization,
-            env=env,
         )
     elif type == "processing":
         init_processing(
