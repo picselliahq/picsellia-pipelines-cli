@@ -70,7 +70,7 @@ def run_smoke_test_container(
 
     docker_command += [image, "-c", log_cmd]
 
-    bullet("Launching Docker training container…", accent=True)
+    bullet("Launching Docker container…", accent=True)
     proc = subprocess.Popen(
         docker_command,
         stdout=subprocess.PIPE,
@@ -117,7 +117,7 @@ def run_smoke_test_container(
             typer.echo("⚠️ Timeout reached. Killing process.")
             proc.kill()
 
-    print(f"\n🚦 Docker container exited with code: {proc.returncode}")
+    print(f"\nDocker container exited with code: {proc.returncode}")
 
     if triggered or proc.returncode != 0:
         typer.echo("\n🧾 Captured training.log content:\n" + "-" * 60)
