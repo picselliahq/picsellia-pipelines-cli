@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Optional
 import typer
 
 from picsellia_cli.commands.training.templates.yolov8_template import (
@@ -202,26 +202,29 @@ def get_template_instance(
 
 def choose_or_create_model_version(
     client: Client,
-) -> tuple[str, str, str, str, str] | tuple[str, str, str, Any, Any]:
+) -> tuple[str, str, str, str, str]:
     """Prompt the user to select or create a model version.
 
     Returns:
         Tuple containing:
-            - model_name
-            - model_version_name
-            - model_url
-            - framework
-            - inference_type
+            - model_name: Name of the Picsellia model
+            - model_version_name: Version name
+            - model_url: Web URL for the model version
+            - framework: Framework name (e.g., "ONNX", "PYTORCH")
+            - inference_type: Inference type (e.g., "OBJECT_DETECTION")
     """
     if typer.confirm("Reuse an existing model version?", default=False):
         model_version_id = typer.prompt("Model version ID")
         mv = client.get_model_version_by_id(id=model_version_id)
+
         return (
             mv.origin_name,
             mv.name,
             f"{client.connexion.host}/{client.connexion.organization_id}/model/{mv.origin_id}/version/{mv.id}",
-            mv.framework,
-            mv.type,
+            mv.framework.name
+            if isinstance(mv.framework, Framework)
+            else str(mv.framework),
+            mv.type.name if isinstance(mv.type, InferenceType) else str(mv.type),
         )
 
     # Create a new model version
@@ -235,17 +238,30 @@ def choose_or_create_model_version(
 
     framework_input = typer.prompt(
         f"Select framework ({', '.join(framework_options)})", default="ONNX"
-    )
+    ).upper()
+    if framework_input not in framework_options:
+        typer.echo(
+            f"❌ Invalid framework '{framework_input}'. Must be one of {framework_options}."
+        )
+        raise typer.Exit(code=1)
+
     inference_type_input = typer.prompt(
         f"Select inference type ({', '.join(inference_options)})",
         default="OBJECT_DETECTION",
-    )
+    ).upper()
+    if inference_type_input not in inference_options:
+        typer.echo(
+            f"❌ Invalid inference type '{inference_type_input}'. Must be one of {inference_options}."
+        )
+        raise typer.Exit(code=1)
 
+    # Ensure model exists
     try:
         model = client.get_model(name=model_name)
     except ResourceNotFoundError:
         model = client.create_model(name=model_name)
 
+    # Ensure version does not exist yet
     try:
         _ = model.get_version(model_version_name)
         typer.echo(
@@ -254,16 +270,17 @@ def choose_or_create_model_version(
                 fg=typer.colors.RED,
             )
         )
-        raise typer.Exit()
+        raise typer.Exit(code=1)
     except ResourceNotFoundError:
         pass
 
     mv = model.create_version(
         name=model_version_name,
-        framework=Framework(framework_input),
-        type=InferenceType(inference_type_input),
+        framework=Framework[framework_input],
+        type=InferenceType[inference_type_input],
         base_parameters={"epochs": 2, "batch_size": 8, "image_size": 640},
     )
+
     return (
         model.name,
         mv.name,
@@ -280,14 +297,48 @@ def register_pipeline_metadata(
     framework: str,
     inference_type: str,
 ):
-    """Register model metadata in the pipeline configuration file."""
+    """Register model metadata in the pipeline configuration file.
+
+    Saved under `[model_version]` in `config.toml`:
+
+    ```toml
+    [model_version]
+    name = "v1"
+    origin_name = "MyModel"
+    framework = "ONNX"
+    inference_type = "OBJECT_DETECTION"
+    ```
+
+    Args:
+        config: Pipeline configuration object.
+        model_version_name: Name of the model version.
+        origin_name: Origin model name.
+        framework: Framework string (validated against `Framework` enum).
+        inference_type: Inference type string (validated against `InferenceType` enum).
+    """
+    try:
+        _ = Framework[framework.upper()]
+    except KeyError:
+        typer.echo(
+            f"❌ Invalid framework '{framework}'. Must be one of {[f.name for f in Framework]}."
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        _ = InferenceType[inference_type.upper()]
+    except KeyError:
+        typer.echo(
+            f"❌ Invalid inference type '{inference_type}'. Must be one of {[i.name for i in InferenceType]}."
+        )
+        raise typer.Exit(code=1)
+
     config.config.setdefault("model_version", {})
     config.config["model_version"].update(
         {
             "name": model_version_name,
             "origin_name": origin_name,
-            "framework": framework,
-            "inference_type": inference_type,
+            "framework": framework.upper(),
+            "inference_type": inference_type.upper(),
         }
     )
     config.save()
