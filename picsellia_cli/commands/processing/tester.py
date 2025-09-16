@@ -49,10 +49,6 @@ def test_processing(
         parameters_name="parameters",
     )
 
-    run_config, env_config = prepare_auth_and_env(
-        run_config=run_config, organization=organization, env=env
-    )
-
     # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
     run_config, env_config = prepare_auth_and_env(
