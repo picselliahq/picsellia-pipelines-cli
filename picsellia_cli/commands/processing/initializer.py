@@ -5,6 +5,9 @@ import typer
 from picsellia_cli.commands.processing.templates.data_auto_tagging_template import (
     DataAutoTaggingProcessingTemplate,
 )
+from picsellia_cli.commands.processing.templates.model_conversion_template import (
+    ModelConversionProcessingTemplate,
+)
 from picsellia_cli.commands.processing.templates.pre_annotation_template import (
     PreAnnotationTemplate,
 )
@@ -95,6 +98,12 @@ def get_template_instance(
             )
         case "data_auto_tagging":
             return DataAutoTaggingProcessingTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
+        case "model_conversion":
+            return ModelConversionProcessingTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,
