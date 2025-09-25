@@ -23,12 +23,14 @@ PROCESSING_TEMPLATES = [
     "dataset_version_creation",
     "pre_annotation",
     "data_auto_tagging",
+    "model_conversion",
 ]
 TRAINING_TEMPLATES = ["yolov8"]
 PROCESSING_TYPES_MAPPING = {
     "dataset_version_creation": "DATASET_VERSION_CREATION",
     "pre_annotation": "PRE_ANNOTATION",
     "data_auto_tagging": "DATA_AUTO_TAGGING",
+    "model_conversion": "MODEL_CONVERSION",
 }
 
 
