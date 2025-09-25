@@ -1,18 +1,20 @@
 import typer
 
-from picsellia_cli.commands.processing.deployer import deploy_processing
-from picsellia_cli.commands.processing.initializer import init_processing
-from picsellia_cli.commands.processing.launcher import launch_processing
-from picsellia_cli.commands.processing.smoke_tester import smoke_test_processing
-from picsellia_cli.commands.processing.syncer import sync_processing_params
-from picsellia_cli.commands.processing.tester import test_processing
-from picsellia_cli.commands.training.deployer import deploy_training
-from picsellia_cli.commands.training.initializer import init_training
-from picsellia_cli.commands.training.launcher import launch_training
-from picsellia_cli.commands.training.smoke_tester import smoke_test_training
-from picsellia_cli.commands.training.tester import test_training
-from picsellia_cli.utils.env_utils import Environment
-from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.commands.processing.deployer import deploy_processing
+from picsellia_pipelines_cli.commands.processing.initializer import init_processing
+from picsellia_pipelines_cli.commands.processing.launcher import launch_processing
+from picsellia_pipelines_cli.commands.processing.smoke_tester import (
+    smoke_test_processing,
+)
+from picsellia_pipelines_cli.commands.processing.syncer import sync_processing_params
+from picsellia_pipelines_cli.commands.processing.tester import test_processing
+from picsellia_pipelines_cli.commands.training.deployer import deploy_training
+from picsellia_pipelines_cli.commands.training.initializer import init_training
+from picsellia_pipelines_cli.commands.training.launcher import launch_training
+from picsellia_pipelines_cli.commands.training.smoke_tester import smoke_test_training
+from picsellia_pipelines_cli.commands.training.tester import test_training
+from picsellia_pipelines_cli.utils.env_utils import Environment
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer()
 

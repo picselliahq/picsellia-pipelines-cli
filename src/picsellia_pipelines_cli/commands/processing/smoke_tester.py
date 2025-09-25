@@ -1,27 +1,27 @@
 from pathlib import Path
 
-from picsellia_cli.commands.processing.tester import (
+from picsellia_pipelines_cli.commands.processing.tester import (
     get_processing_params,
     check_output_dataset_version,
     enrich_run_config_with_metadata,
 )
-from picsellia_cli.utils.deployer import (
+from picsellia_pipelines_cli.utils.deployer import (
     prompt_docker_image_if_missing,
 )
-from picsellia_cli.utils.env_utils import (
+from picsellia_pipelines_cli.utils.env_utils import (
     Environment,
 )
-from picsellia_cli.utils.initializer import init_client
-from picsellia_cli.utils.logging import section, kv
-from picsellia_cli.utils.pipeline_config import PipelineConfig
-from picsellia_cli.utils.run_manager import RunManager
-from picsellia_cli.utils.smoke_tester import (
+from picsellia_pipelines_cli.utils.initializer import init_client
+from picsellia_pipelines_cli.utils.logging import section, kv
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.run_manager import RunManager
+from picsellia_pipelines_cli.utils.smoke_tester import (
     run_smoke_test_container,
     build_env_vars,
     build_smoke_command,
     prepare_docker_image,
 )
-from picsellia_cli.utils.tester import (
+from picsellia_pipelines_cli.utils.tester import (
     select_run_dir,
     resolve_run_config_path,
     load_or_init_run_config,

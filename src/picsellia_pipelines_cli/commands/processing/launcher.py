@@ -4,17 +4,20 @@ import toml
 import typer
 from orjson import orjson
 
-from picsellia_cli.commands.processing.tester import (
+from picsellia_pipelines_cli.commands.processing.tester import (
     enrich_run_config_with_metadata,
 )
-from picsellia_cli.utils.env_utils import Environment
-from picsellia_cli.utils.initializer import init_client
-from picsellia_cli.utils.launcher import extract_job_and_run_ids, build_job_url
-from picsellia_cli.utils.logging import section, kv, bullet, hr
-from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.env_utils import Environment
+from picsellia_pipelines_cli.utils.initializer import init_client
+from picsellia_pipelines_cli.utils.launcher import (
+    extract_job_and_run_ids,
+    build_job_url,
+)
+from picsellia_pipelines_cli.utils.logging import section, kv, bullet, hr
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
-from picsellia_cli.utils.tester import (
+from picsellia_pipelines_cli.utils.tester import (
     merge_with_default_parameters,
     prepare_auth_and_env,
 )

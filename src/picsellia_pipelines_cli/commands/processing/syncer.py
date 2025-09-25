@@ -3,10 +3,14 @@ import re
 import typer
 from picsellia.exceptions import ResourceNotFoundError
 
-from picsellia_cli.utils.env_utils import Environment, get_env_config, resolve_env
-from picsellia_cli.utils.initializer import init_client
-from picsellia_cli.utils.logging import section, kv
-from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.env_utils import (
+    Environment,
+    get_env_config,
+    resolve_env,
+)
+from picsellia_pipelines_cli.utils.initializer import init_client
+from picsellia_pipelines_cli.utils.logging import section, kv
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
 def sync_processing_params(

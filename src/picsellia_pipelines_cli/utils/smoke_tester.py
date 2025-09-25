@@ -5,10 +5,10 @@ import typer
 import os
 from shlex import quote
 
-from picsellia_cli.utils.deployer import build_docker_image_only
-from picsellia_cli.utils.logging import bullet, hr, section, kv
-from picsellia_cli.utils.pipeline_config import PipelineConfig
-from picsellia_cli.utils.tester import build_pipeline_command
+from picsellia_pipelines_cli.utils.deployer import build_docker_image_only
+from picsellia_pipelines_cli.utils.logging import bullet, hr, section, kv
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.tester import build_pipeline_command
 
 
 def run_smoke_test_container(

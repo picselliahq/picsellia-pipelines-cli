@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 import typer
-from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 from semver import VersionInfo
 
 

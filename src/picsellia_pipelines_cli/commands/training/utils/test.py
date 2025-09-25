@@ -7,8 +7,8 @@ import typer
 from picsellia import Client, Experiment, Project
 from picsellia.exceptions import ResourceNotFoundError, ResourceConflictError
 
-from picsellia_cli.utils.logging import kv
-from picsellia_cli.utils.run_manager import RunManager
+from picsellia_pipelines_cli.utils.logging import kv
+from picsellia_pipelines_cli.utils.run_manager import RunManager
 
 REQUIRED_TRAIN_INPUT_KEYS = ("train_dataset", "model_version")
 

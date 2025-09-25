@@ -2,17 +2,17 @@ import os
 from typing import Optional
 import typer
 
-from picsellia_cli.commands.training.templates.yolov8_template import (
+from picsellia_pipelines_cli.commands.training.templates.yolov8_template import (
     YOLOV8TrainingTemplate,
 )
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
-from picsellia_cli.utils.env_utils import get_env_config, resolve_env
-from picsellia_cli.utils.initializer import handle_pipeline_name, init_client
-from picsellia_cli.utils.logging import section, kv, bullet, step, hr
-from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.env_utils import get_env_config, resolve_env
+from picsellia_pipelines_cli.utils.initializer import handle_pipeline_name, init_client
+from picsellia_pipelines_cli.utils.logging import section, kv, bullet, step, hr
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
 def init_training(

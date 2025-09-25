@@ -4,15 +4,18 @@ from pathlib import Path
 import toml
 import typer
 
-from picsellia_cli.utils.env_utils import (
+from picsellia_pipelines_cli.utils.env_utils import (
     get_env_config,
     Environment,
     resolve_env,
     get_organization_for_env,
 )
-from picsellia_cli.utils.pipeline_config import PipelineConfig
-from picsellia_cli.utils.run_manager import RunManager
-from picsellia_cli.utils.runner import create_virtual_env, run_pipeline_command
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.run_manager import RunManager
+from picsellia_pipelines_cli.utils.runner import (
+    create_virtual_env,
+    run_pipeline_command,
+)
 
 
 def get_saved_run_config_path(run_manager: RunManager, run_dir: Path) -> Path:
