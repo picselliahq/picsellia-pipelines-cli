@@ -6,7 +6,7 @@ import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 
-from picsellia_cli.utils.run_manager import RunManager
+from picsellia_pipelines_cli.utils.run_manager import RunManager
 
 
 def get_processing_params(
