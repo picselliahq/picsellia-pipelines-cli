@@ -3,7 +3,7 @@ name = "picsellia-pipelines-cli"
 version = "0.1.2"
 description = ""
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 license = { text = "MIT" }
 authors = [{ name = "Sonia Garrouch", email = "sonia.garrouch@picsellia.com" }, { name = "Pierre-Nicolas Tiffreau", email = "pierre-nicolas@picsellia.com" }]
 maintainers = [{ name = "Sonia Garrouch", email = "sonia.garrouch@picsellia.com" }, { name = "Pierre-Nicolas Tiffreau", email = "pierre-nicolas@picsellia.com" }]
@@ -23,24 +23,39 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry]
-packages = [
-    { include = "picsellia_cli"},
+dependencies = [
+    "picsellia>=6.20.0,<7.0.0",
+    "typer>=0.15.2,<0.16.0",
+    "toml>=0.10.2,<1.0",
+    "dotenv>=0.9.9,<1.0",
+    "semver>=3.0.0,<4.0.0",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.10,<3.14"
-picsellia = ">=6.20.0,<7.0.0"
-typer = ">=0.15.2,<0.16.0"
-tinydb = "^4.8.2"
-pre-commit = "^4.2.0"
-toml = "^0.10.2"
-dotenv = "^0.9.9"
-semver = "^3.0.0"
+[dependency-groups]
+dev = [
+    "pre-commit>=4.2.0"
+]
 
-[tool.poetry.scripts]
-pxl-pipeline = "picsellia_cli.main:app"
+[project.scripts]
+pxl-pipeline = "picsellia_pipelines_cli.main:app"
+
+[build-system]
+requires = ["hatchling>=1.18.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle errors
+    "W", # pycodestyle warnings
+    "F", # pyflakes
+    "I", # isort
+    "C", # flake8-comprehensions
+    "B", # flake8-bugbear
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long, handled by black
+]

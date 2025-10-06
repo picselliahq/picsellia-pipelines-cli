@@ -1,4 +1,4 @@
-from picsellia_cli.utils.base_template import BaseTemplate
+from picsellia_pipelines_cli.utils.base_template import BaseTemplate
 
 
 PROCESSING_PIPELINE = """import argparse

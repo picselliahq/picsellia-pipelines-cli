@@ -1,56 +1,36 @@
-from pathlib import Path
-
 import typer
 
-from picsellia_cli.commands.training.tester import _print_training_io_summary
-from picsellia_cli.commands.training.utils.test import (
+from picsellia_pipelines_cli.commands.training.utils.test import (
     get_training_params,
     normalize_training_io,
+    _print_training_io_summary,
 )
-from picsellia_cli.utils.deployer import (
-    prompt_docker_image_if_missing,
-)
-from picsellia_cli.utils.env_utils import (
-    Environment,
-)
-from picsellia_cli.utils.initializer import init_client
-from picsellia_cli.utils.logging import section, kv
-from picsellia_cli.utils.pipeline_config import PipelineConfig
-from picsellia_cli.utils.run_manager import RunManager
-from picsellia_cli.utils.smoke_tester import (
-    run_smoke_test_container,
-    prepare_docker_image,
-    build_env_vars,
-    build_smoke_command,
-)
-from picsellia_cli.utils.tester import (
-    get_saved_run_config_path,
-)
-from picsellia_cli.utils.tester import (
-    load_or_init_run_config,
+from picsellia_pipelines_cli.utils.env_utils import Environment
+from picsellia_pipelines_cli.utils.initializer import init_client
+from picsellia_pipelines_cli.utils.logging import section, kv, bullet, hr
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.run_manager import RunManager
+from picsellia_pipelines_cli.utils.tester import (
     select_run_dir,
     resolve_run_config_path,
+    load_or_init_run_config,
     prepare_auth_and_env,
+    save_and_get_run_config_path,
+    prepare_python_executable,
+    run_pipeline,
 )
 
 
-def smoke_test_training(
+def test_training(
     pipeline_name: str,
     run_config_file: str | None = None,
-    python_version: str = "3.10",
     reuse_dir: bool = False,
     organization: str | None = None,
     env: Environment | None = None,
 ):
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
-    prompt_docker_image_if_missing(pipeline_config=pipeline_config)
     pipeline_type = pipeline_config.get("metadata", "type")
     run_manager = RunManager(pipeline_dir=pipeline_config.pipeline_dir)
-
-    # ── Pipeline ─────────────────────────────────────────────────────────────
-    section("🧩 Pipeline")
-    kv("Name", pipeline_config.get("metadata", "name"))
-    kv("Type", pipeline_config.get("metadata", "type"))
 
     # ── Run directory ────────────────────────────────────────────────────────
     run_dir = select_run_dir(run_manager=run_manager, reuse_dir=reuse_dir)
@@ -87,34 +67,30 @@ def smoke_test_training(
         kv("❌ IO normalization failed", str(e))
         raise
 
-    _print_training_io_summary(run_config=run_config)
+    _print_training_io_summary(run_config)
 
     # ── Persist run config to run dir ────────────────────────────────────────
-    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
-    host_run_config_path = get_saved_run_config_path(
-        run_manager=run_manager, run_dir=run_dir
-    )
-    saved_run_config_path = Path("/workspace") / host_run_config_path.relative_to(
-        Path.cwd()
+    saved_run_config_path = save_and_get_run_config_path(
+        run_manager=run_manager, run_dir=run_dir, run_config=run_config
     )
 
-    full_image_name = prepare_docker_image(pipeline_config=pipeline_config)
+    # ── Virtualenv / Python ─────────────────────────────────────────────────
+    section("🐍 Virtual env")
+    python_executable = prepare_python_executable(pipeline_config=pipeline_config)
 
-    env_vars = build_env_vars(
-        env_config=env_config, run_config=run_config, include_experiment=True
-    )
-
-    command = build_smoke_command(
-        pipeline_name=pipeline_name,
+    # ── Build command ────────────────────────────────────────────────────────
+    section("▶️ Run")
+    run_pipeline(
         pipeline_config=pipeline_config,
         run_config_path=saved_run_config_path,
-        python_version=python_version,
+        python_executable=python_executable,
+        api_token=env_config["api_token"],
     )
 
-    run_smoke_test_container(
-        image=full_image_name,
-        command=command,
-        env_vars=env_vars,
-        pipeline_name=pipeline_name,
-        use_gpu=True,
-    )
+    # ── Save final config (enriched after run if needed) ─────────────────────
+    run_manager.save_run_config(run_dir=run_dir, config_data=run_config)
+
+    section("✅ Done")
+    bullet(f"Training pipeline '{pipeline_name}' completed.", accent=True)
+    kv("Run dir", run_dir.name)
+    hr()

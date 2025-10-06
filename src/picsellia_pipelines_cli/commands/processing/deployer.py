@@ -6,19 +6,19 @@ from picsellia import Client
 from picsellia.types.enums import ProcessingType
 from picsellia.exceptions import ResourceConflictError
 
-from picsellia_cli.utils.deployer import (
+from picsellia_pipelines_cli.utils.deployer import (
     prompt_docker_image_if_missing,
     build_and_push_docker_image,
     bump_pipeline_version,
 )
-from picsellia_cli.utils.env_utils import (
+from picsellia_pipelines_cli.utils.env_utils import (
     get_env_config,
     Environment,
     resolve_env,
     get_organization_for_env,
 )
-from picsellia_cli.utils.logging import kv, bullet, section, hr
-from picsellia_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.logging import kv, bullet, section, hr
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
 def deploy_processing(
