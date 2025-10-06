@@ -284,6 +284,9 @@ id = ""
 
 [input.model_version]
 id = ""
+
+[parameters]
+threshold = 0.1
 """
 
 

@@ -273,6 +273,10 @@ id = ""
 
 [output.dataset_version]
 name = "test_{pipeline_name}"
+
+[parameters]
+datalake = "default"
+data_tag = "processed"
 """
 
 
