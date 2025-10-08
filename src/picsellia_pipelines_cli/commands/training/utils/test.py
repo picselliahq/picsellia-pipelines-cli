@@ -39,6 +39,8 @@ def prompt_training_params(stored_params: dict) -> dict:
 
 def get_training_params(
     run_manager: RunManager | None,
+    pipeline_type: str,
+    pipeline_name: str,
     config_file: Path | None = None,
 ) -> dict:
     if config_file is not None and config_file.exists():
@@ -55,7 +57,6 @@ def get_training_params(
                 with p.open("r") as f:
                     latest_config = toml.load(f)
 
-    params: dict = {}
     stored_params: dict = latest_config or {}
 
     if latest_config:
@@ -67,7 +68,6 @@ def get_training_params(
         if reuse:
             return latest_config
 
-    # 3) Fallback prompt minimal
     params = prompt_training_params(stored_params)
     return params
 
