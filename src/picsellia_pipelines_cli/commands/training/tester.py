@@ -1,23 +1,23 @@
 import typer
 
 from picsellia_pipelines_cli.commands.training.utils.test import (
+    _print_training_io_summary,
     get_training_params,
     normalize_training_io,
-    _print_training_io_summary,
 )
 from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.initializer import init_client
-from picsellia_pipelines_cli.utils.logging import section, kv, bullet, hr
+from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 from picsellia_pipelines_cli.utils.run_manager import RunManager
 from picsellia_pipelines_cli.utils.tester import (
-    select_run_dir,
-    resolve_run_config_path,
     load_or_init_run_config,
     prepare_auth_and_env,
-    save_and_get_run_config_path,
     prepare_python_executable,
+    resolve_run_config_path,
     run_pipeline,
+    save_and_get_run_config_path,
+    select_run_dir,
 )
 
 
