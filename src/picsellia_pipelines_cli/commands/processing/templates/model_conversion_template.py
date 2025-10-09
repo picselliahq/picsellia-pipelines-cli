@@ -186,8 +186,9 @@ type = "MODEL_CONVERSION"
 organization_name = ""
 env = "PROD"
 
-[input.model_version_id]
+[input.model_version]
 id = ""
+visibility = "private"
 
 [run_parameters]
 model_file_name = ""
