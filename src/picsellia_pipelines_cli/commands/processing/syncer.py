@@ -1,5 +1,6 @@
 import json
 import re
+
 import typer
 from picsellia.exceptions import ResourceNotFoundError
 
@@ -9,7 +10,7 @@ from picsellia_pipelines_cli.utils.env_utils import (
     resolve_env,
 )
 from picsellia_pipelines_cli.utils.initializer import init_client
-from picsellia_pipelines_cli.utils.logging import section, kv
+from picsellia_pipelines_cli.utils.logging import kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
@@ -54,7 +55,7 @@ def sync_processing_params(
 
 
 def update_script_parameters(script_path: str, new_params: dict):
-    with open(script_path, "r") as f:
+    with open(script_path) as f:
         content = f.read()
 
     new_param_str = json.dumps(new_params, indent=4)

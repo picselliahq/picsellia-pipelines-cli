@@ -21,7 +21,7 @@ def get_processing_params(
     else:
         latest_config_path = run_manager.get_latest_run_config_path()
         if latest_config_path:
-            with open(latest_config_path, "r") as f:
+            with open(latest_config_path) as f:
                 latest_config = toml.load(f)
         else:
             latest_config = None

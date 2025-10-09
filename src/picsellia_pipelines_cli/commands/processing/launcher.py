@@ -10,13 +10,11 @@ from picsellia_pipelines_cli.commands.processing.tester import (
 from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.initializer import init_client
 from picsellia_pipelines_cli.utils.launcher import (
-    extract_job_and_run_ids,
     build_job_url,
+    extract_job_and_run_ids,
 )
-from picsellia_pipelines_cli.utils.logging import section, kv, bullet, hr
+from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
-
-
 from picsellia_pipelines_cli.utils.tester import (
     merge_with_default_parameters,
     prepare_auth_and_env,
@@ -58,13 +56,13 @@ def launch_processing(
     effective_name = pipeline_config.get("metadata", "name")
     try:
         processing = client.get_processing(name=effective_name)
-    except Exception:
+    except Exception as e:
         env_name = env_config["env"]
         typer.echo(
             f"❌ Processing with name {effective_name} not found on {env_name}, "
             f"please deploy it before with 'pxl-pipeline deploy {pipeline_name} --env {env_name}'"
         )
-        raise typer.Exit()
+        raise typer.Exit() from e
 
     # ── Inputs / Outputs ──────────────────────────────────────────────
     section("📥 Inputs / 📤 Outputs")
@@ -108,9 +106,80 @@ def launch_processing(
 
     except Exception as e:
         typer.echo(typer.style(f"❌ Error during launch: {e}", fg=typer.colors.RED))
-        raise typer.Exit(code=1)
+        raise typer.Exit() from e
 
     hr()
+
+
+def get_base_payload(processing_id: str, run_config: dict) -> dict:
+    """Extract common payload fields shared by all processing types."""
+    docker_cfg = run_config.get("docker", {})
+    return {
+        "processing_id": processing_id,
+        "parameters": run_config.get("parameters", {}),
+        "cpu": docker_cfg.get("cpu", 4),
+        "gpu": docker_cfg.get("gpu", 0),
+    }
+
+
+def get_dataset_version_id(inputs: dict) -> str | None:
+    """Return dataset version ID from inputs if present."""
+    return inputs.get("dataset_version", {}).get("id")
+
+
+def get_datalake_id(inputs: dict) -> str | None:
+    """Return datalake ID from inputs if present."""
+    return inputs.get("datalake", {}).get("id")
+
+
+def validate_required_id(
+    resource_name: str, resource_id: str | None, pipeline_type: str
+):
+    """Ensure a required input resource ID exists, otherwise exit gracefully."""
+    if not resource_id:
+        typer.echo(f"Missing {resource_name}.id for {pipeline_type}")
+        raise typer.Exit()
+
+
+def build_endpoint(pipeline_type: str, inputs: dict) -> str:
+    """Return the endpoint path based on the pipeline type."""
+    if pipeline_type in ("DATASET_VERSION_CREATION", "PRE_ANNOTATION"):
+        dataset_id = get_dataset_version_id(inputs)
+        validate_required_id("dataset_version", dataset_id, pipeline_type)
+        return f"/api/dataset/version/{dataset_id}/processing/launch"
+
+    if pipeline_type == "DATA_AUTO_TAGGING":
+        datalake_id = get_datalake_id(inputs)
+        validate_required_id("datalake", datalake_id, pipeline_type)
+        return f"/api/datalake/{datalake_id}/processing/launch"
+
+    typer.echo(f"Unsupported pipeline type: {pipeline_type}")
+    raise typer.Exit()
+
+
+def add_optional_fields(payload: dict, inputs: dict, outputs: dict, run_config: dict):
+    """Attach optional fields to the payload when present."""
+    # Optional: model version
+    model_id = inputs.get("model_version", {}).get("id")
+    if model_id:
+        payload["model_version_id"] = model_id
+
+    # Optional: dataset version output name
+    dataset_name = outputs.get("dataset_version", {}).get("name")
+    if dataset_name:
+        payload["target_version_name"] = dataset_name
+
+    # Optional: datalake output name
+    datalake_name = outputs.get("datalake", {}).get("name")
+    if datalake_name:
+        payload["target_datalake_name"] = datalake_name
+
+    # Optional: data_ids
+    data_ids = inputs.get("data_ids") or run_config.get("parameters", {}).get(
+        "data_ids"
+    )
+    if data_ids:
+        payload["data_ids"] = data_ids
 
 
 def build_processing_payload(
@@ -120,50 +189,14 @@ def build_processing_payload(
     outputs: dict,
     run_config: dict,
 ) -> tuple[str, dict]:
-    payload = {
-        "processing_id": processing_id,
-        "parameters": run_config.get("parameters", {}),
-        "cpu": run_config.get("docker", {}).get("cpu", 4),
-        "gpu": run_config.get("docker", {}).get("gpu", 0),
-    }
+    """
+    Build the API endpoint and payload for launching a processing job.
 
-    if pipeline_type == "DATASET_VERSION_CREATION":
-        dataset_version_id = inputs.get("dataset_version", {}).get("id")
-        if not dataset_version_id:
-            typer.echo("Missing dataset_version.id for DATASET_VERSION_CREATION")
-            raise typer.Exit()
-        endpoint = f"/api/dataset/version/{dataset_version_id}/processing/launch"
-
-    elif pipeline_type == "PRE_ANNOTATION":
-        dataset_version_id = inputs.get("dataset_version", {}).get("id")
-        if not dataset_version_id:
-            typer.echo("Missing dataset_version.id for PRE_ANNOTATION")
-            raise typer.Exit()
-        endpoint = f"/api/dataset/version/{dataset_version_id}/processing/launch"
-
-    elif pipeline_type == "DATA_AUTO_TAGGING":
-        datalake_id = inputs.get("datalake", {}).get("id")
-        if not datalake_id:
-            typer.echo("Missing datalake.id for DATA_AUTO_TAGGING")
-            raise typer.Exit()
-        endpoint = f"/api/datalake/{datalake_id}/processing/launch"
-    else:
-        typer.echo(f"Unsupported pipeline type: {pipeline_type}")
-        raise typer.Exit()
-
-    if "model_version" in inputs and "id" in inputs["model_version"]:
-        payload["model_version_id"] = inputs["model_version"]["id"]
-
-    if "dataset_version" in outputs and "name" in outputs["dataset_version"]:
-        payload["target_version_name"] = outputs["dataset_version"]["name"]
-
-    if "datalake" in outputs and "name" in outputs["datalake"]:
-        payload["target_datalake_name"] = outputs["datalake"]["name"]
-
-    data_ids = inputs.get("data_ids") or run_config.get("parameters", {}).get(
-        "data_ids"
-    )
-    if data_ids:
-        payload["data_ids"] = data_ids
+    Returns:
+        tuple[str, dict]: (endpoint, payload)
+    """
+    payload = get_base_payload(processing_id, run_config)
+    endpoint = build_endpoint(pipeline_type, inputs)
+    add_optional_fields(payload, inputs, outputs, run_config)
 
     return endpoint, payload
