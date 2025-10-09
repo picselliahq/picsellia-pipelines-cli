@@ -1,5 +1,4 @@
-from picsellia_cli.utils.base_template import BaseTemplate
-
+from picsellia_pipelines_cli.utils.base_template import BaseTemplate
 
 PROCESSING_PIPELINE = """import argparse
 
@@ -112,8 +111,11 @@ from picsellia_cv_engine.core.parameters import Parameters
 class ProcessingParameters(Parameters):
     def __init__(self, log_data: LogDataType):
         super().__init__(log_data=log_data)
-        self.model_file_name = self.extract_parameter(
-            ["model_file_name"], expected_type=str, default="model.pt"
+        self.input_model_file_name = self.extract_parameter(
+            ["input_model_file_name"], expected_type=str, default="best-model"
+        )
+        self.output_model_file_name = self.extract_parameter(
+            ["output_model_file_name"], expected_type=str, default="onnx-model"
         )
         self.opset_version = self.extract_parameter(
             ["opset_version"], expected_type=int, default=12
@@ -190,10 +192,9 @@ env = "PROD"
 id = ""
 visibility = "private"
 
-[run_parameters]
-model_file_name = ""
-
 [parameters]
+input_model_file_name = "pretrained-weights"
+output_model_file_name = "onnx-model"
 opset_version = 0
 """
 
