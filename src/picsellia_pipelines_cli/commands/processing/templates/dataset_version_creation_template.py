@@ -1,6 +1,5 @@
 from picsellia_pipelines_cli.utils.base_template import BaseTemplate
 
-
 PROCESSING_PIPELINE = """import argparse
 
 from picsellia.types.enums import ProcessingType

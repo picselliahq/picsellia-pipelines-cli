@@ -1,6 +1,5 @@
 from picsellia_pipelines_cli.utils.base_template import BaseTemplate
 
-
 PROCESSING_PIPELINE = """import argparse
 
 from picsellia.types.enums import ProcessingType
@@ -160,24 +159,6 @@ def autotag_datalake_with_clip(
 
     logging.info(f"Tags added to datalake {datalake.datalake.id}.")
 
-"""
-
-PROCESSING_PIPELINE_PARAMETERS = """from picsellia_cv_engine.core.parameters.base_parameters import Parameters
-
-
-class ProcessingParameters(Parameters):
-    def __init__(self, log_data):
-        super().__init__(log_data)
-
-        self.tags_list = [
-            tag.strip()
-            for tag in self.extract_parameter(["tags_list"], expected_type=str, default="women, men").split(",")
-            if tag.strip()
-        ]
-
-        self.batch_size = self.extract_parameter(
-            keys=["batch_size"], expected_type=int, default=8
-        )
 """
 
 PROCESSING_PIPELINE_MODEL = """from typing import Any
@@ -508,6 +489,24 @@ class CLIPModelPredictor(ModelPredictor[HuggingFaceModel]):
             processed_predictions.append(processed_prediction)
 
         return processed_predictions
+"""
+
+PROCESSING_PIPELINE_PARAMETERS = """from picsellia_cv_engine.core.parameters.base_parameters import Parameters
+
+
+class ProcessingParameters(Parameters):
+    def __init__(self, log_data):
+        super().__init__(log_data)
+
+        self.tags_list = [
+            tag.strip()
+            for tag in self.extract_parameter(["tags_list"], expected_type=str, default="women, men").split(",")
+            if tag.strip()
+        ]
+
+        self.batch_size = self.extract_parameter(
+            keys=["batch_size"], expected_type=int, default=8
+        )
 """
 
 PROCESSING_PIPELINE_REQUIREMENTS = """
