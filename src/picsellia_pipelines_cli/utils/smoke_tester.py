@@ -1,14 +1,149 @@
+import os
 import subprocess
 from pathlib import Path
-
-import typer
-import os
 from shlex import quote
 
+import typer
+
 from picsellia_pipelines_cli.utils.deployer import build_docker_image_only
-from picsellia_pipelines_cli.utils.logging import bullet, hr, section, kv
+from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 from picsellia_pipelines_cli.utils.tester import build_pipeline_command
+
+
+def _docker_rm(container_name: str) -> None:
+    """Remove container if it exists (best-effort)."""
+    subprocess.run(
+        ["docker", "rm", "-f", container_name],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+
+def _ensure_gpu_available_or_exit() -> None:
+    """Exit with a clear message if NVIDIA runtime isn't available."""
+    if not check_nvidia_runtime():
+        typer.echo("❌ GPU requested but NVIDIA runtime not available.")
+        raise typer.Exit(1)
+
+
+def _compose_docker_run_cmd(
+    image: str,
+    container_name: str,
+    command: list[str],
+    env_vars: dict,
+    use_gpu: bool,
+    workdir: str,
+    pipeline_name: str,
+) -> list[str]:
+    """Build the final `docker run` command with envs, volume, GPU, and entrypoint."""
+    # prepare shell command to run inside the container (activate venv + user cmd)
+    log_cmd = f"source /experiment/{pipeline_name}/.venv/bin/activate && " + " ".join(
+        quote(arg) for arg in command
+    )
+
+    base = [
+        "docker",
+        "run",
+        "--shm-size",
+        "8g",
+        "--name",
+        container_name,
+    ]
+
+    if use_gpu:
+        base += ["--gpus", "all"]
+
+    base += [
+        "--entrypoint",
+        "bash",
+        "-v",
+        f"{workdir}:/workspace",
+    ]
+
+    # env variables
+    for k, v in env_vars.items():
+        base += ["-e", f"{k}={v}"]
+
+    # image + bash -c "<log_cmd>"
+    base += [image, "-c", log_cmd]
+    return base
+
+
+def _stream_container_logs_and_detect_error(
+    proc: subprocess.Popen, container_name: str
+) -> tuple[bool, int]:
+    """Stream logs; detect '--ec-- 1'; copy training.log and stop container if seen.
+
+    Returns:
+        (triggered, returncode)
+        - triggered: True if '--ec-- 1' encountered and handled
+        - returncode: docker process return code
+    """
+    triggered = False
+
+    if proc.stdout is None:
+        typer.echo("❌ Failed to capture Docker logs.")
+        proc.wait(timeout=10)
+        return triggered, proc.returncode or 1
+
+    try:
+        for line in proc.stdout:
+            print(line, end="")
+            if "--ec-- 1" in line and not triggered:
+                typer.echo(
+                    "\n❌ '--ec-- 1' detected! Something went wrong during training."
+                )
+                typer.echo(
+                    "📥 Copying training logs before stopping the container...\n"
+                )
+                triggered = True
+
+                # best-effort copy of training.log, prefer capture_output to PIPE
+                subprocess.run(
+                    [
+                        "docker",
+                        "cp",
+                        f"{container_name}:/experiment/training.log",
+                        "training.log",
+                    ],
+                    check=False,
+                    text=True,
+                    capture_output=True,
+                )
+                subprocess.run(["docker", "stop", container_name], check=False)
+                # we break once we've handled the error marker
+                break
+    except Exception as e:
+        typer.echo(f"❌ Error while monitoring Docker: {e}")
+    finally:
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            typer.echo("⚠️ Timeout reached. Killing process.")
+            proc.kill()
+
+    return triggered, proc.returncode or 0
+
+
+def _print_captured_training_log_if_any(error_or_triggered: bool) -> None:
+    """If there was an error, try to print the local training.log content."""
+    if not error_or_triggered:
+        return
+
+    typer.echo("\n🧾 Captured training.log content:\n" + "-" * 60)
+    try:
+        with open("training.log") as f:
+            print(f.read())
+    except Exception as e:
+        typer.echo(f"⚠️ Could not read training.log: {e}")
+    print("-" * 60 + "\n")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Main smoke-test entry
+# ──────────────────────────────────────────────────────────────────────────────
 
 
 def run_smoke_test_container(
@@ -29,105 +164,45 @@ def run_smoke_test_container(
     """
     container_name = "smoke-test-temp"
 
-    log_cmd = f"source /experiment/{pipeline_name}/.venv/bin/activate && " + " ".join(
-        quote(arg) for arg in command
-    )
-
-    # Clean up any previous container
-    subprocess.run(
-        ["docker", "rm", "-f", container_name],
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-
-    docker_command = [
-        "docker",
-        "run",
-        "--shm-size",
-        "8g",
-        "--name",
-        container_name,
-        "--entrypoint",
-        "bash",
-        "-v",
-        f"{os.getcwd()}:/workspace",
-    ]
-
-    # Add GPU flag if requested
+    # optional GPU check early to fail fast
     if use_gpu:
-        if check_nvidia_runtime():
-            docker_command.insert(2, "--gpus")
-            docker_command.insert(3, "all")
-        else:
-            typer.echo("❌ GPU requested but NVIDIA runtime not available.")
-            raise typer.Exit(1)
+        _ensure_gpu_available_or_exit()
 
-    # Add env vars
-    for k, v in env_vars.items():
-        docker_command += ["-e", f"{k}={v}"]
+    # clean previous container
+    _docker_rm(container_name)
 
-    docker_command += [image, "-c", log_cmd]
+    # build docker run command
+    docker_command = _compose_docker_run_cmd(
+        image=image,
+        container_name=container_name,
+        command=command,
+        env_vars=env_vars,
+        use_gpu=use_gpu,
+        workdir=os.getcwd(),
+        pipeline_name=pipeline_name,
+    )
 
     bullet("Launching Docker container…", accent=True)
-    proc = subprocess.Popen(
-        docker_command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        universal_newlines=True,
+    try:
+        proc = subprocess.Popen(
+            docker_command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+        )
+    except Exception as e:
+        typer.echo(f"❌ Failed to start Docker process: {e}")
+        raise typer.Exit(1) from e
+
+    triggered, returncode = _stream_container_logs_and_detect_error(
+        proc, container_name
     )
 
-    triggered = False
-    if proc.stdout is None:
-        typer.echo("❌ Failed to capture Docker logs.")
-        return
+    print(f"\nDocker container exited with code: {returncode}")
 
-    try:
-        for line in proc.stdout:
-            print(line, end="")
-            if "--ec-- 1" in line:
-                typer.echo(
-                    "\n❌ '--ec-- 1' detected! Something went wrong during training."
-                )
-                typer.echo(
-                    "📥 Copying training logs before stopping the container...\n"
-                )
-                triggered = True
+    _print_captured_training_log_if_any(triggered or returncode != 0)
 
-                subprocess.run(
-                    [
-                        "docker",
-                        "cp",
-                        f"{container_name}:/experiment/training.log",
-                        "training.log",
-                    ],
-                    check=False,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-                subprocess.run(["docker", "stop", container_name], check=False)
-                break
-    except Exception as e:
-        typer.echo(f"❌ Error while monitoring Docker: {e}")
-    finally:
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            typer.echo("⚠️ Timeout reached. Killing process.")
-            proc.kill()
-
-    print(f"\nDocker container exited with code: {proc.returncode}")
-
-    if triggered or proc.returncode != 0:
-        typer.echo("\n🧾 Captured training.log content:\n" + "-" * 60)
-        try:
-            with open("training.log") as f:
-                print(f.read())
-        except Exception as e:
-            typer.echo(f"⚠️ Could not read training.log: {e}")
-        print("-" * 60 + "\n")
-    else:
+    if not triggered and returncode == 0:
         typer.echo("✅ Docker pipeline ran successfully.")
 
     hr()

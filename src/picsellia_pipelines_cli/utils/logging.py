@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import textwrap
 from contextlib import contextmanager
-from typing import Any, Optional
+from typing import Any
 
 import typer
 
@@ -78,7 +78,7 @@ def kv(
     label: str,
     value: Any,
     *,
-    color: Optional[str] = None,
+    color: str | None = None,
     level: str | None = None,
     align: int = _LABEL_ALIGN,
     width: int = _DEFAULT_WIDTH,
