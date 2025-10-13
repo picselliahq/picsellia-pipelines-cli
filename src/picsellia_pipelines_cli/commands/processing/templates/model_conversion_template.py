@@ -34,7 +34,9 @@ if __name__ == "__main__":
     {pipeline_name}_pipeline()
 """
 
-PROCESSING_PIPELINE_STEPS = """from picsellia_cv_engine.core.contexts import PicselliaModelProcessingContext
+PROCESSING_PIPELINE_STEPS = """import os
+
+from picsellia_cv_engine.core.contexts import PicselliaModelProcessingContext
 from picsellia_cv_engine.decorators.pipeline_decorator import Pipeline
 from picsellia_cv_engine.decorators.step_decorator import step
 
@@ -57,52 +59,59 @@ def convert_model():
 
     # Get model version and download file
     model_version = context.model_version
-    model_file = model_version.get_file(parameters.get("model_file_name", "model.pt"))
-    local_path = model_file.download(target_dir="downloads")
+    model_file = model_version.get_file(parameters.get("input_model_file_name"))
+    model_file.download(target_path=os.path.join(context.working_dir, "model"))
+
+    model_file_path = os.path.join(context.working_dir, "model", model_file.filename)
 
     # Process conversion
-    output_path = convert_model_file(local_path, parameters)
+    output_path = convert_model_file(model_file_path, parameters)
 
     # Optionally, re-upload converted file back to Picsellia
-    model_version.upload_file(output_path, name="converted_model.onnx")
+    model_version.store(name=parameters.get("output_model_file_name"), path=output_path)
 
     print(f"✅ Model converted and uploaded: {output_path}")
 """
 
-PROCESSING_PIPELINE_PROCESSING = """import os
-import torch
+PROCESSING_PIPELINE_PROCESSING = """from ultralytics import YOLO
 
 def convert_model_file(input_path: str, parameters: dict) -> str:
     \"\"\"
-    Handles model conversion logic.
+    Converts an Ultralytics YOLO model (.pt) to a specified export format.
 
     Args:
-        input_path (str): Path to input model (e.g. .pt).
-        parameters (dict): Extra user-defined parameters (e.g. opset_version).
+        input_path (str): Path to the YOLO .pt model file.
+        parameters (dict): Export configuration.
 
     Returns:
-        str: Path to converted model file.
+        str: Path to the exported model file or directory.
     \"\"\"
-    output_path = os.path.splitext(input_path)[0] + ".onnx"
+    fmt = parameters.get("output_format", "onnx")
+    imgsz = parameters.get("imgsz", 640)
+    opset = parameters.get("opset_version", 12)
+    half = parameters.get("half", False)
+    int8 = parameters.get("int8", False)
+    dynamic = parameters.get("dynamic", False)
 
-    # Example: PyTorch .pt to ONNX
-    model = torch.load(input_path, map_location="cpu")
-    model.eval()
+    print(f"🚀 Loading YOLO model from {input_path}")
+    model = YOLO(model=input_path, task="classif")
 
-    dummy_input = torch.randn(1, 3, 224, 224)  # adjust depending on model
-    torch.onnx.export(
-        model,
-        dummy_input,
-        output_path,
-        export_params=True,
-        opset_version=parameters.get("opset_version", 12),
-        do_constant_folding=True,
-        input_names=["input"],
-        output_names=["output"],
-        dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}},
+    print(
+        f"🔧 Exporting model with format={fmt}, imgsz={imgsz}, opset={opset}, "
+        f"half={half}, int8={int8}, dynamic={dynamic}"
     )
 
-    return output_path
+    # Run Ultralytics export
+    exported_model_path = model.export(
+        format=fmt,
+        imgsz=imgsz,
+        opset=opset,
+        half=half,
+        int8=int8,
+        dynamic=dynamic,
+    )
+
+    return exported_model_path
 """
 
 PROCESSING_PIPELINE_PARAMETERS = """from picsellia.types.schemas import LogDataType
@@ -117,6 +126,21 @@ class ProcessingParameters(Parameters):
         self.output_model_file_name = self.extract_parameter(
             ["output_model_file_name"], expected_type=str, default="onnx-model"
         )
+        self.output_format = self.extract_parameter(
+            ["output_format"], expected_type=str, default="onnx"
+        )
+        self.imgsz = self.extract_parameter(
+            ["imgsz"], expected_type=int, default=640
+        )
+        self.half = self.extract_parameter(
+            ["half"], expected_type=bool, default=False
+        )
+        self.int8 = self.extract_parameter(
+            ["int8"], expected_type=bool, default=False
+        )
+        self.dynamic = self.extract_parameter(
+            ["dynamic"], expected_type=bool, default=False
+        )
         self.opset_version = self.extract_parameter(
             ["opset_version"], expected_type=int, default=12
         )
@@ -124,8 +148,10 @@ class ProcessingParameters(Parameters):
 
 PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 picsellia-pipelines-cli
-picsellia-cv-engine
-torch
+picsellia-cv-engine[ultralytics]
+onnx>=1.12
+onnxslim>=0.1.67
+onnxruntime
 """
 
 PROCESSING_PIPELINE_PYPROJECT = """[project]
@@ -136,9 +162,15 @@ requires-python = ">=3.10"
 
 dependencies = [
     "picsellia-pipelines-cli",
-    "picsellia-cv-engine",
-    "torch"
+    "picsellia-cv-engine[ultralytics]",
+    "onnx>=1.12",
+    "onnxslim>=0.1.67",
+    "onnxruntime",
 ]
+
+[tool.uv.sources]
+picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "fix/context-config" }}
+picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "feat/16-add-model-version-processing-template" }}
 """
 
 
