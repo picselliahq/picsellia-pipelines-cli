@@ -167,10 +167,6 @@ dependencies = [
     "onnxslim>=0.1.67",
     "onnxruntime",
 ]
-
-[tool.uv.sources]
-picsellia-cv-engine = {{ git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "fix/context-config" }}
-picsellia-pipelines-cli = {{ git = "https://github.com/picselliahq/picsellia-pipelines-cli.git", rev = "feat/16-add-model-version-processing-template" }}
 """
 
 
