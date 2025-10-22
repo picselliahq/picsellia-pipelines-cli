@@ -94,7 +94,7 @@ def convert_model_file(input_path: str, parameters: dict) -> str:
     dynamic = parameters.get("dynamic", False)
 
     print(f"🚀 Loading YOLO model from {input_path}")
-    model = YOLO(model=input_path, task="classif")
+    model = YOLO(model=input_path, task="classify")
 
     print(
         f"🔧 Exporting model with format={fmt}, imgsz={imgsz}, opset={opset}, "
