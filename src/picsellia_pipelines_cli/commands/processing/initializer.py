@@ -1,17 +1,17 @@
-from typing import Optional
-
 import typer
 
 from picsellia_pipelines_cli.commands.processing.templates.data_auto_tagging_template import (
     DataAutoTaggingProcessingTemplate,
 )
-from picsellia_pipelines_cli.commands.processing.templates.pre_annotation_template import (
-    PreAnnotationTemplate,
-)
 from picsellia_pipelines_cli.commands.processing.templates.dataset_version_creation_template import (
     DatasetVersionCreationProcessingTemplate,
 )
-
+from picsellia_pipelines_cli.commands.processing.templates.model_conversion_template import (
+    ModelConversionProcessingTemplate,
+)
+from picsellia_pipelines_cli.commands.processing.templates.pre_annotation_template import (
+    PreAnnotationTemplate,
+)
 from picsellia_pipelines_cli.utils.base_template import BaseTemplate
 from picsellia_pipelines_cli.utils.initializer import handle_pipeline_name
 
@@ -19,8 +19,8 @@ from picsellia_pipelines_cli.utils.initializer import handle_pipeline_name
 def init_processing(
     pipeline_name: str,
     template: str,
-    output_dir: Optional[str] = None,
-    use_pyproject: Optional[bool] = True,
+    output_dir: str | None = None,
+    use_pyproject: bool | None = True,
 ):
     """
     Initialize a new **processing pipeline** project.
@@ -95,6 +95,12 @@ def get_template_instance(
             )
         case "data_auto_tagging":
             return DataAutoTaggingProcessingTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
+        case "model_conversion":
+            return ModelConversionProcessingTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,

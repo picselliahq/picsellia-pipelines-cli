@@ -3,8 +3,9 @@ import sys
 from pathlib import Path
 
 import typer
-from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 from semver import VersionInfo
+
+from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
 def ensure_docker_login(image_name: str):
@@ -28,9 +29,9 @@ def ensure_docker_login(image_name: str):
             check=True,
             stdin=sys.stdin,
         )
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
         typer.echo("Failed to retrieve Docker info. Is Docker running?")
-        raise typer.Exit()
+        raise typer.Exit() from e
 
     current_user = None
     for line in result.stdout.splitlines():
@@ -57,9 +58,9 @@ def ensure_docker_login(image_name: str):
                 check=True,
                 stdin=sys.stdin,
             )
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
             typer.echo("❌ Docker login failed. Please check your credentials.")
-            raise typer.Exit()
+            raise typer.Exit() from e
     else:
         typer.echo(f"Docker already logged in as expected user: '{expected_user}'")
 
@@ -111,7 +112,7 @@ def build_docker_image_only(pipeline_dir: Path, full_image_name: str) -> str:
                 bold=True,
             )
         )
-        raise typer.Exit(code=e.returncode)
+        raise typer.Exit(code=e.returncode) from e
 
     return full_image_name
 

@@ -1,23 +1,20 @@
-from typing import Optional
-
 import typer
-
 from picsellia import Client
-from picsellia.types.enums import ProcessingType
 from picsellia.exceptions import ResourceConflictError
+from picsellia.types.enums import ProcessingType
 
 from picsellia_pipelines_cli.utils.deployer import (
-    prompt_docker_image_if_missing,
     build_and_push_docker_image,
     bump_pipeline_version,
+    prompt_docker_image_if_missing,
 )
 from picsellia_pipelines_cli.utils.env_utils import (
-    get_env_config,
     Environment,
-    resolve_env,
+    get_env_config,
     get_organization_for_env,
+    resolve_env,
 )
-from picsellia_pipelines_cli.utils.logging import kv, bullet, section, hr
+from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
@@ -74,7 +71,7 @@ def deploy_processing(
 
     # ── Register on each host ────────────────────────────────────────────────
     section("📦 Register / Update")
-    results: list[tuple[str, str, Optional[str]]] = []
+    results: list[tuple[str, str, str | None]] = []
     try:
         status, msg = _register_or_update(
             cfg=pipeline_config,
@@ -134,7 +131,7 @@ def prompt_allocation_if_missing(pipeline_config: PipelineConfig):
     kv("Saved GPU", gpu)
 
 
-def _infer_docker_flags(cfg: PipelineConfig) -> Optional[list]:
+def _infer_docker_flags(cfg: PipelineConfig) -> list | None:
     """Return docker flags implied by GPU allocation."""
     try:
         gpu_count = int(cfg.get("docker", "gpu") or 0)
@@ -150,7 +147,7 @@ def _register_or_update(
     api_token: str,
     organization_name: str,
     host: str,
-) -> tuple[str, Optional[str]]:
+) -> tuple[str, str | None]:
     """
     Create or update the processing on a given host.
     Returns:

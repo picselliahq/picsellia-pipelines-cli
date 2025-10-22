@@ -4,17 +4,17 @@ from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
 from picsellia_pipelines_cli.utils.deployer import (
-    prompt_docker_image_if_missing,
     build_and_push_docker_image,
     bump_pipeline_version,
+    prompt_docker_image_if_missing,
 )
 from picsellia_pipelines_cli.utils.env_utils import (
-    get_env_config,
     Environment,
-    resolve_env,
+    get_env_config,
     get_organization_for_env,
+    resolve_env,
 )
-from picsellia_pipelines_cli.utils.logging import kv, bullet, section
+from picsellia_pipelines_cli.utils.logging import bullet, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
@@ -143,11 +143,12 @@ def _get_model_settings(cfg: PipelineConfig) -> dict:
     ).upper()
 
     if not model_name or not version_name:
-        raise typer.Exit(
+        typer.echo(
             "Missing model configuration.\n"
             "Please provide:\n"
             "model_version.name, model_version.origin_name, model_version.framework, and model_version.inference_type"
         )
+        raise typer.Exit()
 
     return {
         "model_name": model_name,

@@ -1,25 +1,24 @@
 import os
-from typing import Optional
-import typer
 
-from picsellia_pipelines_cli.commands.training.templates.yolov8_template import (
-    YOLOV8TrainingTemplate,
-)
+import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
+from picsellia_pipelines_cli.commands.training.templates.yolov8_template import (
+    YOLOV8TrainingTemplate,
+)
 from picsellia_pipelines_cli.utils.env_utils import get_env_config, resolve_env
 from picsellia_pipelines_cli.utils.initializer import handle_pipeline_name, init_client
-from picsellia_pipelines_cli.utils.logging import section, kv, bullet, step, hr
+from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section, step
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
 def init_training(
     pipeline_name: str,
     template: str,
-    output_dir: Optional[str] = None,
-    use_pyproject: Optional[bool] = True,
+    output_dir: str | None = None,
+    use_pyproject: bool | None = True,
 ):
     """Initialize and scaffold a training pipeline project.
 
@@ -224,14 +223,14 @@ def choose_or_create_model_version(
             try:
                 model = client.get_public_model(name=model_name)
                 mv = model.get_version(version=model_version_name)
-            except ResourceNotFoundError:
+            except ResourceNotFoundError as e:
                 typer.echo(
                     typer.style(
                         f"❌ Could not find public model '{model_name}' with version '{model_version_name}'.",
                         fg=typer.colors.RED,
                     )
                 )
-                raise typer.Exit(code=1)
+                raise typer.Exit(code=1) from e
         else:
             model_version_id = typer.prompt("Private model version ID")
             mv = client.get_model_version_by_id(id=model_version_id)
@@ -335,19 +334,19 @@ def register_pipeline_metadata(
     """
     try:
         _ = Framework[framework.upper()]
-    except KeyError:
+    except KeyError as e:
         typer.echo(
             f"❌ Invalid framework '{framework}'. Must be one of {[f.name for f in Framework]}."
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
     try:
         _ = InferenceType[inference_type.upper()]
-    except KeyError:
+    except KeyError as e:
         typer.echo(
             f"❌ Invalid inference type '{inference_type}'. Must be one of {[i.name for i in InferenceType]}."
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
     config.config.setdefault("model_version", {})
     config.config["model_version"].update(

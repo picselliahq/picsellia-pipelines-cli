@@ -21,7 +21,7 @@ def get_processing_params(
     else:
         latest_config_path = run_manager.get_latest_run_config_path()
         if latest_config_path:
-            with open(latest_config_path, "r") as f:
+            with open(latest_config_path) as f:
                 latest_config = toml.load(f)
         else:
             latest_config = None
@@ -45,6 +45,10 @@ def get_processing_params(
     elif pipeline_type == "DATASET_VERSION_CREATION":
         return prompt_dataset_version_creation_params(
             stored_params=stored_params, pipeline_name=pipeline_name
+        )
+    elif pipeline_type == "MODEL_CONVERSION" or pipeline_type == "MODEL_COMPRESSION":
+        return prompt_model_process_params(
+            stored_params=stored_params, pipeline_type=pipeline_type
         )
     else:
         raise Exception(f"Unknown pipeline_type: {pipeline_type}")
@@ -144,6 +148,23 @@ def prompt_data_auto_tagging_params(stored_params: dict) -> dict:
         "output": {"datalake": {"id": output_datalake_id}},
         "parameters": {"tags_list": tags_list},
         "run_parameters": {"offset": int(offset), "limit": int(limit)},
+    }
+
+
+def prompt_model_process_params(stored_params: dict, pipeline_type: str) -> dict:
+    input = stored_params.get("input", {})
+    model = input.get("model_version", {})
+
+    model_version_id = typer.prompt(
+        typer.style("🧠 Model version ID", fg=typer.colors.CYAN),
+        default=model.get("id", ""),
+    )
+
+    return {
+        "job": {"type": pipeline_type},
+        "input": {
+            "model_version": {"id": model_version_id},
+        },
     }
 
 

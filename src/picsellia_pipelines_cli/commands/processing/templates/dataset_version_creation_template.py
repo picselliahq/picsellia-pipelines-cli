@@ -1,6 +1,5 @@
 from picsellia_pipelines_cli.utils.base_template import BaseTemplate
 
-
 PROCESSING_PIPELINE = """import argparse
 
 from picsellia.types.enums import ProcessingType
@@ -206,7 +205,7 @@ class ProcessingParameters(Parameters):
 
 PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 picsellia-pipelines-cli
-picsellia-cv-engine
+picsellia-cv-engine>=0.4.1"
 """
 
 PROCESSING_PIPELINE_PYPROJECT = """[project]
@@ -217,7 +216,7 @@ requires-python = ">=3.10"
 
 dependencies = [
     "picsellia-pipelines-cli",
-    "picsellia-cv-engine",
+    "picsellia-cv-engine>=0.4.1"",
 ]
 """
 
@@ -273,6 +272,10 @@ id = ""
 
 [output.dataset_version]
 name = "test_{pipeline_name}"
+
+[parameters]
+datalake = "default"
+data_tag = "processed"
 """
 
 

@@ -1,11 +1,10 @@
 import json
 from pathlib import Path
-from typing import Optional
 
 import toml
 import typer
 from picsellia import Client, Experiment, Project
-from picsellia.exceptions import ResourceNotFoundError, ResourceConflictError
+from picsellia.exceptions import ResourceConflictError, ResourceNotFoundError
 
 from picsellia_pipelines_cli.utils.logging import kv
 from picsellia_pipelines_cli.utils.run_manager import RunManager
@@ -39,6 +38,8 @@ def prompt_training_params(stored_params: dict) -> dict:
 
 def get_training_params(
     run_manager: RunManager | None,
+    pipeline_type: str,
+    pipeline_name: str,
     config_file: Path | None = None,
 ) -> dict:
     if config_file is not None and config_file.exists():
@@ -55,7 +56,6 @@ def get_training_params(
                 with p.open("r") as f:
                     latest_config = toml.load(f)
 
-    params: dict = {}
     stored_params: dict = latest_config or {}
 
     if latest_config:
@@ -67,7 +67,6 @@ def get_training_params(
         if reuse:
             return latest_config
 
-    # 3) Fallback prompt minimal
     params = prompt_training_params(stored_params)
     return params
 
@@ -207,90 +206,90 @@ def _ensure_experiment_has_datasets(
 def _ensure_experiment_has_model_version(
     client: Client, experiment: Experiment, run_config: dict
 ) -> None:
-    """
-    Attache la model version à l'experiment en gérant bien les modèles publics.
-
-    - public  : client.get_public_model(name=origin_name).get_version(version_name=..)
-    - private : par id si fourni, sinon par (origin_name + version_name)
-
-    Enrichit run_config["input"]["model_version"] avec id/name/origin_name/url/visibility.
-    """
     inp = (run_config or {}).get("input") or {}
     mv = (inp.get("model_version") or {}).copy()
 
-    # Normaliser la visibilité (compatibilité avec l’ancien flag "public": bool)
+    # --- normalize visibility
     visibility = mv.get("visibility")
     if visibility is None and isinstance(mv.get("public"), bool):
         visibility = "public" if mv["public"] else "private"
     if visibility not in ("public", "private"):
         visibility = "private"
 
-    def _enrich_and_attach(mv_obj, vis: str, origin_name: Optional[str] = None):
-        # Enrichit le run_config
-        mv.update(
-            {
-                "id": str(mv_obj.id),
-                "name": mv_obj.name,
-                "origin_name": origin_name or getattr(mv_obj, "origin_name", None),
-                "url": mv_obj.get_resource_url_on_platform(),
-                "visibility": vis,
-            }
-        )
-        inp["model_version"] = mv
-        run_config["input"] = inp
-        # Attache à l'expériment (idempotent)
-        try:
-            experiment.attach_model_version(model_version=mv_obj)
-        except ResourceConflictError:
-            pass
-
+    # --- choose handler
     if visibility == "public":
-        origin_name = mv.get("origin_name")
-        version_name = mv.get("name") or mv.get("version_name")
-        if not (origin_name and version_name):
-            raise typer.Exit(
-                "❌ Public model requires 'input.model_version.origin_name' "
-                "and 'input.model_version.name' (or 'version_name')."
-            )
-        try:
-            pub_model = client.get_public_model(name=origin_name)
-            pub_mv = pub_model.get_version(version=version_name)
-        except Exception as e:
-            typer.echo(f"❌ Unable to resolve public model/version: {e}")
-            raise typer.Exit()
+        _attach_public_model_version(client, experiment, run_config, mv, inp)
+    else:
+        _attach_private_model_version(client, experiment, run_config, mv, inp)
 
-        _enrich_and_attach(pub_mv, vis="public", origin_name=origin_name)
-        return
 
-    # Cas privé : par id prioritaire, sinon (origin_name + version_name)
+def _attach_public_model_version(client, experiment, run_config, mv, inp):
+    origin_name = mv.get("origin_name")
+    version_name = mv.get("name") or mv.get("version_name")
+    if not (origin_name and version_name):
+        typer.echo(
+            "❌ Public model requires 'input.model_version.origin_name' "
+            "and 'input.model_version.name' (or 'version_name')."
+        )
+        raise typer.Exit()
+
+    try:
+        pub_model = client.get_public_model(name=origin_name)
+        pub_mv = pub_model.get_version(version=version_name)
+    except Exception as e:
+        typer.echo(f"❌ Unable to resolve public model/version: {e}")
+        raise typer.Exit() from None
+
+    _enrich_and_attach(experiment, run_config, inp, mv, pub_mv, "public", origin_name)
+
+
+def _attach_private_model_version(client, experiment, run_config, mv, inp):
     mv_obj = None
     mv_id = mv.get("id")
     if mv_id:
         try:
             mv_obj = client.get_model_version_by_id(mv_id)
         except Exception as e:
-            raise typer.Exit(
-                f"❌ Could not fetch private model version by id '{mv_id}': {e}"
-            )
+            typer.echo(f"❌ Could not fetch private model version by id '{mv_id}': {e}")
+            raise typer.Exit() from None
     else:
         origin_name = mv.get("origin_name")
         version_name = mv.get("name") or mv.get("version_name")
         if not (origin_name and version_name):
-            raise typer.Exit(
+            typer.echo(
                 "❌ Private model requires 'input.model_version.id' "
                 "or ('origin_name' + 'name'/'version_name')."
             )
+            raise typer.Exit()
         try:
             model = client.get_model(name=origin_name)
             mv_obj = model.get_version(version=version_name)
         except Exception as e:
             typer.echo(f"❌ Unable to resolve private model/version: {e}")
-            raise typer.Exit()
+            raise typer.Exit() from None
 
-    _enrich_and_attach(mv_obj, vis="private")
+    _enrich_and_attach(experiment, run_config, inp, mv, mv_obj, "private")
 
 
-def _ensure_dataset_version_id(client: Client, ref: dict) -> Optional[str]:
+def _enrich_and_attach(experiment, run_config, inp, mv, mv_obj, vis, origin_name=None):
+    mv.update(
+        {
+            "id": str(mv_obj.id),
+            "name": mv_obj.name,
+            "origin_name": origin_name or getattr(mv_obj, "origin_name", None),
+            "url": mv_obj.get_resource_url_on_platform(),
+            "visibility": vis,
+        }
+    )
+    inp["model_version"] = mv
+    run_config["input"] = inp
+    try:
+        experiment.attach_model_version(model_version=mv_obj)
+    except ResourceConflictError:
+        pass
+
+
+def _ensure_dataset_version_id(client: Client, ref: dict) -> str | None:
     """Retourne/refill l'id de dataset version depuis ref (id ou origin_name+name/version_name)."""
     if not isinstance(ref, dict):
         return None
@@ -320,7 +319,7 @@ def _ensure_dataset_version_id(client: Client, ref: dict) -> Optional[str]:
         return None
 
 
-def _resolve_model_version_id_from_names(client: Client, mv_ref: dict) -> Optional[str]:
+def _resolve_model_version_id_from_names(client: Client, mv_ref: dict) -> str | None:
     """Déduit l'id de model version si on n'a que origin_name + (name|version_name), public/private."""
     if not isinstance(mv_ref, dict):
         return None
@@ -403,21 +402,24 @@ def _has_required_inputs(run_config: dict) -> bool:
 
 
 def _exit_missing_inputs():
-    raise typer.Exit(
+    typer.echo(
         "❌ Missing required training inputs: train_dataset_version and/or model_version."
     )
+    raise typer.Exit()
 
 
 def _exit_case_b_inputs():
-    raise typer.Exit(
+    typer.echo(
         "❌ For case B, provide train_dataset_version + model_version + experiment name & project name."
     )
+    raise typer.Exit()
 
 
 def _raise_invalid_config():
-    raise typer.Exit(
+    typer.echo(
         "❌ Invalid training config. Provide either experiment.id or experiment.name with required inputs."
     )
+    raise typer.Exit()
 
 
 def _set_experiment_metadata(experiment: Experiment, run_config: dict):
@@ -432,15 +434,20 @@ def _set_experiment_metadata(experiment: Experiment, run_config: dict):
 
 def _resolve_input_metadata(client: Client, run_config: dict):
     input = run_config.get("input", {})
+    _resolve_dataset_metadata(client, input)
+    _resolve_model_metadata(client, input)
+    run_config["input"] = input
 
-    def resolve_dsv(dataset: str):
-        slot = input.get(dataset, {})
+
+def _resolve_dataset_metadata(client, input: dict):
+    def resolve_dsv(key):
+        slot = input.get(key, {})
         dsv_id = slot.get("id")
         if not dsv_id:
             return
         try:
             dsv = client.get_dataset_version_by_id(dsv_id)
-            input[dataset] = {
+            input[key] = {
                 "id": dsv_id,
                 "name": dsv.version,
                 "origin_name": dsv.name,
@@ -448,21 +455,23 @@ def _resolve_input_metadata(client: Client, run_config: dict):
                 "url": dsv.get_resource_url_on_platform(),
             }
         except Exception as e:
-            typer.echo(f"⚠️ Could not resolve dataset metadata for {dataset}: {e}")
+            typer.echo(f"⚠️ Could not resolve dataset metadata for {key}: {e}")
 
-    for key in (
+    for k in (
         "train_dataset_version",
         "test_dataset_version",
         "validation_dataset_version",
     ):
-        resolve_dsv(key)
+        resolve_dsv(k)
 
+
+def _resolve_model_metadata(client, input: dict):
     mv = input.get("model_version", {})
     visibility = mv.get("visibility")
     if visibility is None and isinstance(mv.get("public"), bool):
         visibility = "public" if mv["public"] else "private"
     if visibility not in ("public", "private"):
-        visibility = "private"  # default
+        visibility = "private"
 
     mv_id = mv.get("id")
     mv_version_name = mv.get("name") or mv.get("version_name")
@@ -477,7 +486,6 @@ def _resolve_input_metadata(client: Client, run_config: dict):
                 )
             pub_model = client.get_public_model(name=mv_origin_name)
             pub_mv = pub_model.get_version(version=mv_version_name)
-
             input["model_version"] = {
                 "id": str(pub_mv.id),
                 "name": pub_mv.name,
@@ -486,17 +494,13 @@ def _resolve_input_metadata(client: Client, run_config: dict):
                 "visibility": "public",
             }
         else:
-            if mv_id:
-                model_version = client.get_model_version_by_id(mv_id)
-            else:
-                if not (mv_origin_name and mv_version_name):
-                    raise ValueError(
-                        "Private model requires 'input.model_version.id', "
-                        "or ('origin_name' + version 'name'/'version_name')."
-                    )
-                model = client.get_model(name=mv_origin_name)
-                model_version = model.get_version(version=mv_version_name)
-
+            model_version = (
+                client.get_model_version_by_id(mv_id)
+                if mv_id
+                else client.get_model(name=mv_origin_name).get_version(
+                    version=mv_version_name
+                )
+            )
             input["model_version"] = {
                 "id": str(model_version.id),
                 "name": model_version.name,
@@ -507,9 +511,7 @@ def _resolve_input_metadata(client: Client, run_config: dict):
 
     except Exception as e:
         typer.echo(f"❌ Could not resolve model metadata: {e}")
-        raise typer.Exit()
-
-    run_config["input"] = input
+        raise typer.Exit() from None
 
 
 def _get_or_create_project(client: Client, project_name: str):

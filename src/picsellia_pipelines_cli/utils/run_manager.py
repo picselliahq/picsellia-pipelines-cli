@@ -1,6 +1,6 @@
-import toml
 from pathlib import Path
-from typing import Optional
+
+import toml
 
 
 class RunManager:
@@ -22,22 +22,20 @@ class RunManager:
         run_dir.mkdir()
         return run_dir
 
-    def get_latest_run_config_path(self) -> Optional[Path]:
+    def get_latest_run_config_path(self) -> Path | None:
         candidates = sorted(
-            [p for p in self.runs_dir.glob("run*/run_config.toml")],
+            self.runs_dir.glob("run*/run_config.toml"),
             key=lambda p: int(p.parent.name[3:]),
             reverse=True,
         )
-        if not candidates:
-            return None
-        return candidates[0]
+        return candidates[0] if candidates else None
 
     def save_run_config(self, run_dir: Path, config_data: dict):
         config_path = run_dir / "run_config.toml"
         with config_path.open("w") as f:
             toml.dump(config_data, f)
 
-    def get_latest_run_dir(self) -> Optional[Path]:
+    def get_latest_run_dir(self) -> Path | None:
         runs = sorted(
             [
                 p

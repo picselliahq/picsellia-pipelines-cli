@@ -187,6 +187,11 @@ id = ""
 [output.experiment]
 name = "{pipeline_name}_exp1"
 project_name = "{pipeline_name}"
+
+[hyperparameters]
+epochs = 3
+batch_size = 8
+image_size = 640
 """
 
 

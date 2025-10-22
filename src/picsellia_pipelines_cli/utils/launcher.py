@@ -1,11 +1,9 @@
-from typing import Optional
+from datetime import datetime
 
 from picsellia import Client
 
-from datetime import datetime
 
-
-def extract_job_and_run_ids(resp: dict) -> tuple[Optional[str], Optional[str]]:
+def extract_job_and_run_ids(resp: dict) -> tuple[str | None, str | None]:
     job_id, run_id = None, None
     if isinstance(resp, dict):
         job_id = (
@@ -20,7 +18,7 @@ def extract_job_and_run_ids(resp: dict) -> tuple[Optional[str], Optional[str]]:
     return job_id, run_id
 
 
-def build_job_url(client: Client, job_id: str, run_id: Optional[str]) -> str:
+def build_job_url(client: Client, job_id: str, run_id: str | None) -> str:
     base = client.connexion.host.rstrip("/")
     org_id = getattr(client.connexion, "organization_id", None)
     if run_id:
@@ -28,7 +26,7 @@ def build_job_url(client: Client, job_id: str, run_id: Optional[str]) -> str:
     return f"{base}/{org_id}/jobs/{job_id}"
 
 
-def _parse_dt(s: Optional[str]) -> Optional[datetime]:
+def _parse_dt(s: str | None) -> datetime | None:
     if not s:
         return None
     try:
@@ -37,7 +35,7 @@ def _parse_dt(s: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def _pick_latest_run(runs: list[dict]) -> Optional[dict]:
+def _pick_latest_run(runs: list[dict]) -> dict | None:
     if not runs:
         return None
 

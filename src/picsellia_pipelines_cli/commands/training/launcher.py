@@ -1,21 +1,21 @@
 import typer
 
 from picsellia_pipelines_cli.commands.training.utils.test import (
-    normalize_training_io,
-    get_training_params,
     _print_training_io_summary,
+    get_training_params,
+    normalize_training_io,
 )
 from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.initializer import init_client
-from picsellia_pipelines_cli.utils.logging import hr, section, kv, step
+from picsellia_pipelines_cli.utils.logging import hr, kv, section, step
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 from picsellia_pipelines_cli.utils.run_manager import RunManager
 from picsellia_pipelines_cli.utils.tester import (
-    select_run_dir,
+    load_or_init_run_config,
+    prepare_auth_and_env,
     resolve_run_config_path,
     save_and_get_run_config_path,
-    prepare_auth_and_env,
-    load_or_init_run_config,
+    select_run_dir,
 )
 
 
@@ -93,13 +93,13 @@ def launch_training(
         experiment = client.get_experiment_by_id(exp_id)
     except Exception as e:
         typer.echo(f"❌ Could not fetch experiment '{exp_id}': {e}")
-        raise typer.Exit()
+        raise typer.Exit() from e
 
     try:
         experiment.launch()
     except Exception as e:
         typer.echo(f"❌ Launch failed: {e}")
-        raise typer.Exit()
+        raise typer.Exit() from e
 
     org_id = getattr(getattr(client, "connexion", None), "organization_id", None)
     host_base = getattr(getattr(client, "connexion", None), "host", "").rstrip("/")

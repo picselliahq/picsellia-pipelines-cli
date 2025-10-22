@@ -5,10 +5,10 @@ import toml
 import typer
 
 from picsellia_pipelines_cli.utils.env_utils import (
-    get_env_config,
     Environment,
-    resolve_env,
+    get_env_config,
     get_organization_for_env,
+    resolve_env,
 )
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 from picsellia_pipelines_cli.utils.run_manager import RunManager
