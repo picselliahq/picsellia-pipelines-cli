@@ -223,7 +223,7 @@ visibility = "private"
 [parameters]
 input_model_file_name = "pretrained-weights"
 output_model_file_name = "onnx-model"
-opset_version = 0
+opset_version = 12
 """
 
 
