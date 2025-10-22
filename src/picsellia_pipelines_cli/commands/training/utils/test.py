@@ -448,7 +448,7 @@ def _resolve_dataset_metadata(client, input: dict):
         try:
             dsv = client.get_dataset_version_by_id(dsv_id)
             input[key] = {
-                "id": str(dsv.id),
+                "id": dsv_id,
                 "name": dsv.version,
                 "origin_name": dsv.name,
                 "version_name": dsv.version,
