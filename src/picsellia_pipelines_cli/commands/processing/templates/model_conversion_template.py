@@ -162,7 +162,7 @@ requires-python = ">=3.10"
 
 dependencies = [
     "picsellia-pipelines-cli",
-    "picsellia-cv-engine[ultralytics]",
+    "picsellia-cv-engine[ultralytics]>=0.4.1",
     "onnx>=1.12",
     "onnxslim>=0.1.67",
     "onnxruntime",
