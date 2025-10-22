@@ -511,7 +511,7 @@ class ProcessingParameters(Parameters):
 
 PROCESSING_PIPELINE_REQUIREMENTS = """
 transformers[torch]
-picsellia-cv-engine
+picsellia-cv-engine>=0.4.1"
 """
 
 PROCESSING_PIPELINE_PYPROJECT = """[project]
@@ -523,7 +523,7 @@ requires-python = ">=3.10"
 dependencies = [
     "picsellia-pipelines-cli",
     "transformers[torch]",
-    "picsellia-cv-engine"
+    picsellia-cv-engine>=0.4.1"
 ]
 """
 
