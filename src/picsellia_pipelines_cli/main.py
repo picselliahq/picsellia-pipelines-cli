@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Annotated
+
 import typer
 
 from picsellia_pipelines_cli.commands.processing.deployer import deploy_processing
@@ -31,18 +35,19 @@ PROCESSING_TYPES_MAPPING = {
     "pre_annotation": "PRE_ANNOTATION",
     "data_auto_tagging": "DATA_AUTO_TAGGING",
     "model_conversion": "MODEL_CONVERSION",
+    "model_compression": "MODEL_COMPRESSION",
 }
 
 
 @app.command(name="init")
 def init(
     pipeline_name: str,
-    type: str = typer.Option(
-        None, help="Type of pipeline ('training' or 'processing')"
-    ),
-    template: str = typer.Option(None, help="Template to use"),
-    output_dir: str = typer.Option(".", help="Where to create the pipeline"),
-    use_pyproject: bool = typer.Option(True, help="Use pyproject.toml"),
+    type: Annotated[
+        str | None, typer.Option(help="Type of pipeline ('training' or 'processing')")
+    ] = None,
+    template: Annotated[str | None, typer.Option(help="Template to use")] = None,
+    output_dir: Annotated[str, typer.Option(help="Where to create the pipeline")] = ".",
+    use_pyproject: Annotated[bool, typer.Option(help="Use pyproject.toml")] = True,
 ):
     if type is None:
         typer.secho(
@@ -104,24 +109,26 @@ def get_pipeline_type(pipeline_name: str) -> str:
         if not pipeline_type:
             raise ValueError
         return pipeline_type
-    except Exception:
+    except Exception as e:
         typer.echo(f"❌ Could not determine type for pipeline '{pipeline_name}'.")
-        raise typer.Exit()
+        raise typer.Exit() from e
 
 
 @app.command(name="test")
 def test(
     pipeline_name: str,
-    run_config_file: str = typer.Option(None, help="Path to a custom run config file"),
-    reuse_dir: bool = typer.Option(
-        False, help="Reuse previous run directory if available"
+    run_config_file: Annotated[
+        str | None, typer.Option(help="Path to a custom run config file")
+    ] = None,
+    reuse_dir: Annotated[bool, typer.Option(help="Reuse previous run directory")] = (
+        False
     ),
-    organization: str | None = typer.Option(
-        None, "--organization", help="Organization name"
-    ),
-    env: Environment = typer.Option(
-        Environment.PROD, "--env", help="Target environment"
-    ),
+    organization: Annotated[
+        str | None, typer.Option("--organization", help="Organization name")
+    ] = None,
+    env: Annotated[
+        Environment, typer.Option("--env", help="Target environment")
+    ] = Environment.PROD,
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
@@ -148,18 +155,22 @@ def test(
 @app.command(name="smoke-test")
 def smoke_test(
     pipeline_name: str,
-    run_config_file: str = typer.Option(None, help="Path to a custom run config file"),
-    reuse_dir: bool = typer.Option(
-        False, help="Reuse previous run directory if available"
+    run_config_file: Annotated[
+        str | None, typer.Option(help="Path to a custom run config file")
+    ] = None,
+    reuse_dir: Annotated[bool, typer.Option(help="Reuse previous run directory")] = (
+        False
     ),
-    python_version: str = typer.Option("3.10", help="Python version for container"),
-    use_gpu: bool = typer.Option(False, help="Run with GPU support"),
-    organization: str | None = typer.Option(
-        None, "--organization", help="Organization name"
-    ),
-    env: Environment = typer.Option(
-        Environment.PROD, "--env", help="Target environment"
-    ),
+    python_version: Annotated[
+        str, typer.Option(help="Python version for container")
+    ] = "3.10",
+    use_gpu: Annotated[bool, typer.Option(help="Run with GPU support")] = False,
+    organization: Annotated[
+        str | None, typer.Option("--organization", help="Organization name")
+    ] = None,
+    env: Annotated[
+        Environment, typer.Option("--env", help="Target environment")
+    ] = Environment.PROD,
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
@@ -189,14 +200,12 @@ def smoke_test(
 @app.command(name="deploy")
 def deploy(
     pipeline_name: str,
-    organization: str | None = typer.Option(
-        None,
-        "--organization",
-        help="Organization name",
-    ),
-    env: Environment = typer.Option(
-        Environment.PROD, "--env", help="Target environment"
-    ),
+    organization: Annotated[
+        str | None, typer.Option("--organization", help="Organization name")
+    ] = None,
+    env: Annotated[
+        Environment, typer.Option("--env", help="Target environment")
+    ] = Environment.PROD,
 ):
     pipeline_type = get_pipeline_type(pipeline_name=pipeline_name)
     if pipeline_type == "TRAINING":
@@ -213,10 +222,12 @@ def deploy(
 @app.command(name="sync")
 def sync(
     pipeline_name: str,
-    organization: str = typer.Option("--organization", help="Organization name"),
-    env: Environment = typer.Option(
-        Environment.PROD, "--env", help="Target environment"
-    ),
+    organization: Annotated[
+        str | None, typer.Option("--organization", help="Organization name")
+    ] = None,
+    env: Annotated[
+        Environment, typer.Option("--env", help="Target environment")
+    ] = Environment.PROD,
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type in PROCESSING_TYPES_MAPPING.values():
@@ -233,13 +244,15 @@ def sync(
 @app.command(name="launch")
 def launch(
     pipeline_name: str,
-    run_config_file: str = typer.Option(help="Path to a custom run config file"),
-    organization: str | None = typer.Option(
-        None, "--organization", help="Organization name"
-    ),
-    env: Environment = typer.Option(
-        Environment.PROD, "--env", help="Target environment"
-    ),
+    run_config_file: Annotated[
+        str, typer.Option(help="Path to a custom run config file")
+    ],
+    organization: Annotated[
+        str | None, typer.Option("--organization", help="Organization name")
+    ] = None,
+    env: Annotated[
+        Environment, typer.Option("--env", help="Target environment")
+    ] = Environment.PROD,
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type in PROCESSING_TYPES_MAPPING.values():
