@@ -11,8 +11,6 @@ from picsellia_pipelines_cli.utils.deployer import (
 from picsellia_pipelines_cli.utils.env_utils import (
     Environment,
     get_env_config,
-    get_organization_for_env,
-    resolve_env,
 )
 from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
@@ -30,11 +28,7 @@ def deploy_processing(
 
     # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
-    selected_env = resolve_env(env or Environment.PROD.value)
-    if not organization:
-        organization = get_organization_for_env(env=selected_env)
-    env_config = get_env_config(organization=organization, env=selected_env)
-
+    env_config = get_env_config(organization=organization, env=env)
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
 
@@ -46,10 +40,11 @@ def deploy_processing(
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)
     new_version = bump_pipeline_version(pipeline_config=pipeline_config)
     prompt_allocation_if_missing(pipeline_config=pipeline_config)
+    runtime_tag = "test" if "-rc" in new_version else "latest"
 
     image_name = pipeline_config.get("docker", "image_name")
 
-    tags_to_push = [new_version, "test" if "-rc" in new_version else "latest"]
+    tags_to_push = [new_version, runtime_tag]
 
     section("🐳 Docker")
     kv("Image", image_name)
@@ -66,7 +61,7 @@ def deploy_processing(
     bullet("Image pushed ✅", accent=False)
 
     pipeline_config.config["metadata"]["version"] = str(new_version)
-    pipeline_config.config["docker"]["image_tag"] = str(new_version)
+    pipeline_config.config["docker"]["image_tag"] = str(runtime_tag)
     pipeline_config.save()
 
     # ── Register on each host ────────────────────────────────────────────────
