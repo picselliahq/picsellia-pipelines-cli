@@ -5,10 +5,7 @@ import toml
 import typer
 
 from picsellia_pipelines_cli.utils.env_utils import (
-    Environment,
     get_env_config,
-    get_organization_for_env,
-    resolve_env,
 )
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 from picsellia_pipelines_cli.utils.run_manager import RunManager
@@ -90,31 +87,19 @@ def merge_with_default_parameters(
     return run_config
 
 
-def prepare_auth_and_env(
-    run_config: dict,
-    organization: str | None,
-    env: str | None,
-) -> tuple[dict, dict]:
-    org = run_config.get("auth", {}).get("organization_name") or organization
-    selected_env = (
-        run_config.get("auth", {}).get("env") or env or Environment.PROD.value
-    )
-    selected_env_enum = resolve_env(selected_env)
-
-    if not org:
-        org = get_organization_for_env(env=selected_env_enum)
-
-    env_config = get_env_config(organization=org, env=selected_env_enum)
-
-    run_config.setdefault("auth", {})
-    run_config["auth"].update(
+def prepare_auth_and_env(run_config: dict) -> tuple[dict, dict]:
+    """
+    Use the current CLI context (set via `pxl auth login`) to fill auth info.
+    Never prompts. If no context/token, get_env_config() will exit with a clear message.
+    """
+    env_config = get_env_config()  # reads current context
+    run_config.setdefault("auth", {}).update(
         {
             "organization_name": env_config["organization_name"],
-            "env": selected_env_enum.value,
+            "env": env_config["env"],
             "host": env_config["host"],
         }
     )
-
     return run_config, env_config
 
 

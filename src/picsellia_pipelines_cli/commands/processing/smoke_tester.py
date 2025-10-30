@@ -8,9 +8,6 @@ from picsellia_pipelines_cli.commands.processing.tester import (
 from picsellia_pipelines_cli.utils.deployer import (
     prompt_docker_image_if_missing,
 )
-from picsellia_pipelines_cli.utils.env_utils import (
-    Environment,
-)
 from picsellia_pipelines_cli.utils.initializer import init_client
 from picsellia_pipelines_cli.utils.logging import kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
@@ -36,8 +33,6 @@ def smoke_test_processing(
     python_version: str = "3.10",
     use_gpu: bool = False,
     reuse_dir: bool = False,
-    organization: str | None = None,
-    env: Environment | None = None,
 ):
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)
@@ -61,10 +56,7 @@ def smoke_test_processing(
 
     # Environment
     section("🌍 Environment")
-    run_config, env_config = prepare_auth_and_env(
-        run_config=run_config, organization=organization, env=env
-    )
-
+    run_config, env_config = prepare_auth_and_env(run_config=run_config)
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
 

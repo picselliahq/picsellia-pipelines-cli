@@ -1,5 +1,3 @@
-import os
-
 import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
@@ -8,7 +6,7 @@ from picsellia.types.enums import Framework, InferenceType
 from picsellia_pipelines_cli.commands.training.templates.yolov8_template import (
     YOLOV8TrainingTemplate,
 )
-from picsellia_pipelines_cli.utils.env_utils import get_env_config, resolve_env
+from picsellia_pipelines_cli.utils.env_utils import get_env_config
 from picsellia_pipelines_cli.utils.initializer import handle_pipeline_name, init_client
 from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section, step
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
@@ -44,18 +42,7 @@ def init_training(
 
     # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
-
-    organization = os.getenv("PICSELLIA_ORGANIZATION")
-    if not organization:
-        organization = typer.prompt("Organization name")
-
-    selected_env = os.getenv("PICSELLIA_ENV")
-    if not selected_env:
-        selected_env = "PROD"
-
-    env = resolve_env(selected_env)
-    env_config = get_env_config(organization=organization, env=env)
-
+    env_config = get_env_config()
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
 

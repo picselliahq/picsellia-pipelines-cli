@@ -6,7 +6,6 @@ from picsellia_pipelines_cli.commands.processing.utils.tester import (
     enrich_run_config_with_metadata,
     get_processing_params,
 )
-from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.initializer import init_client
 from picsellia_pipelines_cli.utils.logging import kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
@@ -26,8 +25,6 @@ def test_processing(
     pipeline_name: str,
     run_config_file: str | None = None,
     reuse_dir: bool = False,
-    organization: str | None = None,
-    env: Environment | None = None,
 ):
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
     pipeline_type = pipeline_config.get("metadata", "type")
@@ -51,10 +48,7 @@ def test_processing(
 
     # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
-    run_config, env_config = prepare_auth_and_env(
-        run_config=run_config, organization=organization, env=env
-    )
-
+    run_config, env_config = prepare_auth_and_env(run_config=run_config)
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
 
