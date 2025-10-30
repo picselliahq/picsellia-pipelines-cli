@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 APP_DIR = Path.home() / ".config" / "picsellia"
 ENV_FILE = APP_DIR / ".env"
 CTX_FILE = APP_DIR / "context.json"
+
+APP_DIR.mkdir(parents=True, exist_ok=True)
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE, override=False)
 
@@ -31,7 +33,7 @@ class Environment(str, Enum):
         return [e.value for e in cls]
 
 
-def resolve_env(selected_env: str | Environment | None) -> Environment:
+def resolve_env(selected_env: str | Environment | None) -> "Environment":
     if isinstance(selected_env, Environment):
         return selected_env
     try:
@@ -43,25 +45,94 @@ def resolve_env(selected_env: str | Environment | None) -> Environment:
         raise typer.Exit(1) from err
 
 
-def _env_key(org: str, env: Environment) -> str:
+# ---------------------
+# Low-level key & files
+# ---------------------
+
+
+def env_key(org: str, env: Environment) -> str:
     return f"PICSELLIA_{org}_{env.value}_API_TOKEN"
 
 
-def _read_current_context() -> tuple[str | None, Environment | None]:
+def ensure_env_loaded() -> None:
+    """(Re)load ~/.config/picsellia/.env into process env."""
+    if ENV_FILE.exists():
+        load_dotenv(ENV_FILE, override=False)
+
+
+def write_env_line(key: str, value: str) -> None:
+    lines = ENV_FILE.read_text().splitlines() if ENV_FILE.exists() else []
+    found = False
+    for i, line in enumerate(lines):
+        if line.startswith(f"{key}="):
+            lines[i] = f"{key}={value}"
+            found = True
+            break
+    if not found:
+        lines.append(f"{key}={value}")
+    ENV_FILE.write_text("\n".join(lines) + ("\n" if lines else ""))
+
+
+# ---------------------
+# Context helpers
+# ---------------------
+
+
+def set_current_context(org: str, env: Environment) -> None:
+    CTX_FILE.write_text(json.dumps({"organization": org, "env": env.value}))
+
+
+def clear_current_context() -> None:
+    if CTX_FILE.exists():
+        CTX_FILE.unlink()
+
+
+def read_current_context() -> tuple[str | None, Environment | None]:
     if not CTX_FILE.exists():
         return None, None
     try:
         ctx = json.loads(CTX_FILE.read_text())
         org = ctx.get("organization")
         env_str = ctx.get("env")
-        env = Environment(env_str) if env_str else None
-        return org, env
+        ev = Environment(env_str) if env_str else None
+        return org, ev
     except Exception:
         return None, None
 
 
+# ---------------------
+# Token helpers
+# ---------------------
+
+
+def token_for(org: str, env: Environment) -> str | None:
+    """Return token for org@env from .env (or None)."""
+    ensure_env_loaded()
+    return os.getenv(env_key(org, env))
+
+
+def ensure_token(
+    org: str, env: Environment, *, prompt_label: str | None = None
+) -> None:
+    """
+    Ensure a token exists for org@env. If missing, prompt & persist it.
+    """
+    if token_for(org, env):
+        return
+    label = prompt_label or f"Enter Picsellia API token for {org}@{env.value}"
+    token = typer.prompt(label, hide_input=True)
+    write_env_line(env_key(org, env), token)
+    typer.secho("✓ Token saved.", fg=typer.colors.GREEN)
+
+
+# ---------------------
+# High-level config (used by commands)
+# ---------------------
+
+
 def get_env_config(
-    organization: str | None = None, env: str | Environment | None = None
+    organization: str | None = None,
+    env: str | Environment | None = None,
 ) -> dict[str, str]:
     """
     Return the active environment configuration:
@@ -69,8 +140,7 @@ def get_env_config(
       - otherwise → read the current context (from `auth login`)
     Never prompts. If the token is missing, show an error suggesting `pxl auth login`.
     """
-    org_ctx, env_ctx = _read_current_context()
-
+    org_ctx, env_ctx = read_current_context()
     org = organization or org_ctx
     ev = resolve_env(env or env_ctx)
 
@@ -80,12 +150,8 @@ def get_env_config(
         )
         raise typer.Exit(1)
 
-    # (Re)load .env to ensure variables are available
-    if ENV_FILE.exists():
-        load_dotenv(ENV_FILE, override=False)
-
-    key = _env_key(org, ev)
-    token = os.getenv(key)
+    ensure_env_loaded()
+    token = token_for(org, ev)
     if not token:
         typer.echo(
             f"❌ No API token found for {org}@{ev.value}.\n"
