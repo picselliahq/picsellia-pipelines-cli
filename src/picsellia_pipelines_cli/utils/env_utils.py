@@ -1,3 +1,4 @@
+import json
 import os
 from enum import Enum
 from pathlib import Path
@@ -5,10 +6,11 @@ from pathlib import Path
 import typer
 from dotenv import load_dotenv
 
-ENV_FILE = Path.home() / ".config" / "picsellia" / ".env"
-ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+APP_DIR = Path.home() / ".config" / "picsellia"
+ENV_FILE = APP_DIR / ".env"
+CTX_FILE = APP_DIR / "context.json"
 if ENV_FILE.exists():
-    load_dotenv(ENV_FILE)
+    load_dotenv(ENV_FILE, override=False)
 
 
 class Environment(str, Enum):
@@ -29,143 +31,71 @@ class Environment(str, Enum):
         return [e.value for e in cls]
 
 
-def _env_key(organization: str, env: str, key: str) -> str:
-    return f"PICSELLIA_{organization}_{env.upper()}_{key.upper()}"
-
-
-def _write_env_var(key: str, value: str):
-    lines = ENV_FILE.read_text().splitlines() if ENV_FILE.exists() else []
-    if not any(line.startswith(f"{key}=") for line in lines):
-        with ENV_FILE.open("a") as f:
-            f.write(f"{key}={value}\n")
-
-
-def _require_env_var(key: str, prompt: str, hide_input=False) -> str:
-    value = os.getenv(key)
-    if value:
-        return value
-    value = typer.prompt(prompt, hide_input=hide_input)
-    os.environ[key] = value
-    _write_env_var(key, value)
-    return value
-
-
-def resolve_env(selected_env: str) -> Environment:
-    """
-    Convert a string environment into an Environment enum,
-    with validation and error handling.
-
-    Args:
-        selected_env: Environment name as string (e.g. "prod", "staging", "local").
-
-    Returns:
-        Environment: Enum value (Environment.PROD, STAGING, LOCAL).
-
-    Raises:
-        typer.Exit: If the environment is invalid.
-    """
+def resolve_env(selected_env: str | Environment | None) -> Environment:
+    if isinstance(selected_env, Environment):
+        return selected_env
     try:
-        return Environment(selected_env.upper())
-    except ValueError:
+        return Environment((selected_env or "PROD").upper())
+    except ValueError as err:
         typer.echo(
-            f"❌ Invalid environment '{selected_env}'. Must be one of {[e.value for e in Environment]}"
+            f"❌ Invalid environment '{selected_env}'. Must be one of {Environment.list()}"
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(1) from err
 
 
-def get_env_config(organization: str, env: Environment) -> dict[str, str]:
-    env_name = env.value.upper()
+def _env_key(org: str, env: Environment) -> str:
+    return f"PICSELLIA_{org}_{env.value}_API_TOKEN"
 
-    api_token_key = _env_key(organization, env_name, "API_TOKEN")
 
-    api_token = _require_env_var(
-        api_token_key, f"🔐 API token for {organization}@{env_name}", hide_input=True
-    )
+def _read_current_context() -> tuple[str | None, Environment | None]:
+    if not CTX_FILE.exists():
+        return None, None
+    try:
+        ctx = json.loads(CTX_FILE.read_text())
+        org = ctx.get("organization")
+        env_str = ctx.get("env")
+        env = Environment(env_str) if env_str else None
+        return org, env
+    except Exception:
+        return None, None
+
+
+def get_env_config(
+    organization: str | None = None, env: str | Environment | None = None
+) -> dict[str, str]:
+    """
+    Return the active environment configuration:
+      - if organization/env are provided → use them
+      - otherwise → read the current context (from `auth login`)
+    Never prompts. If the token is missing, show an error suggesting `pxl auth login`.
+    """
+    org_ctx, env_ctx = _read_current_context()
+
+    org = organization or org_ctx
+    ev = resolve_env(env or env_ctx)
+
+    if not org or not ev:
+        typer.echo(
+            "❌ No current context. Run: pxl auth login --organization <ORG> --env <ENV>"
+        )
+        raise typer.Exit(1)
+
+    # (Re)load .env to ensure variables are available
+    if ENV_FILE.exists():
+        load_dotenv(ENV_FILE, override=False)
+
+    key = _env_key(org, ev)
+    token = os.getenv(key)
+    if not token:
+        typer.echo(
+            f"❌ No API token found for {org}@{ev.value}.\n"
+            f"   Run: pxl auth login --organization {org} --env {ev.value}"
+        )
+        raise typer.Exit(1)
 
     return {
-        "organization_name": organization,
-        "api_token": api_token,
-        "host": env.url,
-        "env": env_name,
+        "organization_name": org,
+        "api_token": token,
+        "host": ev.url,
+        "env": ev.value,
     }
-
-
-def get_available_configs() -> list[dict[str, str]]:
-    configs = []
-    for line in ENV_FILE.read_text().splitlines():
-        if "API_TOKEN" in line:
-            key = line.split("=")[0]
-            parts = key.split("_")
-
-            if len(parts) < 4 or parts[0] != "PICSELLIA":
-                continue
-
-            org = "_".join(parts[1:-2])  # tout ce qui est entre PICSELLIA et ENV
-            env_str = parts[-2]
-
-            try:
-                env = Environment(env_str.upper())
-                config = get_env_config(org, env)
-                configs.append(config)
-            except Exception:
-                continue
-
-    if not configs:
-        typer.echo("❌ No valid Picsellia configurations found.")
-        raise typer.Exit()
-
-    return configs
-
-
-def parse_env_key(key: str) -> tuple[str, str] | None:
-    """
-    Parse a PICSELLIA env key of the form:
-    PICSELLIA_{organization}_{ENV}_API_TOKEN
-
-    Returns:
-        (organization, env_str) if valid, else None
-    """
-    parts = key.split("_")
-    if len(parts) < 4 or parts[0] != "PICSELLIA" or parts[-2:] != ["API", "TOKEN"]:
-        return None
-
-    # Chercher l'env dans les parties
-    for i, part in enumerate(parts):
-        if part.upper() in [e.value for e in Environment]:
-            org = "_".join(parts[1:i])  # tout ce qui est entre PICSELLIA et ENV
-            return org, part.upper()
-
-    return None
-
-
-def get_organization_for_env(env: Environment) -> str:
-    env_name = env.value.upper()
-    orgs_for_env = []
-
-    if not ENV_FILE.exists():
-        typer.echo("❌ No .env file found with Picsellia credentials.")
-        raise typer.Exit(code=1)
-
-    for line in ENV_FILE.read_text().splitlines():
-        if line.strip() and "API_TOKEN" in line:
-            key = line.split("=")[0]
-            parsed = parse_env_key(key)
-            if not parsed:
-                continue
-            org, env_str = parsed
-
-            if env_str == env_name:
-                orgs_for_env.append(org)
-
-    if not orgs_for_env:
-        typer.echo(f"❌ No organization found for environment {env_name}.")
-        raise typer.Exit(code=1)
-
-    if len(orgs_for_env) > 1:
-        typer.echo(
-            f"❌ Multiple organizations found for environment {env_name}: {', '.join(orgs_for_env)}. "
-            f"Please specify one with --organization."
-        )
-        raise typer.Exit(code=1)
-
-    return orgs_for_env[0]
