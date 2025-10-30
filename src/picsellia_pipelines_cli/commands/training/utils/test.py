@@ -77,6 +77,7 @@ def normalize_training_io(client: Client, run_config: dict) -> None:
     experiment_id = experiment.get("id")
     experiment_name = experiment.get("name")
     project_name = experiment.get("project_name")
+    override = bool(run_config.get("override_outputs", False))
 
     if experiment_id:
         _handle_experiment_by_id(
@@ -88,6 +89,7 @@ def normalize_training_io(client: Client, run_config: dict) -> None:
             run_config=run_config,
             experiment_name=experiment_name,
             project_name=project_name,
+            override_outputs=override,
         )
     else:
         _raise_invalid_config()
@@ -112,14 +114,20 @@ def _handle_experiment_by_id(client: Client, run_config: dict, experiment_id: st
 
 
 def _handle_experiment_by_name(
-    client: Client, run_config: dict, experiment_name: str, project_name: str
+    client: Client,
+    run_config: dict,
+    experiment_name: str,
+    project_name: str,
+    override_outputs: bool = False,
 ):
     if not _has_required_inputs(run_config=run_config):
         _exit_case_b_inputs()
 
     project = _get_or_create_project(client=client, project_name=project_name)
     experiment = _get_or_create_experiment_in_project(
-        project=project, experiment_name=experiment_name
+        project=project,
+        experiment_name=experiment_name,
+        override_outputs=override_outputs,
     )
 
     _set_experiment_metadata(experiment=experiment, run_config=run_config)
@@ -129,11 +137,9 @@ def _handle_experiment_by_name(
         _exit_missing_inputs()
 
     _ensure_project_has_datasets(client=client, project=project, run_config=run_config)
-
     _ensure_experiment_has_datasets(
         client=client, experiment=experiment, run_config=run_config
     )
-
     _ensure_experiment_has_model_version(
         client=client, experiment=experiment, run_config=run_config
     )
@@ -523,13 +529,20 @@ def _get_or_create_project(client: Client, project_name: str):
 
 
 def _get_or_create_experiment_in_project(
-    project: Project, experiment_name: str
+    project: Project,
+    experiment_name: str,
+    override_outputs: bool = False,
 ) -> Experiment:
     try:
-        experiment = project.get_experiment(name=experiment_name)
+        existing = project.get_experiment(name=experiment_name)
     except ResourceNotFoundError:
-        experiment = project.create_experiment(name=experiment_name)
-    return experiment
+        return project.create_experiment(name=experiment_name)
+
+    if not override_outputs:
+        return existing
+    else:
+        existing.delete()
+        return project.create_experiment(name=experiment_name)
 
 
 def _print_training_io_summary(run_config: dict) -> None:
