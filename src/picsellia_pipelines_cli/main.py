@@ -19,6 +19,7 @@ from picsellia_pipelines_cli.commands.training.initializer import init_training
 from picsellia_pipelines_cli.commands.training.launcher import launch_training
 from picsellia_pipelines_cli.commands.training.smoke_tester import smoke_test_training
 from picsellia_pipelines_cli.commands.training.tester import test_training
+from picsellia_pipelines_cli.utils.deployer import Bump
 from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
@@ -193,13 +194,18 @@ def deploy(
     env: Annotated[
         Environment, typer.Option("--env", help="Target environment")
     ] = Environment.PROD,
+    bump: Annotated[
+        Bump | None, typer.Option("--bump", help="Version bump to apply (skip prompt)")
+    ] = None,
 ):
     pipeline_type = get_pipeline_type(pipeline_name=pipeline_name)
     if pipeline_type == "TRAINING":
-        deploy_training(pipeline_name=pipeline_name, organization=organization, env=env)
+        deploy_training(
+            pipeline_name=pipeline_name, organization=organization, env=env, bump=bump
+        )
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
         deploy_processing(
-            pipeline_name=pipeline_name, organization=organization, env=env
+            pipeline_name=pipeline_name, organization=organization, env=env, bump=bump
         )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
