@@ -4,6 +4,7 @@ from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
 from picsellia_pipelines_cli.utils.deployer import (
+    Bump,
     build_and_push_docker_image,
     bump_pipeline_version,
     prompt_docker_image_if_missing,
@@ -17,6 +18,7 @@ def deploy_training(
     pipeline_name: str,
     env: Environment,
     organization: str | None = None,
+    bump: Bump | None = None,
 ):
     """Deploy a training pipeline to Picsellia.
 
@@ -29,6 +31,9 @@ def deploy_training(
 
     Args:
         pipeline_name: The name of the pipeline project to deploy.
+        env: The environment to deploy.
+        organization: The organization to deploy to.
+        bump: The version to bump the pipeline from.
 
     Raises:
         typer.Exit: If no environment matches the provided host.
@@ -47,7 +52,7 @@ def deploy_training(
     kv("Description", pipeline_config.get("metadata", "description"))
 
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)
-    new_version = bump_pipeline_version(pipeline_config=pipeline_config)
+    new_version = bump_pipeline_version(pipeline_config=pipeline_config, bump=bump)
     runtime_tag = "test" if "-rc" in new_version else "latest"
     tags_to_push = [new_version, runtime_tag]
 
