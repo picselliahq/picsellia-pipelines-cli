@@ -193,6 +193,11 @@ def build_endpoint(pipeline_type: str, inputs: dict) -> str:
         validate_required_id("datalake", datalake_id, pipeline_type)
         return f"/api/datalake/{datalake_id}/processing/launch"
 
+    if pipeline_type == "MODEL_CONVERSION" or pipeline_type == "MODEL_COMPRESSION":
+        model_version_id = inputs.get("model_version", {}).get("id")
+        validate_required_id("model_version", model_version_id, pipeline_type)
+        return f"/api/model/version/{model_version_id}/processing/launch"
+
     typer.echo(f"Unsupported pipeline type: {pipeline_type}")
     raise typer.Exit()
 
