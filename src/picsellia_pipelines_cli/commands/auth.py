@@ -17,7 +17,6 @@ from picsellia_pipelines_cli.utils.env_utils import (
 
 app = typer.Typer(help="Authenticate and manage Picsellia CLI context.")
 
-# Precompute once to avoid function calls in defaults/help (Ruff B008)
 ENV_CHOICES_STR = ", ".join(Environment.list())
 
 
