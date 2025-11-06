@@ -304,7 +304,6 @@ class PreAnnotationTemplate(BaseTemplate):
                 pipeline_name=self.pipeline_name,
             ),
             "steps.py": PREANNOTATION_PIPELINE_STEPS,
-            "requirements.txt": PREANNOTATION_PIPELINE_REQUIREMENTS,
             ".dockerignore": PREANNOTATION_PIPELINE_DOCKERIGNORE,
             "Dockerfile": self._get_dockerfile(),
         }
