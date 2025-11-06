@@ -217,7 +217,7 @@ class ProcessingParameters(Parameters):
 
 PREANNOTATION_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 picsellia-pipelines-cli
-picsellia-cv-engine[ultralytics]>=0.4.1"
+picsellia-cv-engine[ultralytics]>=0.4.1
 opencv-python
 """
 
