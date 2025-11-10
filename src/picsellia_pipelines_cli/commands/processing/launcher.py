@@ -3,11 +3,11 @@ from pathlib import Path
 import toml
 import typer
 from orjson import orjson
+from picsellia.exceptions import ResourceNotFoundError
 
 from picsellia_pipelines_cli.commands.processing.tester import (
     enrich_run_config_with_metadata,
 )
-from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.initializer import init_client
 from picsellia_pipelines_cli.utils.launcher import (
     build_job_url,
@@ -24,8 +24,6 @@ from picsellia_pipelines_cli.utils.tester import (
 def launch_processing(
     pipeline_name: str,
     run_config_file: str,
-    organization: str | None = None,
-    env: Environment | None = None,
 ):
     """
     🚀 Launch a processing on Picsellia from a run-config TOML.
@@ -42,14 +40,9 @@ def launch_processing(
 
     # ── Environment & auth ─────────────────────────────────────────────
     section("🌍 Environment")
-    run_config, env_config = prepare_auth_and_env(
-        run_config=run_config,
-        organization=organization,
-        env=env,
-    )
-
-    kv("Workspace", env_config["organization_name"])
+    run_config, env_config = prepare_auth_and_env(run_config=run_config)
     kv("Host", env_config["host"])
+    kv("Organization", env_config["organization_name"])
 
     client = init_client(env_config=env_config)
 
@@ -68,6 +61,14 @@ def launch_processing(
     section("📥 Inputs / 📤 Outputs")
     inputs = run_config.get("input", {}) or {}
     outputs = run_config.get("output", {}) or {}
+
+    if pipeline_type == "DATASET_VERSION_CREATION":
+        _apply_override_for_dataset_version_creation(
+            client=client,
+            inputs=inputs,
+            outputs=outputs,
+            override=bool(run_config.get("override_outputs", False)),
+        )
 
     endpoint, payload = build_processing_payload(
         processing_id=str(processing.id),
@@ -111,6 +112,45 @@ def launch_processing(
     hr()
 
 
+def _apply_override_for_dataset_version_creation(
+    client, inputs: dict, outputs: dict, override: bool
+) -> None:
+    if not override:
+        return
+
+    in_dsv = (inputs or {}).get("dataset_version") or {}
+    out_dsv = (outputs or {}).get("dataset_version") or {}
+    out_name = out_dsv.get("name")
+    in_id = in_dsv.get("id")
+
+    if not (in_id and out_name):
+        return
+
+    try:
+        in_version = client.get_dataset_version_by_id(id=in_id)
+        dataset = client.get_dataset_by_id(id=in_version.origin_id)
+        try:
+            existing = dataset.get_version(version=out_name)
+        except ResourceNotFoundError:
+            existing = None
+
+        if existing is not None:
+            existing.delete()
+            typer.echo(
+                typer.style(
+                    f"🧹 Deleted existing output dataset version '{out_name}' (override enabled).",
+                    fg=typer.colors.YELLOW,
+                )
+            )
+    except Exception as e:
+        typer.echo(
+            typer.style(
+                f"⚠️ Override skipped for dataset version '{out_name}': {e}",
+                fg=typer.colors.YELLOW,
+            )
+        )
+
+
 def get_base_payload(processing_id: str, run_config: dict) -> dict:
     """Extract common payload fields shared by all processing types."""
     docker_cfg = run_config.get("docker", {})
@@ -152,6 +192,11 @@ def build_endpoint(pipeline_type: str, inputs: dict) -> str:
         datalake_id = get_datalake_id(inputs)
         validate_required_id("datalake", datalake_id, pipeline_type)
         return f"/api/datalake/{datalake_id}/processing/launch"
+
+    if pipeline_type == "MODEL_CONVERSION" or pipeline_type == "MODEL_COMPRESSION":
+        model_version_id = inputs.get("model_version", {}).get("id")
+        validate_required_id("model_version", model_version_id, pipeline_type)
+        return f"/api/model/version/{model_version_id}/processing/launch"
 
     typer.echo(f"Unsupported pipeline type: {pipeline_type}")
     raise typer.Exit()

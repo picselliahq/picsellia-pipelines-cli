@@ -4,6 +4,8 @@ from typing import Annotated
 
 import typer
 
+from picsellia_pipelines_cli.commands.auth import login, logout, whoami
+from picsellia_pipelines_cli.commands.auth import switch as auth_switch
 from picsellia_pipelines_cli.commands.processing.deployer import deploy_processing
 from picsellia_pipelines_cli.commands.processing.initializer import init_processing
 from picsellia_pipelines_cli.commands.processing.launcher import launch_processing
@@ -17,10 +19,16 @@ from picsellia_pipelines_cli.commands.training.initializer import init_training
 from picsellia_pipelines_cli.commands.training.launcher import launch_training
 from picsellia_pipelines_cli.commands.training.smoke_tester import smoke_test_training
 from picsellia_pipelines_cli.commands.training.tester import test_training
+from picsellia_pipelines_cli.utils.deployer import Bump
 from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 app = typer.Typer()
+app.command("login")(login)
+app.command("logout")(logout)
+app.command("whoami")(whoami)
+app.command("switch")(auth_switch)
+
 
 VALID_PIPELINE_TYPES = ["training", "processing"]
 PROCESSING_TEMPLATES = [
@@ -123,12 +131,6 @@ def test(
     reuse_dir: Annotated[bool, typer.Option(help="Reuse previous run directory")] = (
         False
     ),
-    organization: Annotated[
-        str | None, typer.Option("--organization", help="Organization name")
-    ] = None,
-    env: Annotated[
-        Environment, typer.Option("--env", help="Target environment")
-    ] = Environment.PROD,
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
@@ -136,16 +138,12 @@ def test(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
             reuse_dir=reuse_dir,
-            organization=organization,
-            env=env,
         )
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
         test_processing(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
             reuse_dir=reuse_dir,
-            organization=organization,
-            env=env,
         )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
@@ -165,12 +163,6 @@ def smoke_test(
         str, typer.Option(help="Python version for container")
     ] = "3.10",
     use_gpu: Annotated[bool, typer.Option(help="Run with GPU support")] = False,
-    organization: Annotated[
-        str | None, typer.Option("--organization", help="Organization name")
-    ] = None,
-    env: Annotated[
-        Environment, typer.Option("--env", help="Target environment")
-    ] = Environment.PROD,
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
@@ -179,8 +171,6 @@ def smoke_test(
             run_config_file=run_config_file,
             python_version=python_version,
             reuse_dir=reuse_dir,
-            organization=organization,
-            env=env,
         )
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
         smoke_test_processing(
@@ -189,8 +179,6 @@ def smoke_test(
             python_version=python_version,
             use_gpu=use_gpu,
             reuse_dir=reuse_dir,
-            organization=organization,
-            env=env,
         )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
@@ -206,13 +194,18 @@ def deploy(
     env: Annotated[
         Environment, typer.Option("--env", help="Target environment")
     ] = Environment.PROD,
+    bump: Annotated[
+        Bump | None, typer.Option("--bump", help="Version bump to apply (skip prompt)")
+    ] = None,
 ):
     pipeline_type = get_pipeline_type(pipeline_name=pipeline_name)
     if pipeline_type == "TRAINING":
-        deploy_training(pipeline_name=pipeline_name, organization=organization, env=env)
+        deploy_training(
+            pipeline_name=pipeline_name, organization=organization, env=env, bump=bump
+        )
     elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
         deploy_processing(
-            pipeline_name=pipeline_name, organization=organization, env=env
+            pipeline_name=pipeline_name, organization=organization, env=env, bump=bump
         )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
@@ -247,27 +240,17 @@ def launch(
     run_config_file: Annotated[
         str, typer.Option(help="Path to a custom run config file")
     ],
-    organization: Annotated[
-        str | None, typer.Option("--organization", help="Organization name")
-    ] = None,
-    env: Annotated[
-        Environment, typer.Option("--env", help="Target environment")
-    ] = Environment.PROD,
 ):
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type in PROCESSING_TYPES_MAPPING.values():
         launch_processing(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
-            organization=organization,
-            env=env,
         )
     elif pipeline_type == "TRAINING":
         launch_training(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
-            organization=organization,
-            env=env,
         )
     else:
         typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")

@@ -148,7 +148,7 @@ class ProcessingParameters(Parameters):
 
 PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 picsellia-pipelines-cli
-picsellia-cv-engine[ultralytics]>=0.4.1"
+picsellia-cv-engine[ultralytics]>=0.4.1
 onnx>=1.12
 onnxslim>=0.1.67
 onnxruntime

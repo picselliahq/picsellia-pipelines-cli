@@ -4,11 +4,7 @@ import re
 import typer
 from picsellia.exceptions import ResourceNotFoundError
 
-from picsellia_pipelines_cli.utils.env_utils import (
-    Environment,
-    get_env_config,
-    resolve_env,
-)
+from picsellia_pipelines_cli.utils.env_utils import Environment, get_env_config
 from picsellia_pipelines_cli.utils.initializer import init_client
 from picsellia_pipelines_cli.utils.logging import kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
@@ -23,9 +19,7 @@ def sync_processing_params(
 
     # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
-    selected_env = resolve_env(env or Environment.PROD.value)
-    env_config = get_env_config(organization=organization, env=selected_env)
-
+    env_config = get_env_config(organization=organization, env=env)
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
 

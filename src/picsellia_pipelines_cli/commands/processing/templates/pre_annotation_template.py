@@ -217,7 +217,7 @@ class ProcessingParameters(Parameters):
 
 PREANNOTATION_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 picsellia-pipelines-cli
-picsellia-cv-engine[ultralytics]>=0.4.1"
+picsellia-cv-engine[ultralytics]>=0.4.1
 opencv-python
 """
 
@@ -229,7 +229,7 @@ requires-python = ">=3.10,<3.12"
 
 dependencies = [
     "picsellia-pipelines-cli",
-    "picsellia-cv-engine[ultralytics]>=0.4.1"",
+    "picsellia-cv-engine[ultralytics]>=0.4.1",
     "ultralytics",
     "opencv-python"
 ]
@@ -304,7 +304,6 @@ class PreAnnotationTemplate(BaseTemplate):
                 pipeline_name=self.pipeline_name,
             ),
             "steps.py": PREANNOTATION_PIPELINE_STEPS,
-            "requirements.txt": PREANNOTATION_PIPELINE_REQUIREMENTS,
             ".dockerignore": PREANNOTATION_PIPELINE_DOCKERIGNORE,
             "Dockerfile": self._get_dockerfile(),
         }

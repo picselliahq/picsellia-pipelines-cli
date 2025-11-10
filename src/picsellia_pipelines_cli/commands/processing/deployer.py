@@ -4,6 +4,7 @@ from picsellia.exceptions import ResourceConflictError
 from picsellia.types.enums import ProcessingType
 
 from picsellia_pipelines_cli.utils.deployer import (
+    Bump,
     build_and_push_docker_image,
     bump_pipeline_version,
     prompt_docker_image_if_missing,
@@ -11,8 +12,6 @@ from picsellia_pipelines_cli.utils.deployer import (
 from picsellia_pipelines_cli.utils.env_utils import (
     Environment,
     get_env_config,
-    get_organization_for_env,
-    resolve_env,
 )
 from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
@@ -22,19 +21,24 @@ def deploy_processing(
     pipeline_name: str,
     env: Environment,
     organization: str | None = None,
+    bump: Bump | None = None,
 ):
     """
-    🚀 Deploy a processing pipeline to all available environments in the .env.
+    🚀 Deploy a processing pipeline.
+
+    Args:
+        pipeline_name: The pipeline to deploy.
+        env: Target environment.
+        organization: Target organization (optional).
+        bump: Optional version bump to apply. One of:
+              "patch", "minor", "major", "rc", "final".
+              If None, the user will be prompted.
     """
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
 
     # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
-    selected_env = resolve_env(env or Environment.PROD.value)
-    if not organization:
-        organization = get_organization_for_env(env=selected_env)
-    env_config = get_env_config(organization=organization, env=selected_env)
-
+    env_config = get_env_config(organization=organization, env=env)
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
 
@@ -44,12 +48,13 @@ def deploy_processing(
     kv("Description", pipeline_config.get("metadata", "description"))
 
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)
-    new_version = bump_pipeline_version(pipeline_config=pipeline_config)
+    new_version = bump_pipeline_version(pipeline_config=pipeline_config, bump=bump)
     prompt_allocation_if_missing(pipeline_config=pipeline_config)
+    runtime_tag = "test" if "-rc" in new_version else "latest"
 
     image_name = pipeline_config.get("docker", "image_name")
 
-    tags_to_push = [new_version, "test" if "-rc" in new_version else "latest"]
+    tags_to_push = [new_version, runtime_tag]
 
     section("🐳 Docker")
     kv("Image", image_name)
@@ -66,7 +71,7 @@ def deploy_processing(
     bullet("Image pushed ✅", accent=False)
 
     pipeline_config.config["metadata"]["version"] = str(new_version)
-    pipeline_config.config["docker"]["image_tag"] = str(new_version)
+    pipeline_config.config["docker"]["image_tag"] = str(runtime_tag)
     pipeline_config.save()
 
     # ── Register on each host ────────────────────────────────────────────────
@@ -106,29 +111,57 @@ def deploy_processing(
 
 
 def prompt_allocation_if_missing(pipeline_config: PipelineConfig):
-    docker_section = pipeline_config.config.get("docker", {})
-    cpu = docker_section.get("cpu", "")
-    gpu = docker_section.get("gpu", "")
+    """
+    Ensure docker CPU/GPU defaults are set for running the processing on the platform.
+
+    - If both docker.cpu and docker.gpu exist: do not prompt; just display what will be used.
+    - If any is missing: prompt with clear wording, validate, save to config.toml.
+    """
+    docker_section = pipeline_config.config.get("docker", {}) or {}
+    cpu = docker_section.get("cpu")
+    gpu = docker_section.get("gpu")
 
     section("⚙️ Resources")
 
-    if cpu and gpu:
-        kv("Current CPU", cpu)
-        kv("Current GPU", gpu)
-        if not typer.confirm("Keep the current Docker defaults?", default=True):
-            cpu = typer.prompt("CPU (default)", default=cpu)
-            gpu = typer.prompt("GPU (default)", default=gpu)
-    else:
-        if not cpu:
-            cpu = typer.prompt("CPU (default)")
-        if not gpu:
-            gpu = typer.prompt("GPU (default)")
+    if cpu is not None and gpu is not None:
+        kv("Default CPU (platform)", cpu)
+        kv("Default GPU (platform)", gpu)
+        typer.echo(
+            "To change these defaults, edit docker.cpu / docker.gpu in config.toml."
+        )
+        return
 
-    pipeline_config.config["docker"]["cpu"] = cpu
-    pipeline_config.config["docker"]["gpu"] = gpu
+    def _coerce_nonneg_int(label: str, value: str | int) -> int:
+        try:
+            n = int(value)
+        except Exception as e:
+            raise typer.Exit(f"❌ {label} must be an integer.") from e
+        if n < 0:
+            raise typer.Exit(f"❌ {label} must be ≥ 0.")
+        return n
+
+    if cpu is None:
+        cpu = typer.prompt(
+            "Default CPU cores to allocate when this processing runs on Picsellia",
+            default="4",
+        )
+    if gpu is None:
+        gpu = typer.prompt(
+            "Default number of GPUs to allocate when this processing runs on Picsellia",
+            default="0",
+        )
+
+    cpu_i = _coerce_nonneg_int("CPU", cpu)
+    gpu_i = _coerce_nonneg_int("GPU", gpu)
+
+    pipeline_config.config.setdefault("docker", {})
+    pipeline_config.config["docker"]["cpu"] = cpu_i
+    pipeline_config.config["docker"]["gpu"] = gpu_i
     pipeline_config.save()
-    kv("Saved CPU", cpu)
-    kv("Saved GPU", gpu)
+
+    kv("Saved CPU", cpu_i)
+    kv("Saved GPU", gpu_i)
+    typer.echo("You can adjust these later in config.toml (docker.cpu / docker.gpu).")
 
 
 def _infer_docker_flags(cfg: PipelineConfig) -> list | None:
@@ -181,7 +214,6 @@ def _register_or_update(
         return "Created", f"{name} ({docker_image}:{docker_tag})"
 
     except ResourceConflictError:
-        # already exists → update
         processing = client.get_processing(name=name)
         processing.update(
             description=description,

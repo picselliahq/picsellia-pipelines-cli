@@ -1,11 +1,11 @@
 import typer
+from picsellia.exceptions import ResourceNotFoundError
 
 from picsellia_pipelines_cli.commands.training.utils.test import (
     _print_training_io_summary,
     get_training_params,
     normalize_training_io,
 )
-from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.initializer import init_client
 from picsellia_pipelines_cli.utils.logging import hr, kv, section, step
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
@@ -20,11 +20,7 @@ from picsellia_pipelines_cli.utils.tester import (
 
 
 def launch_training(
-    pipeline_name: str,
-    run_config_file: str | None = None,
-    reuse_dir: bool = False,
-    organization: str | None = None,
-    env: Environment | None = None,
+    pipeline_name: str, run_config_file: str | None = None, reuse_dir: bool = False
 ):
     pipeline_config = PipelineConfig(pipeline_name=pipeline_name)
     pipeline_type = pipeline_config.get("metadata", "type")
@@ -47,18 +43,18 @@ def launch_training(
         parameters_name="hyperparameters",
     )
 
-    # ── Environment
+    # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
-    run_config, env_config = prepare_auth_and_env(
-        run_config=run_config, organization=organization, env=env
-    )
-
+    run_config, env_config = prepare_auth_and_env(run_config=run_config)
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
 
     # ── Normalize IO (resolve IDs, URLs, ensure bindings)
     section("📥 Inputs / 📤 Outputs")
     client = init_client(env_config=env_config)
+
+    _apply_override_for_experiment(client=client, run_config=run_config)
+
     try:
         normalize_training_io(client=client, run_config=run_config)
     except typer.Exit as e:
@@ -109,3 +105,39 @@ def launch_training(
     kv("Job URL", url, color=typer.colors.BLUE)
 
     hr()
+
+
+def _apply_override_for_experiment(client, run_config: dict) -> None:
+    if not bool(run_config.get("override_outputs", False)):
+        return
+
+    exp = (run_config.get("output") or {}).get("experiment") or {}
+    exp_id = exp.get("id")
+    exp_name = exp.get("name")
+    project_name = exp.get("project_name")
+
+    if exp_id or not (exp_name and project_name):
+        return
+
+    try:
+        project = client.get_project(project_name=project_name)
+        try:
+            existing = project.get_experiment(name=exp_name)
+        except ResourceNotFoundError:
+            existing = None
+
+        if existing is not None:
+            existing.delete()
+            typer.echo(
+                typer.style(
+                    f"🧹 Deleted existing experiment '{exp_name}' in project '{project_name}' (override enabled).",
+                    fg=typer.colors.YELLOW,
+                )
+            )
+    except Exception as e:
+        typer.echo(
+            typer.style(
+                f"⚠️ Override skipped for experiment '{exp_name}' in '{project_name}': {e}",
+                fg=typer.colors.YELLOW,
+            )
+        )

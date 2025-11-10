@@ -4,16 +4,12 @@ from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
 from picsellia_pipelines_cli.utils.deployer import (
+    Bump,
     build_and_push_docker_image,
     bump_pipeline_version,
     prompt_docker_image_if_missing,
 )
-from picsellia_pipelines_cli.utils.env_utils import (
-    Environment,
-    get_env_config,
-    get_organization_for_env,
-    resolve_env,
-)
+from picsellia_pipelines_cli.utils.env_utils import Environment, get_env_config
 from picsellia_pipelines_cli.utils.logging import bullet, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
@@ -22,6 +18,7 @@ def deploy_training(
     pipeline_name: str,
     env: Environment,
     organization: str | None = None,
+    bump: Bump | None = None,
 ):
     """Deploy a training pipeline to Picsellia.
 
@@ -34,6 +31,9 @@ def deploy_training(
 
     Args:
         pipeline_name: The name of the pipeline project to deploy.
+        env: The environment to deploy.
+        organization: The organization to deploy to.
+        bump: The version to bump the pipeline from.
 
     Raises:
         typer.Exit: If no environment matches the provided host.
@@ -42,11 +42,7 @@ def deploy_training(
 
     # ── Environment ─────────────────────────────────────────────────────────
     section("🌍 Environment")
-    selected_env = resolve_env(env or Environment.PROD.value)
-    if not organization:
-        organization = get_organization_for_env(env=selected_env)
-    env_config = get_env_config(organization=organization, env=selected_env)
-
+    env_config = get_env_config(organization=organization, env=env)
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
 
@@ -56,11 +52,11 @@ def deploy_training(
     kv("Description", pipeline_config.get("metadata", "description"))
 
     prompt_docker_image_if_missing(pipeline_config=pipeline_config)
-    new_version = bump_pipeline_version(pipeline_config=pipeline_config)
+    new_version = bump_pipeline_version(pipeline_config=pipeline_config, bump=bump)
+    runtime_tag = "test" if "-rc" in new_version else "latest"
+    tags_to_push = [new_version, runtime_tag]
 
     image_name = pipeline_config.get("docker", "image_name")
-
-    tags_to_push = [new_version, "test" if "-rc" in new_version else "latest"]
 
     # ── Ensure model/version exist before build ──────────────────────────────
     section("Model / Version (Pre-check)")
@@ -89,7 +85,7 @@ def deploy_training(
     bullet("Image pushed ✅", accent=False)
 
     pipeline_config.config["metadata"]["version"] = str(new_version)
-    pipeline_config.config["docker"]["image_tag"] = str(new_version)
+    pipeline_config.config["docker"]["image_tag"] = str(runtime_tag)
     pipeline_config.save()
 
     # ── Register/Update Model + Version with Docker info ────────────────────
