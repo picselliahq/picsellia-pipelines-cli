@@ -155,12 +155,7 @@ def login(
         typer.Option("--env", "-e", help=f"One of: {ENV_CHOICES_STR}"),
     ] = None,
 ):
-    """
-    - If a token already exists for ORG+ENV, reuse it (no prompt).
-    - Otherwise, prompt for the token and save it.
-    - ORG/ENV can be provided as options; if omitted, they will be prompted.
-    - Always sets the current context (ORG+ENV).
-    """
+    """Log in to Picsellia and set the active organization/environment context."""
     organization, env = _prompt_org_and_env(organization, env)
     _configure_and_persist_context(
         organization,
@@ -172,7 +167,7 @@ def login(
 
 @app.command("logout")
 def logout():
-    """Unset the current context only. Tokens stored on disk are preserved."""
+    """Clear the current context without removing stored API tokens."""
     clear_current_context()
     typer.secho(
         "✓ Logged out: current context cleared (tokens preserved).",
@@ -182,6 +177,7 @@ def logout():
 
 @app.command("whoami")
 def whoami():
+    """Show the currently active organization and environment."""
     org, env = read_current_context()
     if not org or not env:
         typer.echo("No current context. Run: pxl auth login")
@@ -203,7 +199,7 @@ def switch(
         typer.Option("--env", "-e", help=f"One of: {ENV_CHOICES_STR}"),
     ] = None,
 ):
-    """Change the current context; if the target org/env has no token saved, prompt for it and save."""
+    """Switch to a different organization/environment context."""
     organization, env = _prompt_org_and_env(organization, env)
     _configure_and_persist_context(
         organization,
