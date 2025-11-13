@@ -146,13 +146,23 @@ def token_for(org: str, env: Environment) -> str | None:
 
 
 def ensure_token(
-    org: str, env: Environment, *, prompt_label: str | None = None
+    org: str,
+    env: Environment,
+    *,
+    prompt_label: str | None = None,
+    token_override: str | None = None,
 ) -> None:
     """
     Ensure a token exists for org@env. If missing, prompt & persist it.
     """
+    if token_override:
+        write_env_line(env_key(org, env), token_override)
+        typer.secho("✓ Token saved.", fg=typer.colors.GREEN)
+        return
+
     if token_for(org, env):
         return
+
     label = prompt_label or f"Enter Picsellia API token for {org}@{env.value}"
     token = typer.prompt(label, hide_input=True)
     write_env_line(env_key(org, env), token)

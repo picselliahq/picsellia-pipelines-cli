@@ -118,6 +118,7 @@ def _configure_and_persist_context(
     *,
     token_prompt_label: str | None,
     success_verb: str,
+    token_override: str | None = None,
 ) -> None:
     """
     Shared logic for:
@@ -131,7 +132,12 @@ def _configure_and_persist_context(
 
     ensure_env_loaded()
     if token_for(organization, env) is None:
-        ensure_token(organization, env, prompt_label=token_prompt_label)
+        ensure_token(
+            organization,
+            env,
+            prompt_label=token_prompt_label,
+            token_override=token_override,
+        )
 
     set_current_context(organization, env)
 
@@ -154,6 +160,10 @@ def login(
         Environment | None,
         typer.Option("--env", "-e", help=f"One of: {ENV_CHOICES_STR}"),
     ] = None,
+    token: Annotated[
+        str | None,
+        typer.Option("--token", help="Picsellia API token (or set PXL_API_TOKEN)."),
+    ] = None,
 ):
     """Log in to Picsellia and set the active organization/environment context."""
     organization, env = _prompt_org_and_env(organization, env)
@@ -162,6 +172,7 @@ def login(
         env,
         token_prompt_label=None,  # default label from ensure_token
         success_verb="set",
+        token_override=token,
     )
 
 
