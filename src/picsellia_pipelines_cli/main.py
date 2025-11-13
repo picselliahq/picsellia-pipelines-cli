@@ -23,7 +23,44 @@ from picsellia_pipelines_cli.utils.deployer import Bump
 from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
-app = typer.Typer()
+app = typer.Typer(no_args_is_help=True)
+
+
+@app.callback()
+def main():
+    """
+    Manage Picsellia training and processing pipelines.
+
+    Examples:
+
+        \b
+      - Authenticate and set the context:
+
+        \b
+        pxl-pipeline login
+
+        \b
+      - Initialize a new processing pipeline:
+
+        \b
+        pxl-pipeline init my_pipeline --type processing --template pre_annotation
+
+        \b
+      - Run local tests:
+
+        \b
+        pxl-pipeline test my_pipeline --run-config-file my_pipeline/runs/run_config.toml
+
+        \b
+      - Deploy to production:
+
+        \b
+        pxl-pipeline deploy my_pipeline
+    """
+    # No runtime logic needed; Typer just uses the docstring for `--help`.
+    ...
+
+
 app.command("login")(login)
 app.command("logout")(logout)
 app.command("whoami")(whoami)
@@ -57,6 +94,7 @@ def init(
     output_dir: Annotated[str, typer.Option(help="Where to create the pipeline")] = ".",
     use_pyproject: Annotated[bool, typer.Option(help="Use pyproject.toml")] = True,
 ):
+    """Initialize a new training or processing pipeline from a template."""
     if type is None:
         typer.secho(
             f"❌ Missing required option: --type. Choose from {VALID_PIPELINE_TYPES}.",
@@ -132,6 +170,7 @@ def test(
         False
     ),
 ):
+    """Run local tests for a pipeline using a run config."""
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
         test_training(
@@ -164,6 +203,7 @@ def smoke_test(
     ] = "3.10",
     use_gpu: Annotated[bool, typer.Option(help="Run with GPU support")] = False,
 ):
+    """Run a containerized smoke test for a pipeline."""
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type == "TRAINING":
         smoke_test_training(
@@ -198,6 +238,7 @@ def deploy(
         Bump | None, typer.Option("--bump", help="Version bump to apply (skip prompt)")
     ] = None,
 ):
+    """Deploy a training or processing pipeline version to Picsellia."""
     pipeline_type = get_pipeline_type(pipeline_name=pipeline_name)
     if pipeline_type == "TRAINING":
         deploy_training(
@@ -222,6 +263,7 @@ def sync(
         Environment, typer.Option("--env", help="Target environment")
     ] = Environment.PROD,
 ):
+    """Sync processing pipeline parameters from code to Picsellia."""
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type in PROCESSING_TYPES_MAPPING.values():
         sync_processing_params(
@@ -241,6 +283,7 @@ def launch(
         str, typer.Option(help="Path to a custom run config file")
     ],
 ):
+    """Launch a remote run for a training or processing pipeline."""
     pipeline_type = get_pipeline_type(pipeline_name)
     if pipeline_type in PROCESSING_TYPES_MAPPING.values():
         launch_processing(
