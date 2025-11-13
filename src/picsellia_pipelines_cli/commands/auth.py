@@ -93,7 +93,7 @@ def _test_connection(organization: str, env: Environment) -> None:
         typer.echo(
             "    - To fix the organization name, update the 'organization' field\n"
             "      or re-run:\n"
-            "        pxl-pipeline login --organization <ORG> --env <ENV>"
+            "        pxl-pipeline login"
         )
         typer.echo("")
         typer.echo(f"  • Credentials file: {ENV_FILE}")
