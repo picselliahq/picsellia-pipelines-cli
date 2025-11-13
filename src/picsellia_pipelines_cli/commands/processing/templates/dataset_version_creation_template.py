@@ -263,10 +263,6 @@ PROCESSING_RUN_CONFIG = """override_outputs = true
 [job]
 type = "DATASET_VERSION_CREATION"
 
-[auth]
-organization_name = ""
-env = "PROD"
-
 [input.dataset_version]
 id = ""
 

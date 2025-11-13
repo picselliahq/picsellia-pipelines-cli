@@ -568,10 +568,6 @@ PROCESSING_RUN_CONFIG = """override_outputs = true
 [job]
 type = "DATA_AUTO_TAGGING"
 
-[auth]
-organization_name = ""
-env = "PROD"
-
 [input.datalake]
 id = ""
 
