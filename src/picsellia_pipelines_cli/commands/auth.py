@@ -180,7 +180,7 @@ def whoami():
     """Show the currently active organization and environment."""
     org, env = read_current_context()
     if not org or not env:
-        typer.echo("No current context. Run: pxl auth login")
+        typer.echo("No current context. Run: pxl-pipeline login")
         raise typer.Exit(1)
 
     has_token = token_for(org, env) is not None

@@ -10,8 +10,6 @@ APP_DIR = Path.home() / ".config" / "picsellia"
 ENV_FILE = APP_DIR / ".env"
 CTX_FILE = APP_DIR / "context.json"
 
-CUSTOM_ENV_KEY = "PICSELLIA_CUSTOM_ENV"
-
 APP_DIR.mkdir(parents=True, exist_ok=True)
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE, override=False)
@@ -21,21 +19,9 @@ class Environment(str, Enum):
     PROD = "PROD"
     STAGING = "STAGING"
     LOCAL = "LOCAL"
-    CUSTOM = "CUSTOM"
 
     @property
     def url(self) -> str:
-        if self is Environment.CUSTOM:
-            ensure_env_loaded()
-            custom_url = os.getenv(CUSTOM_ENV_KEY)
-            if not custom_url:
-                typer.echo(
-                    "❌ Custom environment URL is not configured.\n"
-                    "   Set it by running: pxl auth login --env CUSTOM"
-                )
-                raise typer.Exit(1)
-            return custom_url
-
         return {
             Environment.PROD: "https://app.picsellia.com",
             Environment.STAGING: "https://staging.picsellia.com",
@@ -85,26 +71,6 @@ def write_env_line(key: str, value: str) -> None:
     if not found:
         lines.append(f"{key}={value}")
     ENV_FILE.write_text("\n".join(lines) + ("\n" if lines else ""))
-
-    os.environ[key] = value
-
-
-def get_custom_env_url() -> str | None:
-    """Return the custom environment base URL if configured."""
-    ensure_env_loaded()
-    return os.getenv(CUSTOM_ENV_KEY)
-
-
-def set_custom_env_url(url: str) -> None:
-    """Persist the custom environment base URL to ~/.config/picsellia/.env."""
-    if not url:
-        typer.echo("❌ Custom environment URL cannot be empty.")
-        raise typer.Exit(1)
-    write_env_line(CUSTOM_ENV_KEY, url)
-    typer.secho(
-        f"✓ Custom environment URL saved to {ENV_FILE}",
-        fg=typer.colors.GREEN,
-    )
 
 
 # ---------------------
@@ -156,7 +122,7 @@ def ensure_token(
     label = prompt_label or f"Enter Picsellia API token for {org}@{env.value}"
     token = typer.prompt(label, hide_input=True)
     write_env_line(env_key(org, env), token)
-    typer.secho("✓ Token saved", fg=typer.colors.GREEN)
+    typer.secho("✓ Token saved.", fg=typer.colors.GREEN)
 
 
 # ---------------------
@@ -172,24 +138,21 @@ def get_env_config(
     Return the active environment configuration:
       - if organization/env are provided → use them
       - otherwise → read the current context (from `auth login`)
-    Never prompts. If the token is missing, show an error suggesting `pxl auth login`.
+    Never prompts. If the token is missing, show an error suggesting `pxl-pipeline login`.
     """
     org_ctx, env_ctx = read_current_context()
     org = organization or org_ctx
     ev = resolve_env(env or env_ctx)
 
     if not org or not ev:
-        typer.echo(
-            "❌ No current context. Run: pxl auth login --organization <ORG> --env <ENV>"
-        )
+        typer.echo("❌ No current context. Run: pxl-pipeline login")
         raise typer.Exit(1)
 
     ensure_env_loaded()
     token = token_for(org, ev)
     if not token:
         typer.echo(
-            f"❌ No API token found for {org}@{ev.value}.\n"
-            f"   Run: pxl auth login --organization {org} --env {ev.value}"
+            f"❌ No API token found for {org}@{ev.value}.\n   Run: pxl-pipeline login"
         )
         raise typer.Exit(1)
 

@@ -89,7 +89,7 @@ def merge_with_default_parameters(
 
 def prepare_auth_and_env(run_config: dict) -> tuple[dict, dict]:
     """
-    Use the current CLI context (set via `pxl auth login`) to fill auth info.
+    Use the current CLI context (set via `pxl-pipeline login`) to fill auth info.
     Never prompts. If no context/token, get_env_config() will exit with a clear message.
     """
     env_config = get_env_config()  # reads current context
