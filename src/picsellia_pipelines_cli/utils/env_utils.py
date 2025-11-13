@@ -10,6 +10,8 @@ APP_DIR = Path.home() / ".config" / "picsellia"
 ENV_FILE = APP_DIR / ".env"
 CTX_FILE = APP_DIR / "context.json"
 
+CUSTOM_ENV_KEY = "PICSELLIA_CUSTOM_ENV"
+
 APP_DIR.mkdir(parents=True, exist_ok=True)
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE, override=False)
@@ -19,9 +21,21 @@ class Environment(str, Enum):
     PROD = "PROD"
     STAGING = "STAGING"
     LOCAL = "LOCAL"
+    CUSTOM = "CUSTOM"
 
     @property
     def url(self) -> str:
+        if self is Environment.CUSTOM:
+            ensure_env_loaded()
+            custom_url = os.getenv(CUSTOM_ENV_KEY)
+            if not custom_url:
+                typer.echo(
+                    "❌ Custom environment URL is not configured.\n"
+                    "   Set it by running: pxl auth login --env CUSTOM"
+                )
+                raise typer.Exit(1)
+            return custom_url
+
         return {
             Environment.PROD: "https://app.picsellia.com",
             Environment.STAGING: "https://staging.picsellia.com",
@@ -71,6 +85,26 @@ def write_env_line(key: str, value: str) -> None:
     if not found:
         lines.append(f"{key}={value}")
     ENV_FILE.write_text("\n".join(lines) + ("\n" if lines else ""))
+
+    os.environ[key] = value
+
+
+def get_custom_env_url() -> str | None:
+    """Return the custom environment base URL if configured."""
+    ensure_env_loaded()
+    return os.getenv(CUSTOM_ENV_KEY)
+
+
+def set_custom_env_url(url: str) -> None:
+    """Persist the custom environment base URL to ~/.config/picsellia/.env."""
+    if not url:
+        typer.echo("❌ Custom environment URL cannot be empty.")
+        raise typer.Exit(1)
+    write_env_line(CUSTOM_ENV_KEY, url)
+    typer.secho(
+        f"✓ Custom environment URL saved to {ENV_FILE}",
+        fg=typer.colors.GREEN,
+    )
 
 
 # ---------------------
