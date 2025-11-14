@@ -150,6 +150,42 @@ def _configure_and_persist_context(
     typer.echo(f"Credentials file: {ENV_FILE}")
 
 
+def _list_saved_contexts() -> list[tuple[str, Environment]]:
+    """Return all org/env pairs that have a stored API token."""
+    ensure_env_loaded()
+
+    if not ENV_FILE.exists():
+        return []
+
+    contexts: set[tuple[str, Environment]] = set()
+    for line in ENV_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, _ = line.split("=", 1)
+        # We store tokens as PICSELLIA_{ORG}_{ENV}_API_TOKEN
+        if not key.startswith("PICSELLIA_") or not key.endswith("_API_TOKEN"):
+            continue
+
+        middle = key[len("PICSELLIA_") : -len("_API_TOKEN")]
+        parts = middle.split("_")
+        if len(parts) < 2:
+            continue
+
+        env_str = parts[-1]
+        org = "_".join(parts[:-1])
+
+        try:
+            env = Environment(env_str)
+        except ValueError:
+            continue
+
+        contexts.add((org, env))
+
+    return sorted(contexts, key=lambda x: (x[0].lower(), x[1].value))
+
+
 @app.command("login")
 def login(
     organization: Annotated[
@@ -166,7 +202,19 @@ def login(
     ] = None,
 ):
     """Log in to Picsellia and set the active organization/environment context."""
+
+    current_org, current_env = read_current_context()
+
+    # Case 1 — user already logged in and no params provided
+    if current_org and current_env and organization is None and env is None:
+        typer.echo(f"Already logged in as {current_org}@{current_env.value}.")
+        if not typer.confirm("Do you want to log in as another user?", default=False):
+            typer.echo("Keeping current login.")
+            raise typer.Exit()
+
+    # Case 2 — if parameters provided, override directly (acts like switch)
     organization, env = _prompt_org_and_env(organization, env)
+
     _configure_and_persist_context(
         organization,
         env,
@@ -211,7 +259,57 @@ def switch(
     ] = None,
 ):
     """Switch to a different organization/environment context."""
-    organization, env = _prompt_org_and_env(organization, env)
+    current_org, current_env = read_current_context()
+
+    # If user provided flags, behave like a direct switch
+    if organization is not None or env is not None:
+        organization, env = _prompt_org_and_env(organization, env)
+        _configure_and_persist_context(
+            organization,
+            env,
+            token_prompt_label=f"Enter Picsellia API token for {organization}@{env.value}",
+            success_verb="switched",
+        )
+        return
+
+    # No flags → interactive selection among saved contexts
+    saved_contexts = _list_saved_contexts()
+
+    if not saved_contexts:
+        typer.echo(
+            "No saved contexts found. Please enter a new organization/environment."
+        )
+        organization, env = _prompt_org_and_env(None, None)
+        _configure_and_persist_context(
+            organization,
+            env,
+            token_prompt_label=f"Enter Picsellia API token for {organization}@{env.value}",
+            success_verb="switched",
+        )
+        return
+
+    typer.echo("Available contexts:")
+    for idx, (org, ev) in enumerate(saved_contexts, start=1):
+        marker = ""
+        if current_org == org and current_env == ev:
+            marker = " (current)"
+        typer.echo(f"  {idx}. {org}@{ev.value}{marker}")
+    typer.echo("  n. Use a new organization/environment")
+
+    choice = typer.prompt("Select a context (number or 'n')", default="1").strip()
+
+    if choice.lower().startswith("n"):
+        organization, env = _prompt_org_and_env(None, None)
+    else:
+        try:
+            index = int(choice)
+            if index < 1 or index > len(saved_contexts):
+                raise ValueError
+            organization, env = saved_contexts[index - 1]
+        except Exception as e:
+            typer.echo("❌ Invalid selection.")
+            raise typer.Exit(1) from e
+
     _configure_and_persist_context(
         organization,
         env,
