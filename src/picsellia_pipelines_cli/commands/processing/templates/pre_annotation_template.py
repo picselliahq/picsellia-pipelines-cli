@@ -274,10 +274,6 @@ PROCESSING_RUN_CONFIG = """
 [job]
 type = "PRE_ANNOTATION"
 
-[auth]
-organization_name = ""
-env = "PROD"
-
 [input.dataset_version]
 id = ""
 

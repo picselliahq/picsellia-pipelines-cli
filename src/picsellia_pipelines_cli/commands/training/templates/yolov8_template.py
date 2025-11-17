@@ -174,10 +174,6 @@ TRAINING_RUN_CONFIG = """override_outputs = true
 [job]
 type = "TRAINING"
 
-[auth]
-organization_name = ""
-env = "PROD"
-
 [input.train_dataset_version]
 id = ""
 

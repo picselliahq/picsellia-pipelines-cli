@@ -212,10 +212,6 @@ PROCESSING_RUN_CONFIG = """override_outputs = true
 [job]
 type = "MODEL_CONVERSION"
 
-[auth]
-organization_name = ""
-env = "PROD"
-
 [input.model_version]
 id = ""
 visibility = "private"
