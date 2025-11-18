@@ -232,8 +232,8 @@ def deploy(
         str | None, typer.Option("--organization", help="Organization name")
     ] = None,
     env: Annotated[
-        Environment, typer.Option("--env", help="Target environment")
-    ] = Environment.PROD,
+        Environment | None, typer.Option("--env", help="Target environment")
+    ] = None,
     bump: Annotated[
         Bump | None, typer.Option("--bump", help="Version bump to apply (skip prompt)")
     ] = None,
@@ -260,8 +260,8 @@ def sync(
         str | None, typer.Option("--organization", help="Organization name")
     ] = None,
     env: Annotated[
-        Environment, typer.Option("--env", help="Target environment")
-    ] = Environment.PROD,
+        Environment | None, typer.Option("--env", help="Target environment")
+    ] = None,
 ):
     """Sync processing pipeline parameters from code to Picsellia."""
     pipeline_type = get_pipeline_type(pipeline_name)

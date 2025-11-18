@@ -198,9 +198,12 @@ def get_env_config(
     Never prompts. If the token is missing, show an error suggesting `pxl-pipeline login`.
     """
     org_ctx, env_ctx = read_current_context()
+    print(f"env_ctx: {env_ctx}")
 
     org = organization or org_ctx
     resolved_env = resolve_env(env if env is not None else env_ctx)
+
+    print(f"resolved_env: {resolved_env}")
 
     if not org or not resolved_env:
         typer.echo("❌ No current context. Run: pxl-pipeline login")
