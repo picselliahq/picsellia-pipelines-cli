@@ -41,7 +41,6 @@ def deploy_processing(
     env_config = get_env_config(organization=organization, env=env)
     kv("Host", env_config["host"])
     kv("Organization", env_config["organization_name"])
-    print(f"env : {env_config['env']}")
 
     # ── Pipeline details ─────────────────────────────────────────────────────
     section("🧩 Pipeline")
