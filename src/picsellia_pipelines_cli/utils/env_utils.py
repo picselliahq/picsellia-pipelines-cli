@@ -47,11 +47,22 @@ class Environment(str, Enum):
         return [e.value for e in cls]
 
 
-def resolve_env(selected_env: str | Environment | None) -> "Environment":
+def resolve_env(selected_env: str | Environment | None) -> Environment | None:
+    """
+    Normalize an env value to an Environment enum.
+
+    - If selected_env is None -> return None (no env resolved).
+    - If it's already an Environment -> return it as-is.
+    - If it's a string -> try to cast to Environment, otherwise exit with an error.
+    """
+    if selected_env is None:
+        return None
+
     if isinstance(selected_env, Environment):
         return selected_env
+
     try:
-        return Environment((selected_env or "PROD").upper())
+        return Environment(selected_env.upper())
     except ValueError as err:
         typer.echo(
             f"❌ Invalid environment '{selected_env}'. Must be one of {Environment.list()}"
@@ -180,29 +191,33 @@ def get_env_config(
 ) -> dict[str, str]:
     """
     Return the active environment configuration:
-      - if organization/env are provided → use them
+
+      - if organization/env are provided → they override the current context
       - otherwise → read the current context (from `auth login`)
+
     Never prompts. If the token is missing, show an error suggesting `pxl-pipeline login`.
     """
     org_ctx, env_ctx = read_current_context()
-    org = organization or org_ctx
-    ev = resolve_env(env or env_ctx)
 
-    if not org or not ev:
+    org = organization or org_ctx
+    resolved_env = resolve_env(env if env is not None else env_ctx)
+
+    if not org or not resolved_env:
         typer.echo("❌ No current context. Run: pxl-pipeline login")
         raise typer.Exit(1)
 
     ensure_env_loaded()
-    token = token_for(org, ev)
+    token = token_for(org, resolved_env)
     if not token:
         typer.echo(
-            f"❌ No API token found for {org}@{ev.value}.\n   Run: pxl-pipeline login"
+            f"❌ No API token found for {org}@{resolved_env.value}.\n"
+            "   Run: pxl-pipeline login"
         )
         raise typer.Exit(1)
 
     return {
         "organization_name": org,
         "api_token": token,
-        "host": ev.url,
-        "env": ev.value,
+        "host": resolved_env.url,
+        "env": resolved_env.value,
     }
