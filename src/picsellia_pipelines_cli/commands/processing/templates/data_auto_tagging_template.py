@@ -523,7 +523,7 @@ requires-python = ">=3.10"
 dependencies = [
     "picsellia-pipelines-cli",
     "transformers[torch]",
-    picsellia-cv-engine>=0.4.1"
+    "picsellia-cv-engine>=0.4.1"
 ]
 """
 
