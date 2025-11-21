@@ -1,4 +1,4 @@
-name: Pipeline templates CI (manual)
+name: Pipeline templates CI (manual + branch push)
 
 on:
   workflow_dispatch:
@@ -15,6 +15,10 @@ on:
         description: "Version bump (patch|minor|major|rc|final)"
         required: true
         default: "final"
+
+  push:
+    branches:
+      - feat/17-add-ci-to-test-commands-and-templates
 
 jobs:
   run-cli-template-ci:
