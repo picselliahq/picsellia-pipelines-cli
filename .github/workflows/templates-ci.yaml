@@ -29,7 +29,6 @@ jobs:
       TYPE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.type || 'processing' }}
       TEMPLATE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.template || 'pre_annotation' }}
       BUMP: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.bump || 'final' }}
-      PICSELLIA_CONFIG_DIR: ${{ runner.temp }}/picsellia_cfg
 
     steps:
       - name: Checkout repo
@@ -44,12 +43,14 @@ jobs:
       - name: Run CLI template CI
         env:
           PXL_API_TOKEN: ${{ secrets.PXL_API_TOKEN_STAGING }}
-          PICSELLIA_CONFIG_DIR: ${{ env.PICSELLIA_CONFIG_DIR }}
           TYPE: ${{ env.TYPE }}
           TEMPLATE: ${{ env.TEMPLATE }}
           BUMP: ${{ env.BUMP }}
         run: |
+          # Use GitHub's built-in RUNNER_TEMP env var
+          PICSELLIA_CONFIG_DIR="$RUNNER_TEMP/picsellia_cfg"
           mkdir -p "$PICSELLIA_CONFIG_DIR"
+
           echo "TYPE=$TYPE"
           echo "TEMPLATE=$TEMPLATE"
           echo "BUMP=$BUMP"
