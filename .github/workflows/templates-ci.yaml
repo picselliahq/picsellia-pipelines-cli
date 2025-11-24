@@ -24,7 +24,6 @@ jobs:
   run-cli-template-ci:
     runs-on: ubuntu-latest
 
-    # Compute TYPE / TEMPLATE / BUMP once, with defaults for push
     env:
       TYPE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.type || 'processing' }}
       TEMPLATE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.template || 'pre_annotation' }}
