@@ -1,0 +1,16 @@
+[metadata]
+name = "data_auto_tagging"
+version = "1.0"
+description = "This pipeline processes data for X."
+type = "DATA_AUTO_TAGGING"
+
+[execution]
+pipeline_script = "pipeline.py"
+requirements_file = "pyproject.toml"
+parameters_class = "utils/parameters.py:ProcessingParameters"
+
+[docker]
+image_name = "picsellia/data-auto-tagging"
+image_tag = "latest"
+cpu = "4"
+gpu = "0"
