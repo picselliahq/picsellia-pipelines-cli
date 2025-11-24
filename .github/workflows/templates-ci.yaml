@@ -40,6 +40,9 @@ jobs:
       - name: Sync project dependencies
         run: uv sync
 
+      - name: Install cv engine for CLI
+        run: uv add "picsellia-cv-engine==0.5.0"
+
       - name: Run CLI template CI
         env:
           PXL_API_TOKEN: ${{ secrets.PXL_API_TOKEN_STAGING }}
