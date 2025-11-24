@@ -1,21 +1,6 @@
 name: Pipeline templates CI (manual + branch push)
 
 on:
-  workflow_dispatch:
-    inputs:
-      type:
-        description: "Template type (processing|training)"
-        required: true
-        default: "processing"
-      template:
-        description: "Template name (all | template dir name)"
-        required: true
-        default: "pre_annotation"
-      bump:
-        description: "Version bump (patch|minor|major|rc|final)"
-        required: true
-        default: "final"
-
   push:
     branches:
       - feat/17-add-ci-to-test-commands-and-templates
@@ -24,10 +9,17 @@ jobs:
   run-cli-template-ci:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [ processing ]
+        template:
+          - pre_annotation
+          - dataset_version_creation
+
     env:
-      TYPE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.type || 'processing' }}
-      TEMPLATE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.template || 'pre_annotation' }}
-      BUMP: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.bump || 'final' }}
+      ORGANIZATION: test-account
+      ENVIRONMENT: STAGING
 
     steps:
       - name: Checkout repo
@@ -48,25 +40,23 @@ jobs:
             -u "${{ secrets.DOCKERHUB_USERNAME }}" \
             --password-stdin
 
-      - name: Run CLI template CI
+      - name: Run CLI template CI for one template
         env:
           PXL_API_TOKEN: ${{ secrets.PXL_API_TOKEN_STAGING }}
-          TYPE: ${{ env.TYPE }}
-          TEMPLATE: ${{ env.TEMPLATE }}
           BUMP: ${{ env.BUMP }}
         run: |
           PICSELLIA_CONFIG_DIR="$RUNNER_TEMP/picsellia_cfg"
           mkdir -p "$PICSELLIA_CONFIG_DIR"
 
-          echo "TYPE=$TYPE"
-          echo "TEMPLATE=$TEMPLATE"
+          echo "TYPE=${{ matrix.type }}"
+          echo "TEMPLATE=${{ matrix.template }}"
           echo "BUMP=$BUMP"
           echo "PICSELLIA_CONFIG_DIR=$PICSELLIA_CONFIG_DIR"
 
           uv run bash tests/script.sh \
-            --type "$TYPE" \
-            --template "$TEMPLATE" \
-            --organization "test-account" \
-            --env "STAGING" \
-            --bump "$BUMP" \
+            --type "${{ matrix.type }}" \
+            --template "${{ matrix.template }}" \
+            --organization "$ORGANIZATION" \
+            --env "$ENVIRONMENT" \
+            --bump "final" \
             --config-dir "$PICSELLIA_CONFIG_DIR"
