@@ -1,21 +1,23 @@
-name: Pipeline templates CI (manual + branch push)
+name: Pipeline templates CI (changes-based)
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/17-add-ci-to-test-commands-and-templates
+      - main
 
 jobs:
+  detect-cli-template-changes:
+    uses: .github/workflows/detect-cli-template-changes.yaml
+
   run-cli-template-ci:
+    needs: detect-cli-template-changes
     runs-on: ubuntu-latest
+
+    if: ${{ needs.detect-cli-template-changes.outputs.matrix != '' && needs.detect-cli-template-changes.outputs.matrix != '[]' }}
 
     strategy:
       fail-fast: false
-      matrix:
-        type: [ processing ]
-        template:
-          - pre_annotation
-          - dataset_version_creation
+      matrix: ${{ fromJson(needs.detect-cli-template-changes.outputs.matrix) }}
 
     env:
       ORGANIZATION: test-account
@@ -35,22 +37,25 @@ jobs:
         run: uv add "picsellia-cv-engine==0.5.0"
 
       - name: Login to Docker Hub as picsellia
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
-            -u "${{ secrets.DOCKERHUB_USERNAME }}" \
+          echo "$DOCKERHUB_TOKEN" | docker login \
+            -u "$DOCKERHUB_USERNAME" \
             --password-stdin
 
-      - name: Run CLI template CI for one template
+      - name: Run CLI template CI for one (type, template)
         env:
           PXL_API_TOKEN: ${{ secrets.PXL_API_TOKEN_STAGING }}
-          BUMP: ${{ env.BUMP }}
         run: |
           PICSELLIA_CONFIG_DIR="$RUNNER_TEMP/picsellia_cfg"
           mkdir -p "$PICSELLIA_CONFIG_DIR"
 
           echo "TYPE=${{ matrix.type }}"
           echo "TEMPLATE=${{ matrix.template }}"
-          echo "BUMP=$BUMP"
+          echo "ORG=$ORGANIZATION"
+          echo "ENV=$ENVIRONMENT"
           echo "PICSELLIA_CONFIG_DIR=$PICSELLIA_CONFIG_DIR"
 
           uv run bash tests/script.sh \
