@@ -93,11 +93,11 @@ jobs:
 
           if [ ${#entries[@]} -eq 0 ]; then
             echo "No templates selected (matrix empty)."
-            echo 'matrix=[]' >> "$GITHUB_OUTPUT"
+            echo 'matrix={"include":[]}' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          json="["
+          json='{"include":['
           first=1
           for e in "${entries[@]}"; do
             if [ $first -eq 0 ]; then
@@ -106,7 +106,7 @@ jobs:
             json+="$e"
             first=0
           done
-          json+="]"
+          json+="]}"
 
           echo "Computed matrix: $json"
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
