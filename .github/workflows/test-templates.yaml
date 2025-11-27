@@ -7,7 +7,7 @@ on:
 
 jobs:
   detect-cli-template-changes:
-    uses: ./.github/workflows/detect-cli-template-changes.yaml
+    uses: ./.github/workflows/detect-template-changes.yaml
 
   run-cli-template-ci:
     needs: detect-cli-template-changes
