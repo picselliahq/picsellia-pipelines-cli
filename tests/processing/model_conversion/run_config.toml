@@ -1,4 +1,4 @@
-PROCESSING_RUN_CONFIG = """override_outputs = true
+override_outputs = true
 
 [job]
 type = "MODEL_CONVERSION"
@@ -15,4 +15,3 @@ visibility = "private"
 input_model_file_name = "checkpoint-index-latest"
 output_model_file_name = "onnx-model"
 opset_version = 12
-"""
