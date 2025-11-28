@@ -3,10 +3,13 @@ from pathlib import Path
 import toml
 import typer
 from orjson import orjson
-from picsellia.exceptions import ResourceNotFoundError
 
 from picsellia_pipelines_cli.commands.processing.tester import (
     enrich_run_config_with_metadata,
+)
+from picsellia_pipelines_cli.commands.processing.utils.tester import (
+    delete_existing_dataset_version_if_any,
+    delete_existing_model_file_if_any,
 )
 from picsellia_pipelines_cli.utils.initializer import init_client
 from picsellia_pipelines_cli.utils.launcher import (
@@ -70,6 +73,13 @@ def launch_processing(
             override=bool(run_config.get("override_outputs", False)),
         )
 
+    if pipeline_type in ["MODEL_CONVERSION", "MODEL_COMPRESSION"]:
+        _apply_override_for_model_processing(
+            client=client,
+            inputs=inputs,
+            run_config=run_config,
+        )
+
     endpoint, payload = build_processing_payload(
         processing_id=str(processing.id),
         pipeline_type=pipeline_type,
@@ -127,15 +137,12 @@ def _apply_override_for_dataset_version_creation(
         return
 
     try:
-        in_version = client.get_dataset_version_by_id(id=in_id)
-        dataset = client.get_dataset_by_id(id=in_version.origin_id)
-        try:
-            existing = dataset.get_version(version=out_name)
-        except ResourceNotFoundError:
-            existing = None
-
-        if existing is not None:
-            existing.delete()
+        deleted = delete_existing_dataset_version_if_any(
+            client=client,
+            input_dataset_version_id=in_id,
+            output_name=out_name,
+        )
+        if deleted:
             typer.echo(
                 typer.style(
                     f"🧹 Deleted existing output dataset version '{out_name}' (override enabled).",
@@ -146,6 +153,46 @@ def _apply_override_for_dataset_version_creation(
         typer.echo(
             typer.style(
                 f"⚠️ Override skipped for dataset version '{out_name}': {e}",
+                fg=typer.colors.YELLOW,
+            )
+        )
+
+
+def _apply_override_for_model_processing(
+    client, inputs: dict, run_config: dict
+) -> None:
+    """
+    Handle override_outputs for MODEL_CONVERSION / MODEL_COMPRESSION.
+    Non-interactive: only acts if override_outputs == True.
+    """
+    if not bool(run_config.get("override_outputs", False)):
+        return
+
+    model = (inputs or {}).get("model_version") or {}
+    model_id = model.get("id")
+    params = run_config.get("parameters", {}) or {}
+    file_name = params.get("output_model_file_name")
+
+    if not (model_id and file_name):
+        return
+
+    try:
+        deleted = delete_existing_model_file_if_any(
+            client=client,
+            model_version_id=model_id,
+            file_name=file_name,
+        )
+        if deleted:
+            typer.echo(
+                typer.style(
+                    f"🧹 Deleted existing model file '{file_name}' (override enabled).",
+                    fg=typer.colors.YELLOW,
+                )
+            )
+    except Exception as e:
+        typer.echo(
+            typer.style(
+                f"⚠️ Override skipped for model file '{file_name}': {e}",
                 fg=typer.colors.YELLOW,
             )
         )

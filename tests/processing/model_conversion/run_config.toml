@@ -1,0 +1,17 @@
+override_outputs = true
+
+[job]
+type = "MODEL_CONVERSION"
+
+[auth]
+organization_name = "test-account"
+env = "STAGING"
+
+[input.model_version]
+id = "01967bdb-ee96-7336-bcb5-d6b33d99cc52"
+visibility = "private"
+
+[parameters]
+input_model_file_name = "checkpoint-index-latest"
+output_model_file_name = "onnx-model"
+opset_version = 12

@@ -5,6 +5,9 @@ from picsellia_pipelines_cli.commands.processing.tester import (
     enrich_run_config_with_metadata,
     get_processing_params,
 )
+from picsellia_pipelines_cli.commands.processing.utils.tester import (
+    check_output_model_file,
+)
 from picsellia_pipelines_cli.utils.deployer import (
     prompt_docker_image_if_missing,
 )
@@ -69,6 +72,20 @@ def smoke_test_processing(
             output_name=run_config["output"]["dataset_version"]["name"],
             override_outputs=bool(run_config.get("override_outputs", False)),
         )
+
+    if pipeline_type in ["MODEL_CONVERSION", "MODEL_COMPRESSION"]:
+        output_name = (
+            run_config.get("parameters", {}).get("output_model_file_name")
+            or "onnx-model"
+        )
+
+        run_config["parameters"]["output_model_file_name"] = check_output_model_file(
+            client=client,
+            input_model_version_id=run_config["input"]["model_version"]["id"],
+            output_name=output_name,
+            override_outputs=bool(run_config.get("override_outputs", False)),
+        )
+
     enrich_run_config_with_metadata(client=client, run_config=run_config)
     saved_run_config_path = save_and_get_run_config_path(
         run_manager=run_manager, run_dir=run_dir, run_config=run_config

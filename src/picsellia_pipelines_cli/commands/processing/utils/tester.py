@@ -168,6 +168,32 @@ def prompt_model_process_params(stored_params: dict, pipeline_type: str) -> dict
     }
 
 
+def delete_existing_dataset_version_if_any(
+    client: Client,
+    input_dataset_version_id: str,
+    output_name: str,
+) -> bool:
+    """
+    Delete an existing dataset version named `output_name` on the dataset
+    originating from `input_dataset_version_id`, if it exists.
+
+    Returns:
+        True if a version was deleted, False otherwise.
+    """
+    input_dataset_version = client.get_dataset_version_by_id(
+        id=input_dataset_version_id
+    )
+    dataset = client.get_dataset_by_id(id=input_dataset_version.origin_id)
+
+    try:
+        existing = dataset.get_version(version=output_name)
+    except ResourceNotFoundError:
+        return False
+
+    existing.delete()
+    return True
+
+
 def check_output_dataset_version(
     client: Client,
     input_dataset_version_id: str,
@@ -175,35 +201,105 @@ def check_output_dataset_version(
     override_outputs: bool = False,
 ) -> str:
     try:
-        input_dataset_version = client.get_dataset_version_by_id(
-            id=input_dataset_version_id
-        )
-        dataset = client.get_dataset_by_id(id=input_dataset_version.origin_id)
-        existing = dataset.get_version(version=output_name)
-
         if override_outputs:
-            existing.delete()
+            deleted = delete_existing_dataset_version_if_any(
+                client=client,
+                input_dataset_version_id=input_dataset_version_id,
+                output_name=output_name,
+            )
+            if deleted:
+                typer.echo(
+                    typer.style(
+                        f"🧹 Deleted existing dataset version '{output_name}' (override enabled).",
+                        fg=typer.colors.YELLOW,
+                    )
+                )
             return output_name
 
-        overwrite = typer.confirm(
-            typer.style(
-                f"⚠️ A dataset version named '{output_name}' already exists. Overwrite?",
-                fg=typer.colors.YELLOW,
-            ),
-            default=False,
+        deleted = delete_existing_dataset_version_if_any(
+            client=client,
+            input_dataset_version_id=input_dataset_version_id,
+            output_name=output_name,
         )
-        if overwrite:
-            existing.delete()
-            return output_name
-        else:
-            return typer.prompt(
+        if deleted:
+            overwrite = typer.confirm(
                 typer.style(
-                    "📄 Enter a new output dataset version name", fg=typer.colors.CYAN
+                    f"⚠️ A dataset version named '{output_name}' already existed and has been deleted. "
+                    "Use the same name again?",
+                    fg=typer.colors.YELLOW,
                 ),
-                default=f"{output_name}_new",
+                default=True,
             )
+            if overwrite:
+                return output_name
+
+        return typer.prompt(
+            typer.style(
+                "📄 Enter a new output dataset version name", fg=typer.colors.CYAN
+            ),
+            default=f"{output_name}_new",
+        )
+
+    except Exception as e:
+        typer.echo(f"⚠️ Could not resolve dataset metadata: {e}")
+        return output_name
+
+
+def delete_existing_model_file_if_any(
+    client: Client,
+    model_version_id: str,
+    file_name: str,
+) -> bool:
+    """
+    Delete existing model file `file_name` on a given model version, if present.
+
+    Returns:
+        True if a file was deleted, False otherwise.
+    """
+    model_version = client.get_model_version_by_id(model_version_id)
+
+    try:
+        existing_file = model_version.get_file(name=file_name)
+    except ResourceNotFoundError:
+        return False
+
+    existing_file.delete()
+    return True
+
+
+def check_output_model_file(
+    client: Client,
+    input_model_version_id: str,
+    output_name: str,
+    override_outputs: bool = False,
+) -> str:
+    model_version = client.get_model_version_by_id(input_model_version_id)
+
+    try:
+        existing_file = model_version.get_file(name=output_name)
     except ResourceNotFoundError:
         return output_name
+
+    if override_outputs:
+        existing_file.delete()
+        return output_name
+
+    overwrite = typer.confirm(
+        typer.style(
+            f"⚠️ A model file named '{output_name}' already exists on this model version. Overwrite?",
+            fg=typer.colors.YELLOW,
+        ),
+        default=False,
+    )
+
+    if overwrite:
+        existing_file.delete()
+        return output_name
+    else:
+        return typer.prompt(
+            typer.style("📄 Enter a new output model file name", fg=typer.colors.CYAN),
+            default=f"{output_name}_new",
+        )
 
 
 def enrich_run_config_with_metadata(client: Client, run_config: dict):
