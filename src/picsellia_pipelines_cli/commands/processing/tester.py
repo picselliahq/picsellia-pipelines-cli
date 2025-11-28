@@ -2,6 +2,7 @@ import typer
 
 from picsellia_pipelines_cli.commands.processing.utils.tester import (
     check_output_dataset_version,
+    check_output_model_file,
     enrich_output_metadata_after_run,
     enrich_run_config_with_metadata,
     get_processing_params,
@@ -61,6 +62,19 @@ def test_processing(
             client=client,
             input_dataset_version_id=run_config["input"]["dataset_version"]["id"],
             output_name=run_config["output"]["dataset_version"]["name"],
+            override_outputs=bool(run_config.get("override_outputs", False)),
+        )
+
+    if pipeline_type in ["MODEL_CONVERSION", "MODEL_COMPRESSION"]:
+        output_name = (
+            run_config.get("parameters", {}).get("output_model_file_name")
+            or "onnx-model"
+        )
+
+        run_config["parameters"]["output_model_file_name"] = check_output_model_file(
+            client=client,
+            input_model_version_id=run_config["input"]["model_version"]["id"],
+            output_name=output_name,
             override_outputs=bool(run_config.get("override_outputs", False)),
         )
 
