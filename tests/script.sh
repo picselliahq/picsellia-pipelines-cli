@@ -6,6 +6,7 @@ set -u -o pipefail
 #   tests/script.sh --type <processing|training> --template <name|all> \
 #                   [--organization ORG] [--env ENV] [--token TOKEN] \
 #                   [--config-dir DIR] [--bump <patch|minor|major|rc|final>] \
+#                   [--phase <init|test|smoke|deploy|all>] \
 #                   [--report]
 # ---------------------------------------------------------------------------
 
@@ -21,6 +22,7 @@ ENVIRONMENT="${ENVIRONMENT:-STAGING}"
 TOKEN="${PXL_API_TOKEN:-}"       # can also be provided via --token
 CONFIG_DIR="${PICSELLIA_CONFIG_DIR:-}"  # can also be provided via --config-dir
 BUMP="${PIPELINE_BUMP:-final}"   # patch | minor | major | rc | final
+PHASE="all"                      # init | test | smoke | deploy | all
 WRITE_REPORT=false
 
 # --------------
@@ -35,6 +37,7 @@ while [[ $# -gt 0 ]]; do
     --token)        TOKEN="${2:?--token requires a value}"; shift 2 ;;
     --config-dir)   CONFIG_DIR="${2:?--config-dir requires a value}"; shift 2 ;;
     --bump)         BUMP="${2:?--bump requires a value}"; shift 2 ;;
+    --phase)        PHASE="${2:?--phase requires a value}"; shift 2 ;;
     --report)       WRITE_REPORT=true; shift ;;
     *) echo "Unknown argument: $1"; exit 2 ;;
   esac
@@ -44,6 +47,15 @@ done
 case "$BUMP" in
   patch|minor|major|rc|final) ;;
   *) echo "❌ Invalid bump value: '$BUMP' (must be patch|minor|major|rc|final)"; exit 2 ;;
+esac
+
+# Validate PHASE
+case "$PHASE" in
+  init|test|smoke|deploy|all) ;;
+  *)
+    echo "❌ Invalid phase: '$PHASE' (must be init|test|smoke|deploy|all)"
+    exit 2
+    ;;
 esac
 
 # -----------------------------
@@ -77,6 +89,7 @@ log_header() {
   echo "🏢 Organization:  $ORGANIZATION"
   echo "🌍 Environment:   $ENVIRONMENT"
   echo "📌 Version bump:  $BUMP"
+  echo "📑 Phase:         $PHASE"
   [[ -n "$CONFIG_DIR" ]] && echo "📁 Config dir:    $PICSELLIA_CONFIG_DIR"
   $WRITE_REPORT && echo "📝 Report file:   $REPORT_FILE"
 }
@@ -139,6 +152,7 @@ run_one_template() {
   logr "Template: $display"
   logr "Folder:   $template_path"
   logr "Config:   $run_config"
+  logr "Phase:    $PHASE"
   logr "─────────────────────────────────────────────"
   logr ""
 
@@ -149,63 +163,133 @@ run_one_template() {
     return
   }
 
-  # Ensure a clean workspace for this template
-  rm -rf "$template_name"
-
-  # ---- Init ----
-  logr "▶️  pxl-pipeline init $template_name --type $TYPE --template $template_name"
-  if ! pxl-pipeline init "$template_name" --type "$TYPE" --template "$template_name"; then
-    logr "❌ init failed for $display"
-    RESULTS+=("❌ $display (init)")
-    ANY_FAILURE=true
-    popd >/dev/null
-    return
-  fi
-
-  # ---- Override config.toml for CI (docker image/tag etc.) ----
-  if [[ -f "$ci_config" ]]; then
-    logr "📄 Overriding config.toml from CI config: $ci_config"
-    if ! cp "$ci_config" "$template_name/config.toml"; then
-      logr "❌ Failed to copy CI config.toml for $display"
-      RESULTS+=("❌ $display (config override)")
+  # Helper: ensure that the pipeline workspace exists for non-init phases
+  ensure_workspace() {
+    if [[ ! -d "$template_name" ]]; then
+      logr "❌ Workspace '$workdir/$template_name' not found."
+      logr "   Did you run --phase init for this template before running '$PHASE'?"
+      RESULTS+=("❌ $display (missing workspace for phase $PHASE)")
       ANY_FAILURE=true
+      popd >/dev/null
+      return 1
+    fi
+    return 0
+  }
+
+  # ---- Phase: init (or part of 'all') ----
+  if [[ "$PHASE" == "init" || "$PHASE" == "all" ]]; then
+    # clean workspace for this template
+    rm -rf "$template_name"
+
+    logr "▶️  pxl-pipeline init $template_name --type $TYPE --template $template_name"
+    if ! pxl-pipeline init "$template_name" --type "$TYPE" --template "$template_name"; then
+      logr "❌ init failed for $display"
+      RESULTS+=("❌ $display (init)")
+      ANY_FAILURE=true
+      popd >/dev/null
+      return
+    fi
+
+    # Override config.toml with CI config if present
+    if [[ -f "$ci_config" ]]; then
+      logr "📄 Overriding config.toml from CI config: $ci_config"
+      if ! cp "$ci_config" "$template_name/config.toml"; then
+        logr "❌ Failed to copy CI config.toml for $display"
+        RESULTS+=("❌ $display (config override)")
+        ANY_FAILURE=true
+        popd >/dev/null
+        return
+      fi
+    fi
+
+    if [[ "$PHASE" == "init" ]]; then
+      logr "✅ $display (init) OK"
+      RESULTS+=("✅ $display (init)")
       popd >/dev/null
       return
     fi
   fi
 
-  # ---- Test ----
-  logr "▶️  pxl-pipeline test $template_name --run-config-file $run_config"
-  if ! pxl-pipeline test "$template_name" --run-config-file "$run_config"; then
-    logr "❌ test failed for $display"
-    RESULTS+=("❌ $display (test)")
-    ANY_FAILURE=true
-    popd >/dev/null
-    return
+  # For phases other than init/all, ensure workspace exists
+  if [[ "$PHASE" != "init" ]]; then
+    if ! ensure_workspace; then
+      return
+    fi
+    # On phases test/smoke/all, we can (re)apply CI config just to be safe
+    if [[ -f "$ci_config" ]]; then
+      logr "📄 Ensuring CI config.toml is applied: $ci_config"
+      cp "$ci_config" "$template_name/config.toml" || {
+        logr "❌ Failed to copy CI config.toml for $display"
+        RESULTS+=("❌ $display (config override)")
+        ANY_FAILURE=true
+        popd >/dev/null
+        return
+      }
+    fi
   fi
 
-  # ---- Smoke test ----
-  logr "▶️  pxl-pipeline smoke-test $template_name --run-config-file $run_config"
-  if ! pxl-pipeline smoke-test "$template_name" --run-config-file "$run_config"; then
-    logr "❌ smoke-test failed for $display"
-    RESULTS+=("❌ $display (smoke-test)")
-    ANY_FAILURE=true
-    popd >/dev/null
-    return
+  local phase_label="($PHASE)"
+
+  # ---- Phase: test (or part of 'all') ----
+  if [[ "$PHASE" == "test" || "$PHASE" == "all" ]]; then
+    logr "▶️  pxl-pipeline test $template_name --run-config-file $run_config"
+    if ! pxl-pipeline test "$template_name" --run-config-file "$run_config"; then
+      logr "❌ test failed for $display"
+      RESULTS+=("❌ $display (test)")
+      ANY_FAILURE=true
+      popd >/dev/null
+      return
+    fi
+    if [[ "$PHASE" == "test" ]]; then
+      logr "✅ $display (test) OK"
+      RESULTS+=("✅ $display (test)")
+      popd >/dev/null
+      return
+    fi
   fi
 
-  # ---- Deploy ----
-  logr "▶️  pxl-pipeline deploy $template_name --organization $ORGANIZATION --env $ENVIRONMENT --bump $BUMP"
-  if ! pxl-pipeline deploy "$template_name" --organization "$ORGANIZATION" --env "$ENVIRONMENT" --bump "$BUMP"; then
-    logr "❌ deploy failed for $display"
-    RESULTS+=("❌ $display (deploy)")
-    ANY_FAILURE=true
-    popd >/dev/null
-    return
+  # ---- Phase: smoke-test (or part of 'all') ----
+  if [[ "$PHASE" == "smoke" || "$PHASE" == "all" ]]; then
+    logr "▶️  pxl-pipeline smoke-test $template_name --run-config-file $run_config"
+    if ! pxl-pipeline smoke-test "$template_name" --run-config-file "$run_config"; then
+      logr "❌ smoke-test failed for $display"
+      RESULTS+=("❌ $display (smoke-test)")
+      ANY_FAILURE=true
+      popd >/dev/null
+      return
+    fi
+    if [[ "$PHASE" == "smoke" ]]; then
+      logr "✅ $display (smoke) OK"
+      RESULTS+=("✅ $display (smoke)")
+      popd >/dev/null
+      return
+    fi
   fi
 
-  logr "✅ $display OK"
-  RESULTS+=("✅ $display")
+  # ---- Phase: deploy (or part of 'all') ----
+  if [[ "$PHASE" == "deploy" || "$PHASE" == "all" ]]; then
+    logr "▶️  pxl-pipeline deploy $template_name --organization $ORGANIZATION --env $ENVIRONMENT --bump $BUMP"
+    if ! pxl-pipeline deploy "$template_name" --organization "$ORGANIZATION" --env "$ENVIRONMENT" --bump "$BUMP"; then
+      logr "❌ deploy failed for $display"
+      RESULTS+=("❌ $display (deploy)")
+      ANY_FAILURE=true
+      popd >/dev/null
+      return
+    fi
+    if [[ "$PHASE" == "deploy" ]]; then
+      logr "✅ $display (deploy) OK"
+      RESULTS+=("✅ $display (deploy)")
+      popd >/dev/null
+      return
+    fi
+  fi
+
+  # If we reached here, PHASE == all and everything passed
+  if [[ "$PHASE" == "all" ]]; then
+    logr "✅ $display OK"
+    RESULTS+=("✅ $display")
+  fi
+
   popd >/dev/null
 }
 
