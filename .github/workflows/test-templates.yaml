@@ -1,0 +1,98 @@
+name: Pipeline templates CI (changes-based)
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  detect-cli-template-changes:
+    uses: ./.github/workflows/detect-template-changes.yaml
+
+  run-cli-template-ci:
+    needs: detect-cli-template-changes
+    runs-on: ubuntu-latest
+
+    if: ${{ needs.detect-cli-template-changes.outputs.matrix != '' && needs.detect-cli-template-changes.outputs.matrix != '[]' }}
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-cli-template-changes.outputs.matrix) }}
+
+    env:
+      ORGANIZATION: test-account
+      ENVIRONMENT: STAGING
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync project dependencies
+        run: uv sync
+
+      - name: Install cv engine for CLI
+        run: uv add "picsellia-cv-engine==0.5.0"
+
+      - name: Login to Docker Hub as picsellia
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "$DOCKERHUB_TOKEN" | docker login \
+            -u "$DOCKERHUB_USERNAME" \
+            --password-stdin
+
+      - name: Prepare Picsellia config dir
+        run: |
+          PICSELLIA_CONFIG_DIR="$RUNNER_TEMP/picsellia_cfg"
+          mkdir -p "$PICSELLIA_CONFIG_DIR"
+          echo "PICSELLIA_CONFIG_DIR=$PICSELLIA_CONFIG_DIR" >> "$GITHUB_ENV"
+
+          echo "TYPE=${{ matrix.type }}"
+          echo "TEMPLATE=${{ matrix.template }}"
+          echo "ORG=$ORGANIZATION"
+          echo "ENV=$ENVIRONMENT"
+          echo "PICSELLIA_CONFIG_DIR=$PICSELLIA_CONFIG_DIR"
+
+      # ── Phase 1: init ─────────────────────────────────────────────────────
+      - name: Init template (phase=init)
+        env:
+          PXL_API_TOKEN: ${{ secrets.PXL_API_TOKEN_STAGING }}
+        run: |
+          uv run bash tests/script.sh \
+            --type "${{ matrix.type }}" \
+            --template "${{ matrix.template }}" \
+            --organization "$ORGANIZATION" \
+            --env "$ENVIRONMENT" \
+            --config-dir "$PICSELLIA_CONFIG_DIR" \
+            --phase init
+
+      # ── Phase 2: local test ───────────────────────────────────────────────
+      - name: Run local test (phase=test)
+        env:
+          PXL_API_TOKEN: ${{ secrets.PXL_API_TOKEN_STAGING }}
+        run: |
+          uv run bash tests/script.sh \
+            --type "${{ matrix.type }}" \
+            --template "${{ matrix.template }}" \
+            --organization "$ORGANIZATION" \
+            --env "$ENVIRONMENT" \
+            --config-dir "$PICSELLIA_CONFIG_DIR" \
+            --phase test
+
+      # ── Phase 4: deploy (staging, bump=final) ─────────────────────────────
+      - name: Deploy template (phase=deploy)
+        env:
+          PXL_API_TOKEN: ${{ secrets.PXL_API_TOKEN_STAGING }}
+        run: |
+          uv run bash tests/script.sh \
+            --type "${{ matrix.type }}" \
+            --template "${{ matrix.template }}" \
+            --organization "$ORGANIZATION" \
+            --env "$ENVIRONMENT" \
+            --bump "final" \
+            --config-dir "$PICSELLIA_CONFIG_DIR" \
+            --phase deploy
