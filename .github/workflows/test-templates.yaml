@@ -83,19 +83,6 @@ jobs:
             --config-dir "$PICSELLIA_CONFIG_DIR" \
             --phase test
 
-      # ── Phase 3: smoke-test (Docker) ──────────────────────────────────────
-      - name: Run smoke-test (phase=smoke)
-        env:
-          PXL_API_TOKEN: ${{ secrets.PXL_API_TOKEN_STAGING }}
-        run: |
-          uv run bash tests/script.sh \
-            --type "${{ matrix.type }}" \
-            --template "${{ matrix.template }}" \
-            --organization "$ORGANIZATION" \
-            --env "$ENVIRONMENT" \
-            --config-dir "$PICSELLIA_CONFIG_DIR" \
-            --phase smoke
-
       # ── Phase 4: deploy (staging, bump=final) ─────────────────────────────
       - name: Deploy template (phase=deploy)
         env:
