@@ -44,8 +44,20 @@ jobs:
           echo "training      = ${{ steps.changes.outputs.training }}"
           echo "utils_code    = ${{ steps.changes.outputs.utils_code }}"
 
-          PROCESSING_TEMPLATES=(dataset_version_creation pre_annotation data_auto_tagging model_conversion)
-          TRAINING_TEMPLATES=(yolov8)
+          get_processing_templates() {
+            ls src/picsellia_pipelines_cli/processing/templates/*_template.py 2>/dev/null \
+              | xargs -n1 basename \
+              | sed 's/_template\.py$//'
+          }
+
+          get_training_templates() {
+            ls src/picsellia_pipelines_cli/training/templates/*_template.py 2>/dev/null \
+              | xargs -n1 basename \
+              | sed 's/_template\.py$//'
+          }
+
+          PROCESSING_TEMPLATES=($(get_processing_templates))
+          TRAINING_TEMPLATES=($(get_training_templates))
 
           declare -A TO_RUN_PROC=()
           declare -A TO_RUN_TRAIN=()
