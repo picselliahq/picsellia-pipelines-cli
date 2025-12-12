@@ -183,9 +183,7 @@ RUN git clone --depth 1 https://github.com/picselliahq/picsellia-cv-base-docker.
 
 RUN sed -i '1 a source /experiment/{pipeline_dir}/.venv/bin/activate' /experiment/run.sh
 
-ARG REBUILD_ALL
 COPY ./ {pipeline_dir}
-ARG REBUILD_PICSELLIA
 
 # Sync from uv.lock (assumes uv lock has already been created)
 RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
