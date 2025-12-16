@@ -38,32 +38,32 @@ If you're new to the Picsellia Pipelines CLI, here’s the complete workflow in 
 
 1. **Initialize a pipeline project** → generates code, config, Dockerfile
 
-   👉 See [Init — Create a New Pipeline](#-init--create-a-new-pipeline)
+   See [Init — Create a New Pipeline](#-init--create-a-new-pipeline)
 
 
 2. **Customize your pipeline** → implement steps in `steps.py` and parameters in `utils/parameters.py`
 
-   👉 See [Customize Your Pipeline — Add Steps & Parameters](#-customize-your-pipeline--add-steps--parameters)
+   See [Customize Your Pipeline — Add Steps & Parameters](#-customize-your-pipeline--add-steps--parameters)
 
 
 3. **Test locally in Python** → confirm your code works
 
-   👉 See [Test — Run Your Pipeline Locally](#-test--run-your-pipeline-locally)
+   See [Test — Run Your Pipeline Locally](#-test--run-your-pipeline-locally)
 
 
 4. **Smoke test in Docker** → validate the full container environment
 
-   👉 See [Smoke Test — Validate the Docker Runtime](#-smoke-test--validate-the-docker-runtime)
+   See [Smoke Test — Validate the Docker Runtime](#-smoke-test--validate-the-docker-runtime)
 
 
 5. **Deploy to Picsellia** → build + push Docker image + register pipeline
 
-   👉 See [Deploy — Publish Your Pipeline to Picsellia](#-deploy--publish-your-pipeline-to-picsellia)
+   See [Deploy — Publish Your Pipeline to Picsellia](#-deploy--publish-your-pipeline-to-picsellia)
 
 
 6. (Optionally) **Launch real jobs from the CLI**
 
-   👉 See [Launch — Run Your Pipeline on Picsellia’s Infrastructure](#-launch--run-your-pipeline-on-picsellias-infrastructure)
+   See [Launch — Run Your Pipeline on Picsellia’s Infrastructure](#-launch--run-your-pipeline-on-picsellias-infrastructure)
 
 This workflow ensures your pipeline is fully validated before going to production.
 
@@ -119,7 +119,7 @@ pxl-pipeline logout   # clear active context
 ```
 </details>
 
-## 🔧 Init — Create a new pipeline
+## Init — Create a new pipeline
 
 **Objective: Generate a ready-to-use pipeline project folder with all required template files**
 
@@ -164,7 +164,7 @@ You're now ready to implement your custom logic.
 
 </details>
 
-## ✏️ Customize your pipeline — Add steps & parameters
+## Customize your pipeline — Add steps & parameters
 
 **Objective: Adapt the pipeline template to your specific use case**
 
@@ -272,7 +272,7 @@ Once parameters are defined, you can reference them directly in your step logic 
 
 </details>
 
-## 🧪 Test — Run your pipeline locally
+## Test — Run your pipeline locally
 
 **Objective: Ensure your Python code works exactly as expected, using real Picsellia objects**
 
@@ -330,7 +330,7 @@ pxl-pipeline test my-pipeline \
 
 </details>
 
-## 🔥 Smoke Test — Validate the Docker runtime
+## Smoke Test — Validate the Docker runtime
 
 **Objective: Ensure your Dockerfile, dependencies, imports, paths, and runtime fully work before deployment**
 
@@ -354,7 +354,7 @@ A successful smoke test strongly indicates that the pipeline will run properly o
 
 </details>
 
-## 🚀 Deploy — Publish your pipeline to Picsellia
+## Deploy — Publish your pipeline to Picsellia
 
 **Objective: Build, version, push the Docker image, and register/update the pipeline in your organization**
 
@@ -377,7 +377,7 @@ After deployment, the pipeline becomes usable by your team in the Picsellia inte
 
 </details>
 
-## 🟢 Launch — Run your pipeline on Picsellia’s infrastructure
+## Launch — Run your pipeline on Picsellia’s infrastructure
 
 *(Optional)*
 
@@ -406,7 +406,7 @@ This is equivalent to triggering an actual job from the Picsellia UI.
 
 </details>
 
-## 🔁 Sync — Synchronize local parameters with Picsellia
+## Sync — Synchronize local parameters with Picsellia
 
 *(Optional)*
 
@@ -436,7 +436,7 @@ Training sync is not yet implemented.
 
 </details>
 
-## 💡 Tips
+## Tips
 
 - Use `--output-dir` during init to generate the pipeline elsewhere
 - Virtual environments are created in `<pipeline>/.venv`
