@@ -96,14 +96,12 @@ pxl-pipeline --help
 
 **Objective: Use the same Picsellia user and environment across all commands**
 
-<details>
-<summary>Show authentication commands</summary>
-
-Before using any pipeline command, you must authenticate once:
-
 ```bash
 pxl-pipeline login
 ```
+
+<details>
+<summary>Show detailed explanation</summary>
 
 This stores your:
 
