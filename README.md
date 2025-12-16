@@ -67,7 +67,7 @@ If you're new to the Picsellia Pipelines CLI, here’s the complete workflow in 
 
 This workflow ensures your pipeline is fully validated before going to production.
 
-## Installation
+## 1. Installation
 
 <details>
 <summary>Show installation instructions</summary>
@@ -92,7 +92,7 @@ pxl-pipeline --help
 ```
 </details>
 
-## 🔐 Authentication
+## 2. Authentication
 
 **Objective: Use the same Picsellia user and environment across all commands**
 
@@ -119,7 +119,7 @@ pxl-pipeline logout   # clear active context
 ```
 </details>
 
-## Init — Create a new pipeline
+## 3. Init — Create a new pipeline
 
 **Objective: Generate a ready-to-use pipeline project folder with all required template files**
 
@@ -164,7 +164,7 @@ You're now ready to implement your custom logic.
 
 </details>
 
-## Customize your pipeline — Add steps & parameters
+## 4. Customize your pipeline — Add steps & parameters
 
 **Objective: Adapt the pipeline template to your specific use case**
 
@@ -272,7 +272,7 @@ Once parameters are defined, you can reference them directly in your step logic 
 
 </details>
 
-## Test — Run your pipeline locally
+## 5. Test — Run your pipeline locally
 
 **Objective: Ensure your Python code works exactly as expected, using real Picsellia objects**
 
@@ -330,7 +330,7 @@ pxl-pipeline test my-pipeline \
 
 </details>
 
-## Smoke Test — Validate the Docker runtime
+## 6. Smoke Test — Validate the Docker runtime
 
 **Objective: Ensure your Dockerfile, dependencies, imports, paths, and runtime fully work before deployment**
 
@@ -354,7 +354,7 @@ A successful smoke test strongly indicates that the pipeline will run properly o
 
 </details>
 
-## Deploy — Publish your pipeline to Picsellia
+## 7. Deploy — Publish your pipeline to Picsellia
 
 **Objective: Build, version, push the Docker image, and register/update the pipeline in your organization**
 
