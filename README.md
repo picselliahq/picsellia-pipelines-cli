@@ -1,71 +1,31 @@
 # Picsellia Pipelines CLI
 
-The Picsellia Pipelines CLI is the fastest way for Picsellia users to create, test, dockerize, deploy, and manage their own custom processing or training pipelines.
+The Picsellia Pipelines CLI lets you quickly create, test, dockerize, deploy, and manage custom processing or training pipelines.
 
-It streamlines the entire development workflow:
 
-1. Start from a ready-to-use template
+## How it works
 
-2. Run and debug your pipeline locally
-
-3. Validate the Docker image
-
-4. Deploy it to your Picsellia organization
-
-5. Optionally launch real jobs directly from the CLI
-
-This removes the need to manually handle Docker builds, API interactions, or complex job setup — the CLI takes care of everything for you.
-
-Built with [Typer](https://typer.tiangolo.com/) for an intuitive command-line experience.
-
----
-
-## 💡 Mental model
-
-Think of a pipeline as:
+A pipeline is simply:
 
 - a Python function (`pipeline.py`)
 
-- calling one or more steps (`steps.py`)
+- calling steps (`steps.py`)
 
-- parameterized by a config file (`run_config.toml`)
+- configured via `run_config.toml`
 
-- executed either locally or on Picsellia infrastructure
+- run locally or on Picsellia infrastructure
 
-## Quick Workflow Overview
+## Workflow at a glance
 
-If you're new to the Picsellia Pipelines CLI, here’s the complete workflow in **5 essential steps:**
+1. **[Init](#-init--create-a-new-pipeline)** → generate project template
 
-1. **Initialize a pipeline project** → generates code, config, Dockerfile
+2. **[Customize](#-customize-your-pipeline--add-steps--parameters)** → implement steps & parameters
 
-   See [Init — Create a New Pipeline](#-init--create-a-new-pipeline)
+3. **[Test](#-test--run-your-pipeline-locally)** → run locally
 
+4. **[Smoke Test](#-smoke-test--validate-the-docker-runtime)** → validate Docker image
 
-2. **Customize your pipeline** → implement steps in `steps.py` and parameters in `utils/parameters.py`
-
-   See [Customize Your Pipeline — Add Steps & Parameters](#-customize-your-pipeline--add-steps--parameters)
-
-
-3. **Test locally in Python** → confirm your code works
-
-   See [Test — Run Your Pipeline Locally](#-test--run-your-pipeline-locally)
-
-
-4. **Smoke test in Docker** → validate the full container environment
-
-   See [Smoke Test — Validate the Docker Runtime](#-smoke-test--validate-the-docker-runtime)
-
-
-5. **Deploy to Picsellia** → build + push Docker image + register pipeline
-
-   See [Deploy — Publish Your Pipeline to Picsellia](#-deploy--publish-your-pipeline-to-picsellia)
-
-
-6. (Optionally) **Launch real jobs from the CLI**
-
-   See [Launch — Run Your Pipeline on Picsellia’s Infrastructure](#-launch--run-your-pipeline-on-picsellias-infrastructure)
-
-This workflow ensures your pipeline is fully validated before going to production.
+5. **[Deploy — Publish Your Pipeline to Picsellia](#-deploy--publish-your-pipeline-to-picsellia)** → push & register pipeline
 
 ## 1. Installation
 
