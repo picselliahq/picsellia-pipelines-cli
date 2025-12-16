@@ -69,6 +69,10 @@ This workflow ensures your pipeline is fully validated before going to productio
 
 ## Installation
 
+<details>
+<summary>Show installation instructions</summary>
+
+
 #### With uv (recommended)
 
 ```bash
@@ -86,10 +90,14 @@ Check installation:
 ```bash
 pxl-pipeline --help
 ```
+</details>
 
 ## 🔐 Authentication
 
 **Objective: Use the same Picsellia user and environment across all commands**
+
+<details>
+<summary>Show authentication commands</summary>
 
 Before using any pipeline command, you must authenticate once:
 
@@ -111,6 +119,7 @@ pxl-pipeline whoami   # show active context
 pxl-pipeline switch   # change organization/environment
 pxl-pipeline logout   # clear active context
 ```
+</details>
 
 ## 🔧 Init — Create a new pipeline
 
@@ -119,6 +128,9 @@ pxl-pipeline logout   # clear active context
 ```bash
 pxl-pipeline init <pipeline_name> --type [training|processing] --template <template_name>
 ```
+
+<details>
+<summary>Show detailed explanation</summary>
 
 Examples:
 ```bash
@@ -152,6 +164,8 @@ my-pipeline/
 
 You're now ready to implement your custom logic.
 
+</details>
+
 ## ✏️ Customize your pipeline — Add steps & parameters
 
 **Objective: Adapt the pipeline template to your specific use case**
@@ -184,6 +198,9 @@ You do not need to redesign the whole pipeline unless your logic is more advance
 
 ### Working with Steps
 
+<details>
+<summary>Show detailed explanation</summary>
+
 Steps are Python functions decorated with `@step`.
 You can define them in `steps.py` and call them freely inside `pipeline.py`.
 
@@ -214,8 +231,12 @@ def dataset_version_creation_pipeline():
     upload_full_dataset(dataset_collection["output"], use_id=False)
     return dataset_collection
 ```
+</details>
 
 ### Adding Parameters
+
+<details>
+<summary>Show detailed explanation</summary>
 
 Define pipeline parameters in `utils/parameters.py`.
 
@@ -250,6 +271,9 @@ Each parameter requires:
 
 Once parameters are defined, you can reference them directly in your step logic and override their values in `run_config.toml`.
 
+
+</details>
+
 ## 🧪 Test — Run your pipeline locally
 
 **Objective: Ensure your Python code works exactly as expected, using real Picsellia objects**
@@ -257,6 +281,9 @@ Once parameters are defined, you can reference them directly in your step logic 
 ```bash
 pxl-pipeline test <pipeline_name> --run-config-file <path>
 ```
+
+<details>
+<summary>Show detailed explanation</summary>
 
 #### ⚠️ Important
 Even though the pipeline runs locally, all datasets, experiments, and outputs are created and updated on the Picsellia platform.
@@ -303,6 +330,8 @@ pxl-pipeline test my-pipeline \
   --run-config-file my-pipeline/runs/run_config.toml
 ```
 
+</details>
+
 ## 🔥 Smoke Test — Validate the Docker runtime
 
 **Objective: Ensure your Dockerfile, dependencies, imports, paths, and runtime fully work before deployment**
@@ -310,6 +339,10 @@ pxl-pipeline test my-pipeline \
 ```bash
 pxl-pipeline smoke-test <pipeline_name> --run-config-file <path>
 ```
+
+<details>
+<summary>Show detailed explanation</summary>
+
 This command:
 
 1. Builds the Docker image
@@ -321,6 +354,8 @@ It is your final validation step before deployment.
 
 A successful smoke test strongly indicates that the pipeline will run properly on Picsellia’s infrastructure.
 
+</details>
+
 ## 🚀 Deploy — Publish your pipeline to Picsellia
 
 **Objective: Build, version, push the Docker image, and register/update the pipeline in your organization**
@@ -328,6 +363,9 @@ A successful smoke test strongly indicates that the pipeline will run properly o
 ```bash
 pxl-pipeline deploy <pipeline_name>
 ```
+
+<details>
+<summary>Show detailed explanation</summary>
 
 This command:
 
@@ -339,6 +377,8 @@ This command:
 
 After deployment, the pipeline becomes usable by your team in the Picsellia interface.
 
+</details>
+
 ## 🟢 Launch — Run your pipeline on Picsellia’s infrastructure
 
 *(Optional)*
@@ -348,6 +388,9 @@ After deployment, the pipeline becomes usable by your team in the Picsellia inte
 ```bash
 pxl-pipeline launch <pipeline_name> --run-config-file <path>
 ```
+
+<details>
+<summary>Show detailed explanation</summary>
 
 Launch behaves like:
 
@@ -363,6 +406,8 @@ The `run_config.toml` defines:
 
 This is equivalent to triggering an actual job from the Picsellia UI.
 
+</details>
+
 ## 🔁 Sync — Synchronize local parameters with Picsellia
 
 *(Optional)*
@@ -372,6 +417,10 @@ This is equivalent to triggering an actual job from the Picsellia UI.
 ```bash
 pxl-pipeline sync <pipeline_name>
 ```
+
+<details>
+<summary>Show detailed explanation</summary>
+
 For processing pipelines, this syncs:
 
 - default parameter values
@@ -386,6 +435,8 @@ pxl-pipeline deploy
 because deploy already updates the parameter definition on the platform.
 
 Training sync is not yet implemented.
+
+</details>
 
 ## 💡 Tips
 
