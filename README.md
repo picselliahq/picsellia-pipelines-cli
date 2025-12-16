@@ -20,6 +20,18 @@ Built with [Typer](https://typer.tiangolo.com/) for an intuitive command-line ex
 
 ---
 
+## 💡 Mental model
+
+Think of a pipeline as:
+
+- a Python function (`pipeline.py`)
+
+- calling one or more steps (`steps.py`)
+
+- parameterized by a config file (`run_config.toml`)
+
+- executed either locally or on Picsellia infrastructure
+
 ## Quick Workflow Overview
 
 If you're new to the Picsellia Pipelines CLI, here’s the complete workflow in **5 essential steps:**
@@ -116,11 +128,11 @@ pxl-pipeline init resize-images --type processing --template dataset_version_cre
 
 This generates:
 
-- a single entrypoint: pipeline.py
+- a single entrypoint: `pipeline.py`
 
-- config.toml (metadata + execution parameters)
+- `config.toml` (metadata + execution parameters)
 
-- Dockerfile and .dockerignore
+- `Dockerfile` and `.dockerignore`
 
 - a consistent folder structure:
 
@@ -142,19 +154,38 @@ You're now ready to implement your custom logic.
 
 ## ✏️ Customize your pipeline — Add steps & parameters
 
-**Objective: Implement your pipeline logic and define custom parameters**
+**Objective: Adapt the pipeline template to your specific use case**
 
 After running `init`, your pipeline project is generated with a default structure:
 
 - `pipeline.py` — your entrypoint
 
-- `steps.py` — implement processing or training steps
+- `steps.py` (a default process step) — implement processing or training steps
 
 - `utils/parameters.py` — define your pipeline parameters
 
-### Adding Steps
+👉 In most cases, if you chose the right template, you only need to modify the existing `process` step to implement your use case.
 
-Steps are Python functions decorated with `@step`. You can add as many as you want and call them inside `pipeline.py`.
+You do not need to redesign the whole pipeline unless your logic is more advanced.
+
+### Recommended approach
+
+1. Start by editing the existing `process` step
+
+    This step already exposes the correct inputs, outputs, and parameters expected by Picsellia.
+
+2. Only add new steps if needed
+
+   If your pipeline requires additional logic (pre-processing, post-processing, custom validation, chaining operations, etc.), you can:
+
+   - modify the existing step
+   - replace it entirely
+   - or add new steps and compose them in `pipeline.py`
+
+### Working with Steps
+
+Steps are Python functions decorated with `@step`.
+You can define them in `steps.py` and call them freely inside `pipeline.py`.
 
 Example (`steps.py`):
 
@@ -186,7 +217,15 @@ def dataset_version_creation_pipeline():
 
 ### Adding Parameters
 
-Define pipeline parameters in `utils/parameters.py`. All parameters defined here are automatically recognized by the CLI and uploaded to Picsellia.
+Define pipeline parameters in `utils/parameters.py`.
+
+All parameters declared here are:
+
+- automatically detected by the CLI
+
+- injected at runtime
+
+- uploaded to Picsellia during deploy or sync
 
 Example:
 
@@ -201,16 +240,15 @@ class ProcessingParameters(Parameters):
         self.data_tag = self.extract_parameter(["data_tag"], expected_type=str, default="processed")
 ```
 
+Each parameter requires:
 
-- `extract_parameter` takes:
+- a key → used as the parameter name on the Picsellia platform
 
-    - a key (used on the Picsellia platform)
+- an expected type → str, int, float, etc.
 
-    - an expected type (`str`, `int`, `float`, etc.)
+- a default value → mandatory for parameter registration
 
-    - a default value (mandatory for uploading to Picsellia)
-
-You can now update `run_config.toml` to include values for your custom parameters. Once steps and parameters are defined, you can proceed to Test your pipeline locally.
+Once parameters are defined, you can reference them directly in your step logic and override their values in `run_config.toml`.
 
 ## 🧪 Test — Run your pipeline locally
 
@@ -219,6 +257,9 @@ You can now update `run_config.toml` to include values for your custom parameter
 ```bash
 pxl-pipeline test <pipeline_name> --run-config-file <path>
 ```
+
+#### ⚠️ Important
+Even though the pipeline runs locally, all datasets, experiments, and outputs are created and updated on the Picsellia platform.
 
 This command:
 
@@ -302,7 +343,7 @@ After deployment, the pipeline becomes usable by your team in the Picsellia inte
 
 *(Optional)*
 
-**Objective: Trigger a real Picsellia job (not local), using the same run_config.toml**
+**Objective: Trigger a real Picsellia job (not local), using the same `run_config.toml`**
 
 ```bash
 pxl-pipeline launch <pipeline_name> --run-config-file <path>
@@ -314,7 +355,7 @@ Launch behaves like:
 - or launching a training experiment
 - without manually creating an experiment or job in the UI
 
-The run_config.toml defines:
+The `run_config.toml` defines:
 
 - the dataset/model input
 - the output dataset or experiment name
