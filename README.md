@@ -17,15 +17,15 @@ A pipeline is simply:
 
 ## Workflow at a glance
 
-1. **[Init](#-init--create-a-new-pipeline)** → generate project template
+1. **[Init](#3-init--create-a-new-pipeline)** → generate project template
 
-2. **[Customize](#-customize-your-pipeline--add-steps--parameters)** → implement steps & parameters
+2. **[Customize](#4-customize-your-pipeline--add-steps--parameters)** → implement steps & parameters
 
-3. **[Test](#-test--run-your-pipeline-locally)** → run locally
+3. **[Test](#5-test--run-your-pipeline-locally)** → run locally
 
-4. **[Smoke Test](#-smoke-test--validate-the-docker-runtime)** → validate Docker image
+4. **[Smoke Test](#6-smoke-test--validate-the-docker-runtime)** → validate Docker image
 
-5. **[Deploy — Publish Your Pipeline to Picsellia](#-deploy--publish-your-pipeline-to-picsellia)** → push & register pipeline
+5. **[Deploy — Publish Your Pipeline to Picsellia](#7-deploy--publish-your-pipeline-to-picsellia)** → push & register pipeline
 
 ## 1. Installation
 
