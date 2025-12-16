@@ -34,7 +34,7 @@ jobs:
         run: uv sync
 
       - name: Install cv engine for CLI
-        run: uv add "picsellia-cv-engine==0.5.0"
+        run: uv add picsellia-cv-engine
 
       - name: Login to Docker Hub as picsellia
         env:
