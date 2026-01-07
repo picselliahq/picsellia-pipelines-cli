@@ -39,76 +39,64 @@ jobs:
         id: build-matrix
         shell: bash
         run: |
+          set -euo pipefail
+
           echo "== Changes summary =="
           echo "processing    = ${{ steps.changes.outputs.processing }}"
           echo "training      = ${{ steps.changes.outputs.training }}"
           echo "utils_code    = ${{ steps.changes.outputs.utils_code }}"
 
           get_processing_templates() {
-            find src/picsellia_pipelines_cli/processing/templates \
-              -maxdepth 1 -type f -name '*_template.py' -print 2>/dev/null \
+            local dir="src/picsellia_pipelines_cli/processing/templates"
+            [[ -d "$dir" ]] || return 0
+            find "$dir" -maxdepth 1 -type f -name '*_template.py' -print \
             | while read -r f; do
                 basename "$f" | sed 's/_template\.py$//'
               done \
-            | sort
+            | sort -u
           }
 
           get_training_templates() {
-            find src/picsellia_pipelines_cli/training/templates \
-              -maxdepth 1 -type f -name '*_template.py' -print 2>/dev/null \
+            local dir="src/picsellia_pipelines_cli/training/templates"
+            [[ -d "$dir" ]] || return 0
+            find "$dir" -maxdepth 1 -type f -name '*_template.py' -print \
             | while read -r f; do
                 basename "$f" | sed 's/_template\.py$//'
               done \
-            | sort
+            | sort -u
           }
-
 
           PROCESSING_TEMPLATES=($(get_processing_templates))
           TRAINING_TEMPLATES=($(get_training_templates))
 
+          echo "Found processing templates: ${PROCESSING_TEMPLATES[*]:-<none>}"
+          echo "Found training templates:    ${TRAINING_TEMPLATES[*]:-<none>}"
+
           declare -A TO_RUN_PROC=()
           declare -A TO_RUN_TRAIN=()
 
-          mark_all_processing() {
-            for t in "${PROCESSING_TEMPLATES[@]}"; do
-              TO_RUN_PROC["$t"]=1
-            done
-          }
+          mark_all_processing() { for t in "${PROCESSING_TEMPLATES[@]}"; do TO_RUN_PROC["$t"]=1; done; }
+          mark_all_training()  { for t in "${TRAINING_TEMPLATES[@]}";  do TO_RUN_TRAIN["$t"]=1; done; }
 
-          mark_all_training() {
-            for t in "${TRAINING_TEMPLATES[@]}"; do
-              TO_RUN_TRAIN["$t"]=1
-            done
-          }
-
-          # utils/main → everything
           if [[ "${{ steps.changes.outputs.utils_code }}" == "true" ]]; then
             echo "utils_code changed → mark ALL processing & training templates"
             mark_all_processing
             mark_all_training
           fi
 
-          # processing (code or tests) → all processing templates
           if [[ "${{ steps.changes.outputs.processing }}" == "true" ]]; then
             echo "processing changed → mark ALL processing templates"
             mark_all_processing
           fi
 
-          # training (code or tests) → all training templates
           if [[ "${{ steps.changes.outputs.training }}" == "true" ]]; then
             echo "training changed → mark ALL training templates"
             mark_all_training
           fi
 
           entries=()
-
-          for t in "${!TO_RUN_PROC[@]}"; do
-            entries+=( "{\"type\":\"processing\",\"template\":\"$t\"}" )
-          done
-
-          for t in "${!TO_RUN_TRAIN[@]}"; do
-            entries+=( "{\"type\":\"training\",\"template\":\"$t\"}" )
-          done
+          for t in "${!TO_RUN_PROC[@]}";  do entries+=( "{\"type\":\"processing\",\"template\":\"$t\"}" ); done
+          for t in "${!TO_RUN_TRAIN[@]}"; do entries+=( "{\"type\":\"training\",\"template\":\"$t\"}" ); done
 
           if [ ${#entries[@]} -eq 0 ]; then
             echo "No templates selected (matrix empty)."
@@ -119,9 +107,7 @@ jobs:
           json='{"include":['
           first=1
           for e in "${entries[@]}"; do
-            if [ $first -eq 0 ]; then
-              json+=","
-            fi
+            if [ $first -eq 0 ]; then json+=","; fi
             json+="$e"
             first=0
           done
