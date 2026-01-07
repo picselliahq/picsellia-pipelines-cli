@@ -531,6 +531,7 @@ PROCESSING_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10
 
 RUN apt-get update && apt-get install -y \\
     libgl1-mesa-glx \\
+    git \\
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /experiment
@@ -540,10 +541,13 @@ RUN git clone --depth 1 https://github.com/picselliahq/picsellia-cv-base-docker.
 
 RUN sed -i '1 a source /experiment/{pipeline_dir}/.venv/bin/activate' /experiment/run.sh
 
-COPY ./ {pipeline_dir}
+COPY ./uv.lock {pipeline_dir}/uv.lock
+COPY ./pyproject.toml {pipeline_dir}/pyproject.toml
 
 # Sync from uv.lock (assumes uv lock has already been created)
 RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
+
+COPY ./ {pipeline_dir}
 
 ENV PYTHONPATH="/experiment"
 
