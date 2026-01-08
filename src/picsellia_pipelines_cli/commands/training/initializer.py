@@ -10,6 +10,7 @@ from picsellia_pipelines_cli.utils.env_utils import get_env_config
 from picsellia_pipelines_cli.utils.initializer import handle_pipeline_name, init_client
 from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section, step
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
+from pathlib import Path
 
 
 def init_training(
