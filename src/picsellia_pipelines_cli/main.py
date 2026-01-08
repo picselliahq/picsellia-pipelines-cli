@@ -94,7 +94,11 @@ def init(
     output_dir: Annotated[str, typer.Option(help="Where to create the pipeline")] = ".",
     use_pyproject: Annotated[bool, typer.Option(help="Use pyproject.toml")] = True,
     run_config_file: Annotated[
-        str | None, typer.Option("--run-config-file", help="Optional run_config.toml used to prefill config (training only)")
+        str | None,
+        typer.Option(
+            "--run-config-file",
+            help="Optional run_config.toml used to prefill config (training only)",
+        ),
     ] = None,
 ):
     """Initialize a new training or processing pipeline from a template."""

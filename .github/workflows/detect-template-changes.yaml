@@ -55,7 +55,7 @@ jobs:
               done \
             | sort -u
           }
-          
+
           get_training_templates() {
             local dir="src/picsellia_pipelines_cli/commands/training/templates"
             [[ -d "$dir" ]] || return 0
