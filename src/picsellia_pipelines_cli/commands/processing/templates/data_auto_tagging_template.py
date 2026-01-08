@@ -545,8 +545,7 @@ COPY ./uv.lock {pipeline_dir}/uv.lock
 COPY ./pyproject.toml {pipeline_dir}/pyproject.toml
 
 # Sync from uv.lock (assumes uv lock has already been created)
-RUN uv sync --python=$(which python3.10) --project data_auto_tagging \
- && rm -rf /root/.cache/uv /root/.cache/pip
+RUN uv sync --python=$(which python3.10) --project data_auto_tagging
 
 COPY ./ {pipeline_dir}
 
@@ -642,7 +641,7 @@ class DataAutoTaggingProcessingTemplate(BaseTemplate):
                 else "requirements.txt",
                 "parameters_class": "utils/parameters.py:ProcessingParameters",
             },
-            "docker": {"image_name": "", "image_tag": ""},
+            "docker": {"image_name": "", "image_tag": "", "cpu": 4, "gpu": 1},
         }
 
     def _get_dockerfile(self) -> str:

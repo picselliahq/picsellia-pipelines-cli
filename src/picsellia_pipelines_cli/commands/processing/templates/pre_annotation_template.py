@@ -336,7 +336,7 @@ class PreAnnotationTemplate(BaseTemplate):
                 else "requirements.txt",
                 "parameters_class": "utils/parameters.py:ProcessingParameters",
             },
-            "docker": {"image_name": "", "image_tag": ""},
+            "docker": {"image_name": "", "image_tag": "", "cpu": 4, "gpu": 1},
         }
 
     def _get_dockerfile(self) -> str:
