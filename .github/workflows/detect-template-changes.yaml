@@ -3,16 +3,20 @@ name: Detect CLI template changes
 on:
   workflow_call:
     outputs:
-      matrix:
-        description: "JSON matrix of {type, template} to run"
-        value: ${{ jobs.detect.outputs.matrix }}
+      cpu_matrix:
+        description: "JSON matrix of {type, template} to run on CPU runners"
+        value: ${{ jobs.detect.outputs.cpu_matrix }}
+      gpu_matrix:
+        description: "JSON matrix of {type, template} to run on GPU runners"
+        value: ${{ jobs.detect.outputs.gpu_matrix }}
 
 jobs:
   detect:
     runs-on: ubuntu-latest
 
     outputs:
-      matrix: ${{ steps.build-matrix.outputs.matrix }}
+      cpu_matrix: ${{ steps.split.outputs.cpu_matrix }}
+      gpu_matrix: ${{ steps.split.outputs.gpu_matrix }}
 
     steps:
       - name: Checkout repo
@@ -50,22 +54,17 @@ jobs:
             local dir="src/picsellia_pipelines_cli/commands/processing/templates"
             [[ -d "$dir" ]] || return 0
             find "$dir" -maxdepth 1 -type f -name '*_template.py' -print \
-            | while read -r f; do
-                basename "$f" | sed 's/_template\.py$//'
-              done \
-            | sort -u
+              | while read -r f; do basename "$f" | sed 's/_template\.py$//'; done \
+              | sort -u
           }
 
           get_training_templates() {
             local dir="src/picsellia_pipelines_cli/commands/training/templates"
             [[ -d "$dir" ]] || return 0
             find "$dir" -maxdepth 1 -type f -name '*_template.py' -print \
-            | while read -r f; do
-                basename "$f" | sed 's/_template\.py$//'
-              done \
-            | sort -u
+              | while read -r f; do basename "$f" | sed 's/_template\.py$//'; done \
+              | sort -u
           }
-
 
           PROCESSING_TEMPLATES=($(get_processing_templates))
           TRAINING_TEMPLATES=($(get_training_templates))
@@ -116,3 +115,70 @@ jobs:
 
           echo "Computed matrix: $json"
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
+
+      - name: Split matrix into CPU vs GPU (training -> GPU, processing reads tests/**/config.toml)
+        id: split
+        shell: bash
+        env:
+          FULL_MATRIX: ${{ steps.build-matrix.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          echo "FULL_MATRIX=$FULL_MATRIX"
+
+          python - << 'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          import pathlib
+
+          try:
+              import tomllib  # py>=3.11
+          except ModuleNotFoundError:
+              import tomli as tomllib  # type: ignore
+
+          raw = os.environ.get("FULL_MATRIX", "") or ""
+          data = json.loads(raw) if raw else {"include": []}
+          inc = data.get("include", [])
+
+          cpu = []
+          gpu = []
+
+          def gpu_count_for_processing(template: str) -> int:
+              # We read test-specific config (what your CI uses)
+              cfg = pathlib.Path("tests") / "processing" / template / "config.toml"
+              if not cfg.is_file():
+                  return 0
+              try:
+                  with cfg.open("rb") as f:
+                      d = tomllib.load(f)
+                  docker = d.get("docker") or {}
+                  v = docker.get("gpu", 0)
+                  if isinstance(v, str):
+                      try:
+                          return int(v)
+                      except ValueError:
+                          return 0
+                  if isinstance(v, (int, float)):
+                      return int(v)
+                  return 0
+              except Exception:
+                  return 0
+
+          for e in inc:
+              t = e.get("type")
+              name = e.get("template")
+
+              if t == "training":
+                  # training = always GPU/self-hosted
+                  gpu.append(e)
+                  continue
+
+              # processing
+              g = gpu_count_for_processing(name)
+              if g > 0:
+                  gpu.append(e)
+              else:
+                  cpu.append(e)
+
+          print("cpu_matrix=" + json.dumps({"include": cpu}))
+          print("gpu_matrix=" + json.dumps({"include": gpu}))
+          PY
