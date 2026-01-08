@@ -16,3 +16,8 @@ id = "0196a0ec-e802-775f-818a-4d3482f31d31"
 [output.experiment]
 name = "test-1"
 project_name = "yolov8"
+
+[hyperparameters]
+epochs = 1
+batch_size = 8
+image_size = 640
