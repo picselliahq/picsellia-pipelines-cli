@@ -93,6 +93,9 @@ def init(
     template: Annotated[str | None, typer.Option(help="Template to use")] = None,
     output_dir: Annotated[str, typer.Option(help="Where to create the pipeline")] = ".",
     use_pyproject: Annotated[bool, typer.Option(help="Use pyproject.toml")] = True,
+    run_config_file: Annotated[
+        str | None, typer.Option("--run-config-file", help="Optional run_config.toml used to prefill config (training only)")
+    ] = None,
 ):
     """Initialize a new training or processing pipeline from a template."""
     if type is None:
@@ -133,8 +136,16 @@ def init(
             template=template,
             output_dir=output_dir,
             use_pyproject=use_pyproject,
+            run_config_file=run_config_file,
         )
     elif type == "processing":
+        if run_config_file is not None:
+            typer.secho(
+                "❌ --run-config-file is only supported for training init.",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+
         init_processing(
             pipeline_name=pipeline_name,
             template=template,
