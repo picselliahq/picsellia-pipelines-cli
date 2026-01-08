@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import toml
 import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
@@ -10,7 +13,6 @@ from picsellia_pipelines_cli.utils.env_utils import get_env_config
 from picsellia_pipelines_cli.utils.initializer import handle_pipeline_name, init_client
 from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section, step
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
-from pathlib import Path
 
 
 def init_training(
@@ -81,14 +83,24 @@ def init_training(
         # non-interactive path
         run_path = Path(run_config_file)
         if not run_path.is_file():
-            typer.echo(typer.style(f"❌ run config file not found: {run_config_file}", fg=typer.colors.RED))
+            typer.echo(
+                typer.style(
+                    f"❌ run config file not found: {run_config_file}",
+                    fg=typer.colors.RED,
+                )
+            )
             raise typer.Exit(code=1)
 
         data = toml.load(str(run_path))
 
         model_id = data.get("input", {}).get("model_version", {}).get("id")
         if not model_id:
-            typer.echo(typer.style("❌ run_config.toml is missing [input.model_version].id", fg=typer.colors.RED))
+            typer.echo(
+                typer.style(
+                    "❌ run_config.toml is missing [input.model_version].id",
+                    fg=typer.colors.RED,
+                )
+            )
             raise typer.Exit(code=1)
 
         # On met juste l’ID, pas besoin d’autres infos en CI
@@ -374,14 +386,11 @@ def register_pipeline_metadata(
     )
     config.save()
 
+
 def _load_model_from_run_config(run_config_file: str) -> tuple[str, str]:
     data = toml.load(run_config_file)
 
-    model_id = (
-        data.get("input", {})
-            .get("model_version", {})
-            .get("id")
-    )
+    model_id = data.get("input", {}).get("model_version", {}).get("id")
     if not model_id:
         raise typer.Exit(
             typer.echo(
@@ -389,7 +398,8 @@ def _load_model_from_run_config(run_config_file: str) -> tuple[str, str]:
                     "❌ run_config.toml is missing [input.model_version].id",
                     fg=typer.colors.RED,
                 )
-            ) or 1
+            )
+            or 1
         )
 
     # auth est optionnel (si vous préférez rester sur env var / context)
