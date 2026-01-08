@@ -155,7 +155,7 @@ RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
 
 COPY ./ {pipeline_dir}
 
-ENV PYTHONPATH=":/experiment"
+ENV PYTHONPATH=":/experiment"   
 
 ENTRYPOINT ["run", "python3.10", "{pipeline_dir}/pipeline.py"]
 """

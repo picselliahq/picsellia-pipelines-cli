@@ -47,7 +47,17 @@ jobs:
           echo "utils_code    = ${{ steps.changes.outputs.utils_code }}"
 
           get_processing_templates() {
-            local dir="src/picsellia_pipelines_cli/processing/templates"
+            local dir="src/picsellia_pipelines_cli/commands/processing/templates"
+            [[ -d "$dir" ]] || return 0
+            find "$dir" -maxdepth 1 -type f -name '*_template.py' -print \
+            | while read -r f; do
+                basename "$f" | sed 's/_template\.py$//'
+              done \
+            | sort -u
+          }
+          
+          get_training_templates() {
+            local dir="src/picsellia_pipelines_cli/commands/training/templates"
             [[ -d "$dir" ]] || return 0
             find "$dir" -maxdepth 1 -type f -name '*_template.py' -print \
             | while read -r f; do
@@ -56,15 +66,6 @@ jobs:
             | sort -u
           }
 
-          get_training_templates() {
-            local dir="src/picsellia_pipelines_cli/training/templates"
-            [[ -d "$dir" ]] || return 0
-            find "$dir" -maxdepth 1 -type f -name '*_template.py' -print \
-            | while read -r f; do
-                basename "$f" | sed 's/_template\.py$//'
-              done \
-            | sort -u
-          }
 
           PROCESSING_TEMPLATES=($(get_processing_templates))
           TRAINING_TEMPLATES=($(get_training_templates))
