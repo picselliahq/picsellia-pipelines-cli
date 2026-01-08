@@ -545,7 +545,8 @@ COPY ./uv.lock {pipeline_dir}/uv.lock
 COPY ./pyproject.toml {pipeline_dir}/pyproject.toml
 
 # Sync from uv.lock (assumes uv lock has already been created)
-RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
+RUN uv sync --python=$(which python3.10) --project data_auto_tagging \
+ && rm -rf /root/.cache/uv /root/.cache/pip
 
 COPY ./ {pipeline_dir}
 
