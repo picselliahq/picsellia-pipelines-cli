@@ -1,139 +1,408 @@
-# 🧪 Picsellia Pipelines CLI
+# Picsellia Pipelines CLI
 
-A command-line tool to create, test, deploy, and manage training and processing pipelines for [Picsellia](https://picsellia.com/).
+The Picsellia Pipelines CLI lets you quickly create, test, dockerize, deploy, and manage custom processing or training pipelines.
 
-Built with [Typer](https://typer.tiangolo.com/) for intuitive CLI usage.
 
----
+## How it works
 
-## Installation
+A pipeline is simply:
 
-Install the CLI directly from GitHub (no need to clone the repo):
+- a Python function (`pipeline.py`)
 
-#### Using Poetry:
+- calling steps (`steps.py`)
 
-```bash
-poetry add picsellia-pipelines-cli
-```
+- configured via `run_config.toml`
 
-#### Using uv (faster, works with requirements.txt or pyproject.toml):
+- run locally or on Picsellia infrastructure
+
+## Workflow at a glance
+
+1. **[Init](#3-init--create-a-new-pipeline)** → generate project template
+
+2. **[Customize](#4-customize-your-pipeline--add-steps--parameters)** → implement steps & parameters
+
+3. **[Test](#5-test--run-your-pipeline-locally)** → run locally
+
+4. **[Smoke Test](#6-smoke-test--validate-the-docker-runtime)** → validate Docker image
+
+5. **[Deploy — Publish Your Pipeline to Picsellia](#7-deploy--publish-your-pipeline-to-picsellia)** → push & register pipeline
+
+## 1. Installation
+
+<details>
+<summary>Show installation instructions</summary>
+
+
+#### With uv (recommended)
 
 ```bash
 uv pip install picsellia-pipelines-cli
 ```
 
-You can now use:
+#### With Poetry:
+
+```bash
+poetry add picsellia-pipelines-cli
+```
+
+Check installation:
 
 ```bash
 pxl-pipeline --help
 ```
+</details>
 
-## Available Commands
-🔹 All CLI commands are structured like this:
+## 2. Authentication
 
-```bash
-pxl-pipeline [init|test|deploy|smoke-test|sync] <pipeline_name>
-```
-The pipeline type is resolved automatically from its config file (config.toml), except during init.
-
-
-## 🔧 Initialize a Pipeline
+**Objective: Use the same Picsellia user and environment across all commands**
 
 ```bash
-pxl-pipeline init <pipeline_name> --type [training|processing] --template <template>
+pxl-pipeline login
 ```
+
+<details>
+<summary>Show detailed explanation</summary>
+
+This stores your:
+
+- organization
+- environment (PROD / BETA / DEV / CUSTOM)
+- API token
+- optional custom base URL
+
+Other helpful commands:
+
+```bash
+pxl-pipeline whoami   # show active context
+pxl-pipeline switch   # change organization/environment
+pxl-pipeline logout   # clear active context
+```
+</details>
+
+## 3. Init — Create a new pipeline
+
+**Objective: Generate a ready-to-use pipeline project folder with all required template files**
+
+```bash
+pxl-pipeline init <pipeline_name> --type [training|processing] --template <template_name>
+```
+
+<details>
+<summary>Show detailed explanation</summary>
 
 Examples:
 ```bash
-pxl-pipeline init yolov8 --type training --template ultralytics
+pxl-pipeline init yolov8 --type training --template yolov8
 pxl-pipeline init resize-images --type processing --template dataset_version_creation
 ```
 
 This generates:
 
-- a `config.toml` with pipeline metadata
+- a single entrypoint: `pipeline.py`
 
-- a `Dockerfile`, `.dockerignore`, and dependency file (`pyproject.toml` or `requirements.txt`)
+- `config.toml` (metadata + execution parameters)
 
-- scripts for both `picsellia_pipeline.py` and `local_pipeline.py`
+- `Dockerfile` and `.dockerignore`
 
-- pre-filled `steps.py` and utility files
-
-You can customize templates in your own extensions later.
-
-### After Initialization
-
-Once the pipeline is initialized:
-
-- A local virtual environment is automatically created inside the pipeline directory (`<pipeline_name>/.venv`)
-- You can directly activate it and run any pipeline-related commands:
+- a consistent folder structure:
 
 ```bash
-cd <pipeline_name>
-source .venv/bin/activate  # or .venv\Scripts\activate.bat on Windows
+my-pipeline/
+├── pipeline.py
+├── steps.py
+├── utils/
+│   ├── parameters.py
+├── config.toml
+├── Dockerfile
+├── .dockerignore
+├── runs/
+│   └── run_config.toml   # template for test/smoke-test/launch
+└── pyproject.toml
 ```
 
-You can still use the CLI from inside the venv:
+You're now ready to implement your custom logic.
+
+</details>
+
+## 4. Customize your pipeline — Add steps & parameters
+
+**Objective: Adapt the pipeline template to your specific use case**
+
+After running `init`, your pipeline project is generated with a default structure:
+
+- `pipeline.py` — your entrypoint
+
+- `steps.py` (a default process step) — implement processing or training steps
+
+- `utils/parameters.py` — define your pipeline parameters
+
+👉 In most cases, if you chose the right template, you only need to modify the existing `process` step to implement your use case.
+
+You do not need to redesign the whole pipeline unless your logic is more advanced.
+
+### Recommended approach
+
+1. Start by editing the existing `process` step
+
+    This step already exposes the correct inputs, outputs, and parameters expected by Picsellia.
+
+2. Only add new steps if needed
+
+   If your pipeline requires additional logic (pre-processing, post-processing, custom validation, chaining operations, etc.), you can:
+
+   - modify the existing step
+   - replace it entirely
+   - or add new steps and compose them in `pipeline.py`
+
+### Working with Steps
+
+<details>
+<summary>Show detailed explanation</summary>
+
+Steps are Python functions decorated with `@step`.
+You can define them in `steps.py` and call them freely inside `pipeline.py`.
+
+Example (`steps.py`):
+
+```python
+from picsellia_pipeline.core import step
+
+@step
+def process(dataset_input, dataset_output):
+    # your processing logic here
+    dataset_output["images"] = [img.upper() for img in dataset_input["images"]]
+    return dataset_output
+```
+
+Example pipeline (`pipeline.py`):
+
+```python
+from steps import process
+from picsellia_pipeline.core import pipeline, step
+
+@pipeline
+def dataset_version_creation_pipeline():
+    dataset_collection = load_coco_datasets()
+    dataset_collection["output"] = process(
+        dataset_collection["input"], dataset_collection["output"]
+    )
+    upload_full_dataset(dataset_collection["output"], use_id=False)
+    return dataset_collection
+```
+</details>
+
+### Adding Parameters
+
+<details>
+<summary>Show detailed explanation</summary>
+
+Define pipeline parameters in `utils/parameters.py`.
+
+All parameters declared here are:
+
+- automatically detected by the CLI
+
+- injected at runtime
+
+- uploaded to Picsellia during deploy or sync
+
+Example:
+
+```python
+from picsellia.types.schemas import LogDataType
+from picsellia_cv_engine.core.parameters import Parameters
+
+class ProcessingParameters(Parameters):
+    def __init__(self, log_data: LogDataType):
+        super().__init__(log_data=log_data)
+        self.datalake = self.extract_parameter(["datalake"], expected_type=str, default="default")
+        self.data_tag = self.extract_parameter(["data_tag"], expected_type=str, default="processed")
+```
+
+Each parameter requires:
+
+- a key → used as the parameter name on the Picsellia platform
+
+- an expected type → str, int, float, etc.
+
+- a default value → mandatory for parameter registration
+
+Once parameters are defined, you can reference them directly in your step logic and override their values in `run_config.toml`.
+
+
+</details>
+
+## 5. Test — Run your pipeline locally
+
+**Objective: Ensure your Python code works exactly as expected, using real Picsellia objects**
+
 ```bash
-pxl-pipeline test <pipeline_name>
+pxl-pipeline test <pipeline_name> --run-config-file <path>
 ```
 
-## 🧪 Test Locally
+<details>
+<summary>Show detailed explanation</summary>
+
+#### ⚠️ Important
+Even though the pipeline runs locally, all datasets, experiments, and outputs are created and updated on the Picsellia platform.
+
+This command:
+
+- runs the pipeline locally in the virtual env (.venv/)
+- loads the configuration from your run_config.toml
+- interacts with real Picsellia objects
+- uploads results to the platform exactly like a real run
+- guarantees your step logic and parameters behave correctly
+
+A template run config is generated automatically at:
 
 ```bash
-pxl-pipeline test <pipeline_name>
+<pipeline_name>/runs/run_config.toml
 ```
 
-Runs the pipeline in a local virtualenv (.venv/) and prompts for required parameters (e.g., dataset version ID, experiment ID, etc.).
+You simply need to fill it with your dataset/model IDs, parameters, or metadata.
 
-## 🔥 Smoke Test in Docker
+Example (dataset version creation processing):
+
+```toml
+override_outputs = true
+
+[job]
+type = "DATASET_VERSION_CREATION"
+
+[input.dataset_version]
+id = ""
+
+[output.dataset_version]
+name = "test_my_pipeline"
+
+[parameters]
+datalake = "default"
+data_tag = "processed"
+```
+
+Once the file is filled:
 
 ```bash
-pxl-pipeline smoke-test <pipeline_name>
+pxl-pipeline test my-pipeline \
+  --run-config-file my-pipeline/runs/run_config.toml
 ```
 
-Builds the Docker image for the pipeline and runs it locally to validate that everything (code + dependencies + env) works inside the container.
+</details>
 
+## 6. Smoke Test — Validate the Docker runtime
 
-## 🚀 Deploy to Picsellia
+**Objective: Ensure your Dockerfile, dependencies, imports, paths, and runtime fully work before deployment**
+
+```bash
+pxl-pipeline smoke-test <pipeline_name> --run-config-file <path>
+```
+
+<details>
+<summary>Show detailed explanation</summary>
+
+This command:
+
+1. Builds the Docker image
+2. Runs the pipeline inside the container (not Python locally)
+3. Uses the same run_config.toml as the test command
+4. Updates real objects/results on Picsellia
+
+It is your final validation step before deployment.
+
+A successful smoke test strongly indicates that the pipeline will run properly on Picsellia’s infrastructure.
+
+</details>
+
+## 7. Deploy — Publish your pipeline to Picsellia
+
+**Objective: Build, version, push the Docker image, and register/update the pipeline in your organization**
 
 ```bash
 pxl-pipeline deploy <pipeline_name>
 ```
 
-Builds and pushes the Docker image to your configured registry and registers the pipeline in Picsellia (either as a training pipeline or a dataset processing job).
+<details>
+<summary>Show detailed explanation</summary>
 
-## 🔁 Sync Parameters (Processing Only)
+This command:
+
+- builds the Docker image
+- pushes it to your configured registry
+- versions the image
+- creates or updates the Picsellia processing or training asset
+- ensures the pipeline is ready to be launched from the UI
+
+After deployment, the pipeline becomes usable by your team in the Picsellia interface.
+
+</details>
+
+## Launch — Run your pipeline on Picsellia’s infrastructure
+
+*(Optional)*
+
+**Objective: Trigger a real Picsellia job (not local), using the same `run_config.toml`**
+
+```bash
+pxl-pipeline launch <pipeline_name> --run-config-file <path>
+```
+
+<details>
+<summary>Show detailed explanation</summary>
+
+Launch behaves like:
+
+- launching a processing job on a dataset
+- or launching a training experiment
+- without manually creating an experiment or job in the UI
+
+The `run_config.toml` defines:
+
+- the dataset/model input
+- the output dataset or experiment name
+- the pipeline parameters
+
+This is equivalent to triggering an actual job from the Picsellia UI.
+
+</details>
+
+## Sync — Synchronize local parameters with Picsellia
+
+*(Optional)*
+
+**Objective: Update parameters stored on Picsellia to match your local**
 
 ```bash
 pxl-pipeline sync <pipeline_name>
-
 ```
 
-For processing pipelines, this updates the default parameters stored in Picsellia based on your Parameters class and config.toml.
+<details>
+<summary>Show detailed explanation</summary>
+
+For processing pipelines, this syncs:
+
+- default parameter values
+- parameter schema / types
+
+Sync is usually unnecessary if you run:
+
+```bash
+pxl-pipeline deploy
+```
+
+because deploy already updates the parameter definition on the platform.
 
 Training sync is not yet implemented.
 
-## 📁 Project Structure Example
+</details>
 
-```bash
-resize-images/
-├── config.toml
-├── Dockerfile
-├── picsellia_pipeline.py
-├── local_pipeline.py
-├── steps.py
-├── utils/
-│   ├── parameters.py
-│   └── processing.py
-└── pyproject.toml
-```
+## Tips
 
-## 💡 Tips
-
-- You can override the output directory on init with --output-dir
-- Virtual environments are created in `<pipeline_name>/.venv` by default
-- You can always edit config.toml to change pipeline metadata or execution scripts
+- Use `--output-dir` during init to generate the pipeline elsewhere
+- Virtual environments are created in `<pipeline>/.venv`
+- You can edit `config.toml` at any time (metadata, entrypoints, dependencies)
+- Always run `test` → `smoke-test` → `deploy` for a clean workflow
+- A successful smoke test almost guarantees a successful production run
 
 --------------------------------
 

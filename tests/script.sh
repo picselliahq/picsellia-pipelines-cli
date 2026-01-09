@@ -181,14 +181,21 @@ run_one_template() {
     # clean workspace for this template
     rm -rf "$template_name"
 
-    logr "▶️  pxl-pipeline init $template_name --type $TYPE --template $template_name"
-    if ! pxl-pipeline init "$template_name" --type "$TYPE" --template "$template_name"; then
-      logr "❌ init failed for $display"
-      RESULTS+=("❌ $display (init)")
-      ANY_FAILURE=true
-      popd >/dev/null
-      return
-    fi
+  # Build init command (training: pass run_config to avoid prompts)
+  init_cmd=(pxl-pipeline init "$template_name" --type "$TYPE" --template "$template_name")
+
+  if [[ "$TYPE" == "training" ]]; then
+    init_cmd+=(--run-config-file "$run_config")
+  fi
+
+  logr "▶️  ${init_cmd[*]}"
+  if ! "${init_cmd[@]}"; then
+    logr "❌ init failed for $display"
+    RESULTS+=("❌ $display (init)")
+    ANY_FAILURE=true
+    popd >/dev/null
+    return
+  fi
 
     # Override config.toml with CI config if present
     if [[ -f "$ci_config" ]]; then

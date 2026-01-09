@@ -531,6 +531,7 @@ PROCESSING_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10
 
 RUN apt-get update && apt-get install -y \\
     libgl1-mesa-glx \\
+    git \\
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /experiment
@@ -540,12 +541,13 @@ RUN git clone --depth 1 https://github.com/picselliahq/picsellia-cv-base-docker.
 
 RUN sed -i '1 a source /experiment/{pipeline_dir}/.venv/bin/activate' /experiment/run.sh
 
-ARG REBUILD_ALL
-COPY ./ {pipeline_dir}
-ARG REBUILD_PICSELLIA
+COPY ./uv.lock {pipeline_dir}/uv.lock
+COPY ./pyproject.toml {pipeline_dir}/pyproject.toml
 
 # Sync from uv.lock (assumes uv lock has already been created)
-RUN uv sync --python=$(which python3.10) --project {pipeline_dir}
+RUN uv sync --python=$(which python3.10) --project data_auto_tagging
+
+COPY ./ {pipeline_dir}
 
 ENV PYTHONPATH="/experiment"
 
@@ -639,7 +641,7 @@ class DataAutoTaggingProcessingTemplate(BaseTemplate):
                 else "requirements.txt",
                 "parameters_class": "utils/parameters.py:ProcessingParameters",
             },
-            "docker": {"image_name": "", "image_tag": ""},
+            "docker": {"image_name": "", "image_tag": "", "cpu": 4, "gpu": 1},
         }
 
     def _get_dockerfile(self) -> str:

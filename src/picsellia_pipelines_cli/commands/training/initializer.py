@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import toml
 import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
@@ -17,6 +20,7 @@ def init_training(
     template: str,
     output_dir: str | None = None,
     use_pyproject: bool | None = True,
+    run_config_file: str | None = None,
 ):
     """Initialize and scaffold a training pipeline project.
 
@@ -72,6 +76,44 @@ def init_training(
 
     # Model setup
     section("Model")
+
+    config = PipelineConfig(pipeline_name=pipeline_name)
+
+    if run_config_file:
+        # non-interactive path
+        run_path = Path(run_config_file)
+        if not run_path.is_file():
+            typer.echo(
+                typer.style(
+                    f"❌ run config file not found: {run_config_file}",
+                    fg=typer.colors.RED,
+                )
+            )
+            raise typer.Exit(code=1)
+
+        data = toml.load(str(run_path))
+
+        model_id = data.get("input", {}).get("model_version", {}).get("id")
+        if not model_id:
+            typer.echo(
+                typer.style(
+                    "❌ run_config.toml is missing [input.model_version].id",
+                    fg=typer.colors.RED,
+                )
+            )
+            raise typer.Exit(code=1)
+
+        # On met juste l’ID, pas besoin d’autres infos en CI
+        config.config.setdefault("model_version", {})
+        config.config["model_version"].update({"id": model_id})
+        config.save()
+
+        kv("Mode", "run_config.toml (non-interactive)")
+        kv("Model version id", model_id)
+        hr()
+        return
+
+    # interactive path (local)
     model_name, model_version_name, model_url, framework, inference_type = (
         choose_or_create_model_version(client=client)
     )
@@ -84,8 +126,6 @@ def init_training(
         accent=True,
     )
 
-    # Pipeline metadata
-    config = PipelineConfig(pipeline_name=pipeline_name)
     register_pipeline_metadata(
         config=config,
         model_version_name=model_version_name,
@@ -345,3 +385,25 @@ def register_pipeline_metadata(
         }
     )
     config.save()
+
+
+def _load_model_from_run_config(run_config_file: str) -> tuple[str, str]:
+    data = toml.load(run_config_file)
+
+    model_id = data.get("input", {}).get("model_version", {}).get("id")
+    if not model_id:
+        raise typer.Exit(
+            typer.echo(
+                typer.style(
+                    "❌ run_config.toml is missing [input.model_version].id",
+                    fg=typer.colors.RED,
+                )
+            )
+            or 1
+        )
+
+    # auth est optionnel (si vous préférez rester sur env var / context)
+    auth = data.get("auth", {})
+    org = auth.get("organization_name")
+    env = auth.get("env")
+    return model_id, f"{org}|{env}"

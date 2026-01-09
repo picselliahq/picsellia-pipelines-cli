@@ -3,16 +3,20 @@ name: Detect CLI template changes
 on:
   workflow_call:
     outputs:
-      matrix:
-        description: "JSON matrix of {type, template} to run"
-        value: ${{ jobs.detect.outputs.matrix }}
+      cpu_matrix:
+        description: "JSON matrix of {type, template} to run on CPU runners"
+        value: ${{ jobs.detect.outputs.cpu_matrix }}
+      gpu_matrix:
+        description: "JSON matrix of {type, template} to run on GPU runners"
+        value: ${{ jobs.detect.outputs.gpu_matrix }}
 
 jobs:
   detect:
     runs-on: ubuntu-latest
 
     outputs:
-      matrix: ${{ steps.build-matrix.outputs.matrix }}
+      cpu_matrix: ${{ steps.split.outputs.cpu_matrix }}
+      gpu_matrix: ${{ steps.split.outputs.gpu_matrix }}
 
     steps:
       - name: Checkout repo
@@ -39,57 +43,60 @@ jobs:
         id: build-matrix
         shell: bash
         run: |
+          set -euo pipefail
+
           echo "== Changes summary =="
           echo "processing    = ${{ steps.changes.outputs.processing }}"
           echo "training      = ${{ steps.changes.outputs.training }}"
           echo "utils_code    = ${{ steps.changes.outputs.utils_code }}"
 
-          PROCESSING_TEMPLATES=(dataset_version_creation pre_annotation data_auto_tagging model_conversion)
-          TRAINING_TEMPLATES=(yolov8)
+          get_processing_templates() {
+            local dir="src/picsellia_pipelines_cli/commands/processing/templates"
+            [[ -d "$dir" ]] || return 0
+            find "$dir" -maxdepth 1 -type f -name '*_template.py' -print \
+              | while read -r f; do basename "$f" | sed 's/_template\.py$//'; done \
+              | sort -u
+          }
+
+          get_training_templates() {
+            local dir="src/picsellia_pipelines_cli/commands/training/templates"
+            [[ -d "$dir" ]] || return 0
+            find "$dir" -maxdepth 1 -type f -name '*_template.py' -print \
+              | while read -r f; do basename "$f" | sed 's/_template\.py$//'; done \
+              | sort -u
+          }
+
+          PROCESSING_TEMPLATES=($(get_processing_templates))
+          TRAINING_TEMPLATES=($(get_training_templates))
+
+          echo "Found processing templates: ${PROCESSING_TEMPLATES[*]:-<none>}"
+          echo "Found training templates:    ${TRAINING_TEMPLATES[*]:-<none>}"
 
           declare -A TO_RUN_PROC=()
           declare -A TO_RUN_TRAIN=()
 
-          mark_all_processing() {
-            for t in "${PROCESSING_TEMPLATES[@]}"; do
-              TO_RUN_PROC["$t"]=1
-            done
-          }
+          mark_all_processing() { for t in "${PROCESSING_TEMPLATES[@]}"; do TO_RUN_PROC["$t"]=1; done; }
+          mark_all_training()  { for t in "${TRAINING_TEMPLATES[@]}";  do TO_RUN_TRAIN["$t"]=1; done; }
 
-          mark_all_training() {
-            for t in "${TRAINING_TEMPLATES[@]}"; do
-              TO_RUN_TRAIN["$t"]=1
-            done
-          }
-
-          # utils/main → everything
           if [[ "${{ steps.changes.outputs.utils_code }}" == "true" ]]; then
             echo "utils_code changed → mark ALL processing & training templates"
             mark_all_processing
             mark_all_training
           fi
 
-          # processing (code or tests) → all processing templates
           if [[ "${{ steps.changes.outputs.processing }}" == "true" ]]; then
             echo "processing changed → mark ALL processing templates"
             mark_all_processing
           fi
 
-          # training (code or tests) → all training templates
           if [[ "${{ steps.changes.outputs.training }}" == "true" ]]; then
             echo "training changed → mark ALL training templates"
             mark_all_training
           fi
 
           entries=()
-
-          for t in "${!TO_RUN_PROC[@]}"; do
-            entries+=( "{\"type\":\"processing\",\"template\":\"$t\"}" )
-          done
-
-          for t in "${!TO_RUN_TRAIN[@]}"; do
-            entries+=( "{\"type\":\"training\",\"template\":\"$t\"}" )
-          done
+          for t in "${!TO_RUN_PROC[@]}";  do entries+=( "{\"type\":\"processing\",\"template\":\"$t\"}" ); done
+          for t in "${!TO_RUN_TRAIN[@]}"; do entries+=( "{\"type\":\"training\",\"template\":\"$t\"}" ); done
 
           if [ ${#entries[@]} -eq 0 ]; then
             echo "No templates selected (matrix empty)."
@@ -100,9 +107,7 @@ jobs:
           json='{"include":['
           first=1
           for e in "${entries[@]}"; do
-            if [ $first -eq 0 ]; then
-              json+=","
-            fi
+            if [ $first -eq 0 ]; then json+=","; fi
             json+="$e"
             first=0
           done
@@ -110,3 +115,70 @@ jobs:
 
           echo "Computed matrix: $json"
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
+
+      - name: Split matrix into CPU vs GPU (training -> GPU, processing reads tests/**/config.toml)
+        id: split
+        shell: bash
+        env:
+          FULL_MATRIX: ${{ steps.build-matrix.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          echo "FULL_MATRIX=$FULL_MATRIX"
+
+          python - << 'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          import pathlib
+
+          try:
+              import tomllib  # py>=3.11
+          except ModuleNotFoundError:
+              import tomli as tomllib  # type: ignore
+
+          raw = os.environ.get("FULL_MATRIX", "") or ""
+          data = json.loads(raw) if raw else {"include": []}
+          inc = data.get("include", [])
+
+          cpu = []
+          gpu = []
+
+          def gpu_count_for_processing(template: str) -> int:
+              # We read test-specific config (what your CI uses)
+              cfg = pathlib.Path("tests") / "processing" / template / "config.toml"
+              if not cfg.is_file():
+                  return 0
+              try:
+                  with cfg.open("rb") as f:
+                      d = tomllib.load(f)
+                  docker = d.get("docker") or {}
+                  v = docker.get("gpu", 0)
+                  if isinstance(v, str):
+                      try:
+                          return int(v)
+                      except ValueError:
+                          return 0
+                  if isinstance(v, (int, float)):
+                      return int(v)
+                  return 0
+              except Exception:
+                  return 0
+
+          for e in inc:
+              t = e.get("type")
+              name = e.get("template")
+
+              if t == "training":
+                  # training = always GPU/self-hosted
+                  gpu.append(e)
+                  continue
+
+              # processing
+              g = gpu_count_for_processing(name)
+              if g > 0:
+                  gpu.append(e)
+              else:
+                  cpu.append(e)
+
+          print("cpu_matrix=" + json.dumps({"include": cpu}))
+          print("gpu_matrix=" + json.dumps({"include": gpu}))
+          PY
