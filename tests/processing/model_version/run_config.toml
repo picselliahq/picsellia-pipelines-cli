@@ -1,7 +1,7 @@
 override_outputs = true
 
 [job]
-type = "DATASET_VERSION_CREATION"
+type = "MODEL_COMPRESSION"
 
 [auth]
 organization_name = "test-account"
@@ -10,3 +10,6 @@ env = "STAGING"
 [input.model_version]
 id = "01967bdb-ee96-7336-bcb5-d6b33d99cc52"
 visibility = "private"
+
+[parameters]
+example_parameter = "example"

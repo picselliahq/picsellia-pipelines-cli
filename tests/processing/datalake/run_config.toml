@@ -1,7 +1,7 @@
 override_outputs = true
 
 [job]
-type = "DATASET_VERSION_CREATION"
+type = "DATA_AUTO_TAGGING"
 
 [auth]
 organization_name = "test-account"
@@ -16,3 +16,6 @@ visibility = ""
 
 [output.datalake]
 id = "0189266d-6675-775a-985c-441b2820bdc9"
+
+[parameters]
+example_parameter = "example"
