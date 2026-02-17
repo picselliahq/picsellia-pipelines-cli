@@ -84,6 +84,10 @@ dependencies = [
     "picsellia-pipelines-cli",
     "picsellia-cv-engine",
 ]
+
+[tool.uv.sources]
+picsellia-pipelines-cli = { git = "https://github.com/picselliahq/picsellia-pipelines-cli", branch = "origin/add-simple-dataset-template"  }
+
 """
 
 
