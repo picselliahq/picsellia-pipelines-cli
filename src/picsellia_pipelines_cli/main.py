@@ -74,6 +74,8 @@ PROCESSING_TEMPLATES = [
     "pre_annotation",
     "data_auto_tagging",
     "model_conversion",
+    "model_version",
+    ""
 ]
 TRAINING_TEMPLATES = ["yolov8"]
 PROCESSING_TYPES_MAPPING = {
