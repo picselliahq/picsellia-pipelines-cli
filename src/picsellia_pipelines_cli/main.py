@@ -75,7 +75,7 @@ PROCESSING_TEMPLATES = [
     "data_auto_tagging",
     "model_conversion",
     "model_version",
-    ""
+    "datalake"
 ]
 TRAINING_TEMPLATES = ["yolov8"]
 PROCESSING_TYPES_MAPPING = {

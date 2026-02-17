@@ -1,0 +1,18 @@
+override_outputs = true
+
+[job]
+type = "DATASET_VERSION_CREATION"
+
+[auth]
+organization_name = "test-account"
+env = "STAGING"
+
+[input.datalake]
+id = "0189266d-6675-775a-985c-441b2820bdc9"
+
+[input.model_version]
+id = ""
+visibility = ""
+
+[output.datalake]
+id = "0189266d-6675-775a-985c-441b2820bdc9"
