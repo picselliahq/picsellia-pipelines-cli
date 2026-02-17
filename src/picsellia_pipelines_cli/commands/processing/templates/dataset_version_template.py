@@ -28,7 +28,7 @@ context = create_processing_context_from_config(
 )
 def {pipeline_name}_pipeline():
     # You can write code directly in the pipeline or organize it using `steps` just like the one below.
-    process(context=context))
+    process()
 
 
 if __name__ == "__main__":
