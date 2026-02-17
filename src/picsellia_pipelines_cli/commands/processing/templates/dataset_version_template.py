@@ -142,7 +142,7 @@ example_parameter = "default"
 """
 
 
-class DatasetVersionCreationProcessingTemplate(BaseTemplate):
+class DatasetVersionProcessingTemplate(BaseTemplate):
     def __init__(self, pipeline_name: str, output_dir: str, use_pyproject: bool = True):
         super().__init__(
             pipeline_name=pipeline_name,
