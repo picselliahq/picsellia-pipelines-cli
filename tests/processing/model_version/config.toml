@@ -1,8 +1,8 @@
 [metadata]
-name = "dataset_version_creation"
+name = "model_version"
 version = "1.0"
 description = ""
-type = "DATASET_VERSION_CREATION"
+type = "MODEL_COMPRESSION"
 
 [execution]
 pipeline_script = "pipeline.py"
