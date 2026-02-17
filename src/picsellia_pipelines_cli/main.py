@@ -70,6 +70,7 @@ app.command("switch")(auth_switch)
 VALID_PIPELINE_TYPES = ["training", "processing"]
 PROCESSING_TEMPLATES = [
     "dataset_version_creation",
+    "dataset_version",
     "pre_annotation",
     "data_auto_tagging",
     "model_conversion",

@@ -230,7 +230,7 @@ def validate_required_id(
 
 def build_endpoint(pipeline_type: str, inputs: dict) -> str:
     """Return the endpoint path based on the pipeline type."""
-    if pipeline_type in ("DATASET_VERSION_CREATION", "PRE_ANNOTATION"):
+    if pipeline_type in ("DATASET_VERSION_CREATION", "PRE_ANNOTATION", "DATASET_VERSION"):
         dataset_id = get_dataset_version_id(inputs)
         validate_required_id("dataset_version", dataset_id, pipeline_type)
         return f"/api/dataset/version/{dataset_id}/processing/launch"
