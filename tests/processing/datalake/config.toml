@@ -1,0 +1,16 @@
+[metadata]
+name = "datalake"
+version = "1.0"
+description = ""
+type = "DATA_AUTO_TAGGING"
+
+[execution]
+pipeline_script = "pipeline.py"
+requirements_file = "pyproject.toml"
+parameters_class = "utils/parameters.py:ProcessingParameters"
+
+[docker]
+image_name = "picsellia/datalake-test-pipeline"
+image_tag = "latest"
+cpu = "4"
+gpu = "0"

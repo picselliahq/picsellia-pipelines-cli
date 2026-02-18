@@ -70,9 +70,12 @@ app.command("switch")(auth_switch)
 VALID_PIPELINE_TYPES = ["training", "processing"]
 PROCESSING_TEMPLATES = [
     "dataset_version_creation",
+    "dataset_version",
     "pre_annotation",
     "data_auto_tagging",
     "model_conversion",
+    "model_version",
+    "datalake"
 ]
 TRAINING_TEMPLATES = ["yolov8"]
 PROCESSING_TYPES_MAPPING = {

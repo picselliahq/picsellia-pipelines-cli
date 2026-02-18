@@ -3,12 +3,16 @@ import typer
 from picsellia_pipelines_cli.commands.processing.templates.data_auto_tagging_template import (
     DataAutoTaggingProcessingTemplate,
 )
+from picsellia_pipelines_cli.commands.processing.templates.datalake_template import DatalakeProcessingTemplate
 from picsellia_pipelines_cli.commands.processing.templates.dataset_version_creation_template import (
     DatasetVersionCreationProcessingTemplate,
 )
+from picsellia_pipelines_cli.commands.processing.templates.dataset_version_template import \
+    DatasetVersionProcessingTemplate
 from picsellia_pipelines_cli.commands.processing.templates.model_conversion_template import (
     ModelConversionProcessingTemplate,
 )
+from picsellia_pipelines_cli.commands.processing.templates.model_version_template import ModelVersionProcessingTemplate
 from picsellia_pipelines_cli.commands.processing.templates.pre_annotation_template import (
     PreAnnotationTemplate,
 )
@@ -81,6 +85,12 @@ def get_template_instance(
         typer.Exit: If the template name is not recognized.
     """
     match template_name:
+        case "dataset_version":
+            return DatasetVersionProcessingTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
         case "dataset_version_creation":
             return DatasetVersionCreationProcessingTemplate(
                 pipeline_name=pipeline_name,
@@ -99,8 +109,20 @@ def get_template_instance(
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,
             )
+        case "datalake":
+            return DatalakeProcessingTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
         case "model_conversion":
             return ModelConversionProcessingTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
+        case "model_version":
+            return ModelVersionProcessingTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,
