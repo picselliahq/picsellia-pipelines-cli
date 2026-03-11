@@ -129,6 +129,11 @@ PROCESSING_RUN_CONFIG = """override_outputs = true
 [job]
 type = "DATA_AUTO_TAGGING"
 
+[inputs]
+model_version_id = ""
+input_datalake_id = ""
+output_datalake_id = ""
+
 [input.datalake]
 id = ""
 
