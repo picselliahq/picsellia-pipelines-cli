@@ -78,6 +78,9 @@ dependencies = [
     "picsellia-pipelines-cli",
     "picsellia-cv-engine",
 ]
+
+[tool.uv.sources]
+picsellia-cv-engine = { git = "https://github.com/picselliahq/picsellia-cv-engine.git", rev = "feat/new-local-contexts" }
 """
 
 PROCESSING_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10
