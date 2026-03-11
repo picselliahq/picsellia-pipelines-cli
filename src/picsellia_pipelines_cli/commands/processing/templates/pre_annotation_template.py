@@ -229,7 +229,7 @@ requires-python = ">=3.10,<3.12"
 
 dependencies = [
     "picsellia-pipelines-cli",
-    "picsellia-cv-engine[ultralytics] @ git+https://github.com/picselliahq/picsellia-cv-engine.git@feat/new-local-contexts",
+    "picsellia-cv-engine[ultralytics]",
     "ultralytics",
     "opencv-python"
 ]
