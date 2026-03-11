@@ -84,6 +84,7 @@ dependencies = [
     "picsellia-pipelines-cli",
     "picsellia-cv-engine",
 ]
+
 """
 
 

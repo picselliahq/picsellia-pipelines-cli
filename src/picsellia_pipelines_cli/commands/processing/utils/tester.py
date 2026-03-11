@@ -67,14 +67,14 @@ def prompt_dataset_version_creation_params(
         typer.style("📅 Input dataset version ID", fg=typer.colors.CYAN),
         default=input_dataset.get("id", ""),
     )
-    output_dataset_version_name = typer.prompt(
+    target_version_name = typer.prompt(
         typer.style("📄 Output dataset version name", fg=typer.colors.CYAN),
         default=output_dataset.get("name", f"processed_{pipeline_name}"),
     )
     return {
         "job": {"type": "DATASET_VERSION_CREATION"},
         "input": {"dataset_version": {"id": input_dataset_version_id}},
-        "output": {"dataset_version": {"name": output_dataset_version_name}},
+        "output": {"dataset_version": {"name": target_version_name}},
     }
 
 

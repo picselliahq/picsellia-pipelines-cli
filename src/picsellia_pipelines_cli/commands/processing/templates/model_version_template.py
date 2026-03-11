@@ -78,6 +78,7 @@ dependencies = [
     "picsellia-pipelines-cli",
     "picsellia-cv-engine",
 ]
+
 """
 
 PROCESSING_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10

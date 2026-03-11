@@ -5,7 +5,6 @@ PROCESSING_PIPELINE = """import argparse
 from picsellia.types.enums import ProcessingType
 from picsellia_cv_engine.core.services.context.unified_context import create_processing_context_from_config
 from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
-
 from steps import process
 from utils.parameters import ProcessingParameters
 
@@ -83,6 +82,7 @@ dependencies = [
     "picsellia-pipelines-cli",
     "picsellia-cv-engine",
 ]
+
 """
 
 PROCESSING_PIPELINE_DOCKERFILE = """FROM picsellia/cpu:python3.10
@@ -127,6 +127,11 @@ PROCESSING_RUN_CONFIG = """override_outputs = true
 
 [job]
 type = "DATA_AUTO_TAGGING"
+
+[inputs]
+model_version_id = ""
+input_datalake_id = ""
+output_datalake_id = ""
 
 [input.datalake]
 id = ""
