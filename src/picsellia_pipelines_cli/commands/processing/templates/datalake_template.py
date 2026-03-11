@@ -5,8 +5,9 @@ PROCESSING_PIPELINE = """import argparse
 from picsellia.types.enums import ProcessingType
 from picsellia_cv_engine.core.services.context.unified_context import create_processing_context_from_config
 from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
-from picsellia_cv_engine.core.contexts.processing.common import PicselliaLocalProcessingContext 
-
+from picsellia_cv_engine.core.contexts.processing.common.local_picsellia_context import (
+    PicselliaLocalProcessingContext,
+)
 from steps import process
 from utils.parameters import ProcessingParameters
 
