@@ -5,6 +5,7 @@ PROCESSING_PIPELINE = """import argparse
 from picsellia.types.enums import ProcessingType
 from picsellia_cv_engine.core.services.context.unified_context import create_processing_context_from_config
 from picsellia_cv_engine.decorators.pipeline_decorator import pipeline
+import picsellia_cv_engine
 
 from steps import process
 from utils.parameters import ProcessingParameters
@@ -14,6 +15,7 @@ parser.add_argument("--mode", choices=["local", "picsellia"], default="picsellia
 parser.add_argument("--config-file", type=str, required=False)
 args = parser.parse_args()
 
+print("version", picsellia_cv_engine.__version__)
 context = create_processing_context_from_config(
     processing_type=ProcessingType.DATA_AUTO_TAGGING,
     processing_parameters_cls=ProcessingParameters,
