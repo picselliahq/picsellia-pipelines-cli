@@ -47,7 +47,7 @@ def process():
     context: PicselliaModelProcessingContext = Pipeline.get_active_context()
     parameters = context.processing_parameters
     example_parameter = parameters.example_parameter
-    model_version = context.model_version
+    model_version = context.target
 
     # Your logic goes here ...
 
@@ -76,7 +76,7 @@ requires-python = ">=3.10"
 
 dependencies = [
     "picsellia-pipelines-cli",
-    "picsellia-cv-engine",
+    "picsellia-cv-engine @ git+https://github.com/picselliahq/picsellia-cv-engine.git@feat/new-local-contexts",
 ]
 
 """
@@ -121,12 +121,10 @@ runs/
 
 PROCESSING_RUN_CONFIG = """override_outputs = true
 
+target_id = ""
+
 [job]
 type = "MODEL_CONVERSION"
-
-[input.model_version]
-id = ""
-visibility = "private"
 
 [parameters]
 example_parameter = "default"
