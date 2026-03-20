@@ -77,7 +77,7 @@ PROCESSING_TEMPLATES = [
     "model_version",
     "datalake"
 ]
-TRAINING_TEMPLATES = ["yolov8"]
+TRAINING_TEMPLATES = ["yolov8", "simple"]
 PROCESSING_TYPES_MAPPING = {
     "dataset_version_creation": "DATASET_VERSION_CREATION",
     "pre_annotation": "PRE_ANNOTATION",
