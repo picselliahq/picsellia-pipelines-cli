@@ -65,7 +65,6 @@ class TrainingHyperParameters(HyperParameters):
 """
 
 TRAINING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
-
 """
 
 TRAINING_PIPELINE_PYPROJECT = """[project]
