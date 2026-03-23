@@ -6,6 +6,7 @@ from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
+from picsellia_pipelines_cli.commands.training.templates.simple_template import SimpleTrainingTemplate
 from picsellia_pipelines_cli.commands.training.templates.yolov8_template import (
     YOLOV8TrainingTemplate,
 )
@@ -213,6 +214,12 @@ def get_template_instance(
     match template_name:
         case "yolov8":
             return YOLOV8TrainingTemplate(
+                pipeline_name=pipeline_name,
+                output_dir=output_dir,
+                use_pyproject=use_pyproject,
+            )
+        case "simple":
+            return SimpleTrainingTemplate(
                 pipeline_name=pipeline_name,
                 output_dir=output_dir,
                 use_pyproject=use_pyproject,

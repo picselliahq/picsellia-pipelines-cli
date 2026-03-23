@@ -47,7 +47,7 @@ def process():
     context: PicselliaDatasetProcessingContext = Pipeline.get_active_context()
     parameters = context.processing_parameters
     example_parameter = parameters.example_parameter
-    dataset_version = context.input_dataset_version
+    dataset_version = context.target
     
     # If you want to process only the selected Assets instead of the full Dataset Version
     # you can retrieve context.asset_ids
@@ -82,7 +82,7 @@ requires-python = ">=3.10"
 
 dependencies = [
     "picsellia-pipelines-cli",
-    "picsellia-cv-engine",
+    "picsellia-cv-engine @ git+https://github.com/picselliahq/picsellia-cv-engine.git@feat/new-local-contexts",
 ]
 
 """
@@ -129,14 +129,10 @@ runs/
 
 PROCESSING_RUN_CONFIG = """override_outputs = true
 
+target_id = ""
+
 [job]
 type = "DATASET_VERSION_CREATION"
-
-[input.dataset_version]
-id = ""
-
-[output.dataset_version]
-name = ""
 
 [parameters]
 example_parameter = "default"

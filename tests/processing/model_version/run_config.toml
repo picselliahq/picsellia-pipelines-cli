@@ -1,15 +1,13 @@
 override_outputs = true
 
+target_id = "01967bdb-ee96-7336-bcb5-d6b33d99cc52"
+
 [job]
 type = "MODEL_COMPRESSION"
 
 [auth]
 organization_name = "test-account"
 env = "STAGING"
-
-[input.model_version]
-id = "01967bdb-ee96-7336-bcb5-d6b33d99cc52"
-visibility = "private"
 
 [parameters]
 example_parameter = "example"

@@ -1,5 +1,7 @@
 override_outputs = true
 
+target_id = "0189266d-6675-775a-985c-441b2820bdc9"
+
 [job]
 type = "DATA_AUTO_TAGGING"
 
@@ -11,17 +13,6 @@ env = "STAGING"
 model_version_id = "01991517-f20e-7667-a4f7-4216dfcc076a"
 input_datalake_id = "0189266d-6675-775a-985c-441b2820bdc9"
 output_datalake_id = "0189266d-6675-775a-985c-441b2820bdc9"
-
-
-[input.datalake]
-id = "0189266d-6675-775a-985c-441b2820bdc9"
-
-[input.model_version]
-id = "01991517-f20e-7667-a4f7-4216dfcc076a"
-visibility = "private"
-
-[output.datalake]
-id = "0189266d-6675-775a-985c-441b2820bdc9"
 
 [run_parameters]
 offset = 0

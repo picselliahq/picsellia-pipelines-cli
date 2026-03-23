@@ -46,7 +46,7 @@ def process():
     context: PicselliaDatalakeProcessingContext = Pipeline.get_active_context()
     parameters = context.processing_parameters
     example_parameter = parameters.example_parameter
-    datalake = context.input_datalake
+    datalake = context.target
 
     # If you want to process only the selected Assets instead of the full Dataset Version
     # you can retrieve context.data_ids
@@ -80,8 +80,9 @@ requires-python = ">=3.10"
 
 dependencies = [
     "picsellia-pipelines-cli",
-    "picsellia-cv-engine",
+    "picsellia-cv-engine @ git+https://github.com/picselliahq/picsellia-cv-engine.git@feat/new-local-contexts",
 ]
+
 
 """
 
@@ -125,23 +126,10 @@ runs/
 
 PROCESSING_RUN_CONFIG = """override_outputs = true
 
+target_id = ""
+
 [job]
 type = "DATA_AUTO_TAGGING"
-
-[inputs]
-model_version_id = ""
-input_datalake_id = ""
-output_datalake_id = ""
-
-[input.datalake]
-id = ""
-
-[input.model_version]
-id = ""
-visibility = "private"
-
-[output.datalake]
-id = ""
 
 [parameters]
 example_parameter = "default"
