@@ -70,7 +70,6 @@ def train(picsellia_model: Model, picsellia_datasets: DatasetCollection[YoloData
         )
 
     picsellia_model.save_artifact_to_experiment(
-        experiment=context.experiment,
         artifact_name="best-model",
         artifact_path=os.path.join(
             picsellia_model.results_dir,
