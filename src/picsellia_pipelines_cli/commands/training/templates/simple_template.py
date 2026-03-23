@@ -40,7 +40,7 @@ if __name__ == "__main__":
 """
 
 TRAINING_STEPS = """import os
-
+from picsellia import DatasetVersion
 from picsellia_cv_engine import step, Pipeline
 
 
