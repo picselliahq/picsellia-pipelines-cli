@@ -40,7 +40,7 @@ if __name__ == "__main__":
 """
 
 TRAINING_STEPS = """import os
-
+from picsellia import DatasetVersion
 from picsellia_cv_engine import step, Pipeline
 
 
@@ -48,7 +48,7 @@ from picsellia_cv_engine import step, Pipeline
 def list_training_datasets() -> list[DatasetVersion] :
     context = Pipeline.get_active_context()
     experiment = context.experiment
-    datasets = experiments.list_attached_dataset_versions()
+    datasets = experiment.list_attached_dataset_versions()
     return datasets
 """
 
@@ -65,7 +65,6 @@ class TrainingHyperParameters(HyperParameters):
 """
 
 TRAINING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
-
 """
 
 TRAINING_PIPELINE_PYPROJECT = """[project]
