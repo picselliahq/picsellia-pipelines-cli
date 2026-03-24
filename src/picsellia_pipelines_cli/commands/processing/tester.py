@@ -58,13 +58,13 @@ def test_processing(
     client = init_client(env_config=env_config)
 
     if pipeline_type == "DATASET_VERSION_CREATION":
-        if "input" in run_config and "output" in run_config:
-            run_config["output"]["dataset_version"]["name"] = check_output_dataset_version(
-                client=client,
-                input_dataset_version_id=run_config["input"]["dataset_version"]["id"],
-                output_name=run_config["output"]["dataset_version"]["name"],
-                override_outputs=bool(run_config.get("override_outputs", False)),
-            )
+        # if "input" in run_config and "output" in run_config:
+        run_config["output"]["dataset_version"]["name"] = check_output_dataset_version(
+            client=client,
+            input_dataset_version_id=run_config["input"]["dataset_version"]["id"],
+            output_name=run_config["output"]["dataset_version"]["name"],
+            override_outputs=bool(run_config.get("override_outputs", False)),
+        )
 
     if pipeline_type in ["MODEL_CONVERSION", "MODEL_COMPRESSION"]:
         output_name = (
