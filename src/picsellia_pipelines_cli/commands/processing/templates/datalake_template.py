@@ -52,7 +52,7 @@ def process():
     # you can retrieve context.data_ids
     
     data_ids_to_process = context.data_ids
-    print(context.inputs)
+    
     # Your logic goes here ...
 
 """

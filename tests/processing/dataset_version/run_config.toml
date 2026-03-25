@@ -8,3 +8,6 @@ type = "DATASET_VERSION_CREATION"
 [auth]
 organization_name = "test-account"
 env = "STAGING"
+
+[inputs]
+example_input = "example_value"
