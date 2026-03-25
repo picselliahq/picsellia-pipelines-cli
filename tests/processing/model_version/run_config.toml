@@ -11,3 +11,6 @@ env = "STAGING"
 
 [parameters]
 example_parameter = "example"
+
+[inputs]
+example_input = "example_value"

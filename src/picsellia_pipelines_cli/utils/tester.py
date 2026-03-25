@@ -87,6 +87,37 @@ def merge_with_default_parameters(
     return run_config
 
 
+def merge_with_default_inputs(
+    run_config: dict, default_inputs: list[dict] | None
+) -> dict:
+    """Ensure that all declared inputs have an entry in the run configuration.
+
+    For each input defined in the inputs class, ensures
+    ``run_config["inputs"][<name>]`` exists with an empty string default.
+
+    Existing values in the run config are never overwritten.
+
+    Args:
+        run_config: Current configuration dictionary.
+        default_inputs: List of input definition dicts as returned by
+            ``PipelineConfig.extract_default_inputs()``, or *None*.
+
+    Returns:
+        dict: Updated run configuration.
+    """
+    if not default_inputs:
+        return run_config
+
+    run_config.setdefault("inputs", {})
+
+    for inp in default_inputs:
+        name = inp["name"]
+        if name not in run_config["inputs"]:
+            run_config["inputs"][name] = ""
+
+    return run_config
+
+
 def prepare_auth_and_env(run_config: dict) -> tuple[dict, dict]:
     """
     Use the current CLI context (set via `pxl-pipeline login`) to fill auth info.
@@ -112,6 +143,7 @@ def load_or_init_run_config(
     default_params: dict,
     working_dir: Path,
     parameters_name: str = "parameters",
+    default_inputs: list[dict] | None = None,
 ) -> dict:
     if run_config_path and run_config_path.exists():
         run_config = toml.load(run_config_path)
@@ -130,6 +162,10 @@ def load_or_init_run_config(
         run_config=run_config,
         default_parameters=default_params,
         parameters_name=parameters_name,
+    )
+    run_config = merge_with_default_inputs(
+        run_config=run_config,
+        default_inputs=default_inputs,
     )
     return run_config
 

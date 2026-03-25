@@ -19,6 +19,7 @@ from picsellia_pipelines_cli.utils.launcher import (
 from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 from picsellia_pipelines_cli.utils.tester import (
+    merge_with_default_inputs,
     merge_with_default_parameters,
     prepare_auth_and_env,
 )
@@ -96,6 +97,9 @@ def launch_processing(
     default_pipeline_params = pipeline_config.extract_default_parameters()
     run_config = merge_with_default_parameters(
         run_config=run_config, default_parameters=default_pipeline_params
+    )
+    run_config = merge_with_default_inputs(
+        run_config=run_config, default_inputs=pipeline_config.extract_default_inputs()
     )
     enrich_run_config_with_metadata(client=client, run_config=run_config)
 

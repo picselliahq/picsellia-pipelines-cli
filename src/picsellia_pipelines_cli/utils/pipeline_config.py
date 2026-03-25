@@ -71,6 +71,27 @@ class PipelineConfig:
             ) from e
         return instance.to_dict()
 
+    def extract_default_inputs(self) -> list[dict[str, Any]] | None:
+        """
+        Extract input definitions from the class defined in config.toml.
+
+        Returns:
+            list[dict[str, Any]] | None: A list of input definition dicts,
+                or None if no inputs_class is configured.
+        """
+        class_path = self.get("execution", "inputs_class")
+        if not class_path:
+            return None
+
+        cls = self._import_class_from_path(class_path)
+        try:
+            instance = cls()
+        except Exception as e:
+            raise ValueError(
+                f"Failed to instantiate inputs class '{class_path}'."
+            ) from e
+        return instance.to_list()
+
     def _import_class_from_path(self, path_with_class: str):
         file_path, class_name = path_with_class.split(":")
         abs_path = self.pipeline_dir / file_path

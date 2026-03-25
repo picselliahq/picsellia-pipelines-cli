@@ -1,7 +1,12 @@
 import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceConflictError
-from picsellia.types.enums import ProcessingType
+from picsellia.types.enums import (
+    Framework,
+    InferenceType,
+    ProcessingInputType,
+    ProcessingType,
+)
 
 from picsellia_pipelines_cli.utils.deployer import (
     Bump,
@@ -51,6 +56,14 @@ def deploy_processing(
     new_version = bump_pipeline_version(pipeline_config=pipeline_config, bump=bump)
     prompt_allocation_if_missing(pipeline_config=pipeline_config)
     runtime_tag = "test" if "-rc" in new_version else "latest"
+
+    # ── Inputs ────────────────────────────────────────────────────────────
+    default_inputs = pipeline_config.extract_default_inputs()
+    if default_inputs:
+        section("📥 Inputs")
+        for inp in default_inputs:
+            required_tag = "required" if inp.get("required") else "optional"
+            kv(inp["name"], f"{inp['input_type']} ({required_tag})")
 
     image_name = pipeline_config.get("docker", "image_name")
 
@@ -175,6 +188,59 @@ def _infer_docker_flags(cfg: PipelineConfig) -> list | None:
     return None
 
 
+def _sync_processing_inputs(
+    processing, default_inputs: list[dict] | None
+) -> None:
+    """Synchronise the inputs declared in the pipeline class with the platform.
+
+    Compares declared inputs against what already exists on the Processing
+    object and performs the minimal set of add / update / delete operations.
+    """
+    if default_inputs is None:
+        return
+
+    existing = processing.list_processing_inputs()
+    existing_by_name: dict[str, dict] = {inp["name"]: inp for inp in existing}
+    declared_names: set[str] = {inp["name"] for inp in default_inputs}
+
+    # Delete inputs that are no longer declared
+    for name in existing_by_name:
+        if name not in declared_names:
+            processing.delete_processing_input(name=name)
+
+    # Add or update declared inputs
+    for inp in default_inputs:
+        name = inp["name"]
+        input_type = ProcessingInputType(inp["input_type"])
+        required = inp["required"]
+        inference_type_constraint = (
+            InferenceType(inp["inference_type_constraint"])
+            if inp.get("inference_type_constraint")
+            else None
+        )
+        framework_constraint = (
+            Framework(inp["framework_constraint"])
+            if inp.get("framework_constraint")
+            else None
+        )
+
+        if name in existing_by_name:
+            processing.update_processing_input(
+                name=name,
+                required=required,
+                inference_type_constraint=inference_type_constraint,
+                framework_constraint=framework_constraint,
+            )
+        else:
+            processing.add_processing_input(
+                name=name,
+                input_type=input_type,
+                required=required,
+                inference_type_constraint=inference_type_constraint,
+                framework_constraint=framework_constraint,
+            )
+
+
 def _register_or_update(
     cfg: PipelineConfig,
     api_token: str,
@@ -196,31 +262,38 @@ def _register_or_update(
     default_cpu = int(cfg.get("docker", "cpu"))
     default_gpu = int(cfg.get("docker", "gpu"))
     default_parameters = cfg.extract_default_parameters()
+    default_inputs = cfg.extract_default_inputs()
     docker_image = cfg.get("docker", "image_name")
     docker_tag = cfg.get("docker", "image_tag")
 
+    create_kwargs: dict = dict(
+        name=name,
+        description=description,
+        type=ptype,
+        default_cpu=default_cpu,
+        default_gpu=default_gpu,
+        default_parameters=default_parameters,
+        docker_image=docker_image,
+        docker_tag=docker_tag,
+        docker_flags=docker_flags,
+    )
+
+    update_kwargs: dict = dict(
+        description=description,
+        default_cpu=default_cpu,
+        default_gpu=default_gpu,
+        default_parameters=default_parameters,
+        docker_image=docker_image,
+        docker_tag=docker_tag,
+    )
+
     try:
-        client.create_processing(
-            name=name,
-            description=description,
-            type=ptype,
-            default_cpu=default_cpu,
-            default_gpu=default_gpu,
-            default_parameters=default_parameters,
-            docker_image=docker_image,
-            docker_tag=docker_tag,
-            docker_flags=docker_flags,
-        )
+        processing = client.create_processing(**create_kwargs)
+        _sync_processing_inputs(processing, default_inputs)
         return "Created", f"{name} ({docker_image}:{docker_tag})"
 
     except ResourceConflictError:
         processing = client.get_processing(name=name)
-        processing.update(
-            description=description,
-            default_cpu=default_cpu,
-            default_gpu=default_gpu,
-            default_parameters=default_parameters,
-            docker_image=docker_image,
-            docker_tag=docker_tag,
-        )
+        processing.update(**update_kwargs)
+        _sync_processing_inputs(processing, default_inputs)
         return "Updated", f"{name} ({docker_image}:{docker_tag})"
