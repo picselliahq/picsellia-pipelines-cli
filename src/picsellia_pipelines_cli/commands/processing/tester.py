@@ -45,6 +45,7 @@ def test_processing(
         default_params=pipeline_config.extract_default_parameters(),
         working_dir=run_dir,
         parameters_name="parameters",
+        default_inputs=pipeline_config.extract_default_inputs(),
     )
 
     # ── Environment ─────────────────────────────────────────────────────────

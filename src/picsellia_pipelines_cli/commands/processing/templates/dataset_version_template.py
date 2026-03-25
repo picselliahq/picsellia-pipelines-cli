@@ -69,6 +69,20 @@ class ProcessingParameters(Parameters):
         self.example_parameter = self.extract_parameter(["example_parameter"], expected_type=str, default="default")
 """
 
+PROCESSING_PIPELINE_INPUTS = """from picsellia.types.enums import ProcessingInputType
+from picsellia_pipelines_cli.utils.inputs import PipelineInputs
+
+
+class ProcessingInputs(PipelineInputs):
+    def __init__(self):
+        super().__init__()
+        self.define_input(
+            name="example_input",
+            input_type=ProcessingInputType.TEXT,
+            required=True,
+        )
+"""
+
 PROCESSING_PIPELINE_REQUIREMENTS = """# Add your dependencies here
 picsellia-pipelines-cli
 picsellia-cv-engine
@@ -134,6 +148,9 @@ target_id = ""
 [job]
 type = "DATASET_VERSION_CREATION"
 
+[inputs]
+example_input = "example_value"
+
 [parameters]
 example_parameter = "default"
 """
@@ -170,6 +187,7 @@ class DatasetVersionProcessingTemplate(BaseTemplate):
     def get_utils_files(self) -> dict[str, str]:
         return {
             "parameters.py": PROCESSING_PIPELINE_PARAMETERS,
+            "inputs.py": PROCESSING_PIPELINE_INPUTS,
         }
 
     def get_config_toml(self) -> dict:
@@ -186,6 +204,7 @@ class DatasetVersionProcessingTemplate(BaseTemplate):
                 if self.use_pyproject
                 else "requirements.txt",
                 "parameters_class": "utils/parameters.py:ProcessingParameters",
+                "inputs_class": "utils/inputs.py:ProcessingInputs",
             },
             "docker": {"image_name": "", "image_tag": ""},
         }
