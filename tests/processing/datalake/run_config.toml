@@ -10,9 +10,7 @@ organization_name = "test-account"
 env = "STAGING"
 
 [inputs]
-model_version_id = "01991517-f20e-7667-a4f7-4216dfcc076a"
-input_datalake_id = "0189266d-6675-775a-985c-441b2820bdc9"
-output_datalake_id = "0189266d-6675-775a-985c-441b2820bdc9"
+example_input = "example_value"
 
 [run_parameters]
 offset = 0
