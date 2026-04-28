@@ -35,7 +35,7 @@ class PipelineConfig:
         return self.pipeline_dir / script_name
 
     def get_requirements_path(self) -> Path:
-        return self.pipeline_dir / self.get("execution", "requirements_file")
+        return os.path.join(self.pipeline_dir, self.get("execution", "requirements_file"))
 
     @staticmethod
     def find_pipeline_dir(pipeline_name: str, search_path: Path) -> Path:
