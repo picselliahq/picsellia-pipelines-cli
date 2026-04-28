@@ -178,10 +178,17 @@ def build_docker_image_only(pipeline_dir: Path, full_image_name: str) -> str:
             ".venv/\nvenv/\n__pycache__/\n*.pyc\n*.pyo\n.DS_Store\n"
         )
 
+    build_command = ["docker", "build"]
+    if sys.platform == "darwin":
+        # Ensure Linux-targeted images can be built from macOS hosts (e.g. Apple Silicon).
+        build_command.extend(["--platform", "linux/amd64"])
+
+    build_command.extend(["-t", full_image_name, "-f", dockerfile_path, "."])
+
     typer.echo(f"Building Docker image '{full_image_name}'...")
     try:
         subprocess.run(
-            ["docker", "build", "-t", full_image_name, "-f", dockerfile_path, "."],
+            build_command,
             cwd=str(pipeline_path),
             check=True,
             text=True,
