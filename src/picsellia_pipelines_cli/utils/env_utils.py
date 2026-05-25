@@ -3,8 +3,10 @@ import os
 from enum import Enum
 from pathlib import Path
 
+import requests
 import typer
 from dotenv import load_dotenv
+from requests import Session
 
 APP_DIR = Path.home() / ".config" / "picsellia"
 ENV_FILE = APP_DIR / ".env"
@@ -188,7 +190,7 @@ def ensure_token(
 def get_env_config(
     organization: str | None = None,
     env: str | Environment | None = None,
-) -> dict[str, str]:
+) -> dict[str, str | Session | None]:
     """
     Return the active environment configuration:
 
@@ -214,10 +216,15 @@ def get_env_config(
             "   Run: pxl-pipeline login"
         )
         raise typer.Exit(1)
-
+    if os.getenv("REQUESTS_CA_BUNDLE"):
+        session = requests.Session()
+        session.verify = os.getenv("REQUESTS_CA_BUNDLE")
+    else:
+        session = None
     return {
         "organization_name": org,
         "api_token": token,
         "host": resolved_env.url,
         "env": resolved_env.value,
+        "session": session,
     }

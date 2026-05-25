@@ -3,10 +3,12 @@ from picsellia import Client
 
 
 def init_client(env_config: dict) -> Client:
+
     return Client(
         api_token=env_config["api_token"],
         organization_name=env_config["organization_name"],
         host=env_config["host"],
+        session=env_config["session"]
     )
 
 
