@@ -65,6 +65,7 @@ def deploy_training(
         api_token=env_config["api_token"],
         organization_name=env_config["organization_name"],
         host=env_config["host"],
+        session=env_config["session"]
     )
     _ensure_model_and_version_on_host(
         client=client,
@@ -96,6 +97,7 @@ def deploy_training(
             api_token=env_config["api_token"],
             organization_name=env_config["organization_name"],
             host=env_config["host"],
+            session=env_config["session"]
         )
         _ensure_model_and_version_on_host(
             client=client,

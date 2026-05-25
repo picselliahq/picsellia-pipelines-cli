@@ -7,6 +7,7 @@ from picsellia.types.enums import (
     ProcessingInputType,
     ProcessingType,
 )
+from requests import Session
 
 from picsellia_pipelines_cli.utils.deployer import (
     Bump,
@@ -96,6 +97,7 @@ def deploy_processing(
             api_token=env_config["api_token"],
             organization_name=env_config["organization_name"],
             host=env_config["host"],
+            session=env_config["session"],
         )
         kv("Status", status)
         if msg:
@@ -246,6 +248,7 @@ def _register_or_update(
     api_token: str,
     organization_name: str,
     host: str,
+    session: Session,
 ) -> tuple[str, str | None]:
     """
     Create or update the processing on a given host.
@@ -253,7 +256,7 @@ def _register_or_update(
         status: "Created" | "Updated"
         message: optional details
     """
-    client = Client(api_token=api_token, organization_name=organization_name, host=host)
+    client = Client(api_token=api_token, organization_name=organization_name, host=host, session=session)
     docker_flags = _infer_docker_flags(cfg)
 
     name = cfg.get("metadata", "name")
