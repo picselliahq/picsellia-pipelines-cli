@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 from enum import Enum
@@ -59,13 +60,48 @@ def _validate_registry_path(image_name: str, default_ns: str | None = None) -> s
     raise typer.Exit(1)
 
 
+def _registry_config_keys(registry: str) -> list[str]:
+    return [registry, f"https://{registry}", f"http://{registry}"]
+
+
+def _load_docker_config() -> dict:
+    config_path = Path.home() / ".docker" / "config.json"
+    if not config_path.exists():
+        return {}
+    try:
+        return json.loads(config_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def registry_has_stored_credentials(registry: str) -> bool:
+    """
+    Return True when ~/.docker/config.json indicates credentials for this registry.
+
+    Covers direct auth entries, empty auths placeholders used with credsStore,
+    and per-registry credential helpers.
+    """
+    config = _load_docker_config()
+    auths = config.get("auths") or {}
+    for key in _registry_config_keys(registry):
+        if key in auths:
+            return True
+
+    cred_helpers = config.get("credHelpers") or {}
+    for key in _registry_config_keys(registry):
+        if key in cred_helpers:
+            return True
+
+    return False
+
+
 def ensure_docker_login(image_name: str):
     """
     Ensure Docker auth is set for the target image's registry.
 
     - For images with an explicit registry (e.g., 'ghcr.io/...', '0c6y...ovh.net/...'):
-        * Always attempt: `docker logout <registry>` (ignore errors)
-        * Then interactive: `docker login <registry>`
+        * Reuse credentials from Docker's config when already present
+        * Otherwise run interactive: `docker login <registry>`
     - For Docker Hub (no explicit registry in image):
         * Read the Username from `docker info`
         * If it differs from the expected namespace (first path segment),
@@ -79,10 +115,9 @@ def ensure_docker_login(image_name: str):
 
     if registry:
         typer.echo(f"Detected registry: {registry}")
-        try:
-            subprocess.run(["docker", "logout", registry], check=False, text=True)
-        except Exception:
-            pass
+        if registry_has_stored_credentials(registry):
+            typer.echo(f"Using existing Docker credentials for '{registry}'")
+            return
 
         typer.echo(f"Logging in to registry '{registry}' …")
         try:
