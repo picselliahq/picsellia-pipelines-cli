@@ -14,6 +14,15 @@ from picsellia_pipelines_cli.utils.logging import bullet, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
+def _validate_enum_name(value: str, enum_cls, field_name: str) -> str:
+    candidate = (value or "NOT_CONFIGURED").upper()
+    if candidate not in enum_cls.__members__:
+        allowed = ", ".join(enum_cls.__members__.keys())
+        typer.echo(f"❌ Invalid {field_name} '{value}'. Allowed values: {allowed}.")
+        raise typer.Exit(code=1)
+    return candidate
+
+
 def deploy_training(
     pipeline_name: str,
     env: Environment,
@@ -58,6 +67,16 @@ def deploy_training(
 
     image_name = pipeline_config.get("docker", "image_name")
 
+    model_targets = _get_model_targets(pipeline_config)
+    section("Model targets")
+    kv("Count", str(len(model_targets)))
+    for idx, target in enumerate(model_targets, start=1):
+        kv(
+            f"Target {idx}",
+            f"{target['origin_name']}:{target['name']} "
+            f"[{target['framework']}/{target['inference_type']}]",
+        )
+
     # ── Ensure model/version exist before build ──────────────────────────────
     section("Model / Version (Pre-check)")
     bullet(f"Checking {env_config['host']}...", accent=True)
@@ -67,9 +86,10 @@ def deploy_training(
         host=env_config["host"],
         session=env_config["session"]
     )
-    _ensure_model_and_version_on_host(
+    _ensure_model_versions_on_host(
         client=client,
         cfg=pipeline_config,
+        model_targets=model_targets,
     )
 
     section("Docker")
@@ -99,9 +119,10 @@ def deploy_training(
             host=env_config["host"],
             session=env_config["session"]
         )
-        _ensure_model_and_version_on_host(
+        _ensure_model_versions_on_host(
             client=client,
             cfg=pipeline_config,
+            model_targets=model_targets,
             image_name=image_name,
             image_tag=pipeline_config.get("docker", "image_tag"),
         )
@@ -114,94 +135,137 @@ def deploy_training(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _get_model_settings(cfg: PipelineConfig) -> dict:
-    """Extract model settings from the pipeline config.
-
-    Expected keys in `config.toml`:
-        [model]
-        model_name = "..."
-        model_version_name = "..."
-        framework = "ONNX" | "PYTORCH" | "TENSORFLOW" (optional, default ONNX)
-        inference_type = "OBJECT_DETECTION" | "CLASSIFICATION" | ... (optional, default OBJECT_DETECTION)
-
-    Args:
-        cfg: Pipeline configuration object.
-
-    Returns:
-        dict: Model settings with keys `model_name`, `version_name`, `framework`, `inference_type`.
-
-    Raises:
-        typer.Exit: If required fields are missing.
-    """
-    model_name = cfg.get("model_version", "origin_name")
-    version_name = cfg.get("model_version", "name")
-    framework = (cfg.get("model_version", "framework") or "NOT_CONFIGURED").upper()
-    inference_type = (
-        cfg.get("model_version", "inference_type") or "NOT_CONFIGURED"
-    ).upper()
-
-    if not model_name or not version_name:
+def _normalize_model_target(target: dict, index: int | None = None) -> dict:
+    """Validate and normalize a model version target from config."""
+    origin_name = target.get("origin_name")
+    version_name = target.get("name")
+    if not origin_name or not version_name:
+        prefix = f"model_versions[{index}]" if index is not None else "model_version"
         typer.echo(
             "Missing model configuration.\n"
-            "Please provide:\n"
-            "model_version.name, model_version.origin_name, model_version.framework, and model_version.inference_type"
+            f"Please provide '{prefix}.origin_name' and '{prefix}.name'."
         )
-        raise typer.Exit()
+        raise typer.Exit(code=1)
 
+    framework = _validate_enum_name(
+        value=target.get("framework") or "NOT_CONFIGURED",
+        enum_cls=Framework,
+        field_name="framework",
+    )
+    inference_type = _validate_enum_name(
+        value=target.get("inference_type") or "NOT_CONFIGURED",
+        enum_cls=InferenceType,
+        field_name="inference_type",
+    )
     return {
-        "model_name": model_name,
-        "version_name": version_name,
+        "origin_name": origin_name,
+        "name": version_name,
         "framework": framework,
         "inference_type": inference_type,
     }
 
 
-def _ensure_model_and_version_on_host(
+def _get_model_targets(cfg: PipelineConfig) -> list[dict]:
+    """Extract one or many model version targets from config.
+
+    Supported formats:
+      - Legacy single target:
+            [model_version]
+            origin_name = "MyModel"
+            name = "v1"
+      - Multi-target:
+            [[model_versions]]
+            origin_name = "MyModel"
+            name = "v1"
+            ...
+    """
+    config = cfg.config or {}
+    raw_multi = config.get("model_versions")
+    defaults = config.get("model_version") if isinstance(config.get("model_version"), dict) else {}
+    if raw_multi:
+        if not isinstance(raw_multi, list):
+            typer.echo(
+                "❌ Invalid config: 'model_versions' must be an array of tables "
+                "(use [[model_versions]] in TOML)."
+            )
+            raise typer.Exit(code=1)
+        normalized_targets: list[dict] = []
+        for i, target in enumerate(raw_multi):
+            if not isinstance(target, dict):
+                typer.echo(f"❌ Invalid model_versions[{i}] entry.")
+                raise typer.Exit(code=1)
+            merged_target = {**defaults, **target}
+            normalized_targets.append(
+                _normalize_model_target(target=merged_target, index=i)
+            )
+        return normalized_targets
+
+    single_target = config.get("model_version") or {}
+    if single_target:
+        if not isinstance(single_target, dict):
+            typer.echo("❌ Invalid config: 'model_version' must be a table.")
+            raise typer.Exit(code=1)
+        return [_normalize_model_target(target=single_target)]
+
+    typer.echo(
+        "Missing model configuration.\n"
+        "Please provide either:\n"
+        "- [model_version] (single target)\n"
+        "- [[model_versions]] (multiple targets)"
+    )
+    raise typer.Exit(code=1)
+
+
+def _ensure_model_versions_on_host(
     client: Client,
     cfg: PipelineConfig,
+    model_targets: list[dict],
     image_name: str | None = None,
     image_tag: str | None = None,
 ):
-    """Ensure the model and version exist on the target host, and update them with Docker info.
+    """Ensure each configured model version exists and is updated on the target host.
 
     Args:
         client: Authenticated Picsellia client.
         cfg: Pipeline configuration object.
+        model_targets: List of normalized targets from config.
         image_name: Docker image name to attach.
         image_tag: Docker tag to attach.
     """
-    model_settings = _get_model_settings(cfg)
     defaults = cfg.extract_default_parameters()
     docker_flags = ["--gpus all", "--ipc host", "--name training"]
-    created = False
+    for target in model_targets:
+        target_label = f"{target['origin_name']}:{target['name']}"
+        created_version = False
 
-    try:
-        model = client.get_model(name=model_settings["model_name"])
-    except ResourceNotFoundError:
-        model = client.create_model(name=model_settings["model_name"])
-        created = True
+        try:
+            model = client.get_model(name=target["origin_name"])
+        except ResourceNotFoundError:
+            model = client.create_model(name=target["origin_name"])
 
-    try:
-        mv = model.get_version(version=model_settings["version_name"])
-    except ResourceNotFoundError:
-        mv = model.create_version(
-            name=model_settings["version_name"],
-            framework=Framework[model_settings["framework"]],
-            type=InferenceType[model_settings["inference_type"]],
-            docker_image_name=image_name,
-            docker_tag=image_tag,
-            docker_flags=docker_flags,
-            base_parameters=defaults or {},
-        )
-        created = True
+        try:
+            mv = model.get_version(version=target["name"])
+        except ResourceNotFoundError:
+            mv = model.create_version(
+                name=target["name"],
+                framework=Framework[target["framework"]],
+                type=InferenceType[target["inference_type"]],
+                docker_image_name=image_name,
+                docker_tag=image_tag,
+                docker_flags=docker_flags,
+                base_parameters=defaults or {},
+            )
+            created_version = True
+            bullet(f"Created model version {target_label}", accent=False)
 
-    if not created:
-        mv.update(
-            name=model_settings["version_name"],
-            framework=Framework[model_settings["framework"]],
-            type=InferenceType[model_settings["inference_type"]],
-            docker_image_name=image_name,
-            docker_tag=image_tag,
-            docker_flags=docker_flags,
-            base_parameters=defaults or {},
-        )
+        if not created_version:
+            mv.update(
+                name=target["name"],
+                framework=Framework[target["framework"]],
+                type=InferenceType[target["inference_type"]],
+                docker_image_name=image_name,
+                docker_tag=image_tag,
+                docker_flags=docker_flags,
+                base_parameters=defaults or {},
+            )
+            bullet(f"Updated model version {target_label}", accent=False)
