@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from enum import Enum
@@ -64,14 +65,56 @@ def _registry_config_keys(registry: str) -> list[str]:
     return [registry, f"https://{registry}", f"http://{registry}"]
 
 
+def _docker_hub_config_keys() -> list[str]:
+    return [
+        "https://index.docker.io/v1/",
+        "index.docker.io",
+        "registry-1.docker.io",
+        "https://registry-1.docker.io",
+        "docker.io",
+    ]
+
+
+def _docker_config_path() -> Path:
+    return Path.home() / ".docker" / "config.json"
+
+
 def _load_docker_config() -> dict:
-    config_path = Path.home() / ".docker" / "config.json"
+    config_path = _docker_config_path()
     if not config_path.exists():
         return {}
     try:
         return json.loads(config_path.read_text())
     except (json.JSONDecodeError, OSError):
         return {}
+
+
+def _auth_entry_has_credentials(entry: object) -> bool:
+    """True when an auths entry contains credentials or delegates to a cred helper."""
+    if not isinstance(entry, dict):
+        return False
+    if entry.get("auth"):
+        return True
+    if entry.get("identitytoken"):
+        return True
+    if entry.get("username") and entry.get("password"):
+        return True
+    # Empty dict: Docker Desktop / credsStore stores secrets in the keychain.
+    return entry == {}
+
+
+def _registry_keys_in_config(config: dict, keys: list[str]) -> bool:
+    auths = config.get("auths") or {}
+    for key in keys:
+        if key in auths and _auth_entry_has_credentials(auths[key]):
+            return True
+
+    cred_helpers = config.get("credHelpers") or {}
+    for key in keys:
+        if key in cred_helpers:
+            return True
+
+    return False
 
 
 def registry_has_stored_credentials(registry: str) -> bool:
@@ -82,104 +125,145 @@ def registry_has_stored_credentials(registry: str) -> bool:
     and per-registry credential helpers.
     """
     config = _load_docker_config()
-    auths = config.get("auths") or {}
-    for key in _registry_config_keys(registry):
-        if key in auths:
-            return True
+    return _registry_keys_in_config(config, _registry_config_keys(registry))
 
-    cred_helpers = config.get("credHelpers") or {}
-    for key in _registry_config_keys(registry):
-        if key in cred_helpers:
-            return True
 
-    return False
+def docker_hub_has_stored_credentials() -> bool:
+    """Return True when Docker Hub credentials are present in the local Docker config."""
+    config = _load_docker_config()
+    if config.get("credsStore"):
+        return True
+    return _registry_keys_in_config(config, _docker_hub_config_keys())
+
+
+def _docker_credentials_from_env() -> tuple[str, str] | None:
+    username = os.getenv("DOCKERHUB_USERNAME") or os.getenv("DOCKER_USERNAME")
+    password = (
+        os.getenv("DOCKERHUB_TOKEN")
+        or os.getenv("DOCKER_PASSWORD")
+        or os.getenv("DOCKER_TOKEN")
+    )
+    if username and password:
+        return username, password
+    return None
+
+
+def _run_docker_login(
+    *,
+    registry: str | None = None,
+    username: str | None = None,
+    password: str | None = None,
+) -> None:
+    """Run docker login and persist credentials in ~/.docker/config.json (Docker CLI default)."""
+    command = ["docker", "login"]
+    if username:
+        command.extend(["-u", username])
+    if password is not None:
+        command.append("--password-stdin")
+    if registry:
+        command.append(registry)
+
+    kwargs: dict = {"check": True, "text": True}
+    if password is not None:
+        kwargs["input"] = password
+    else:
+        kwargs["stdin"] = sys.stdin
+
+    subprocess.run(command, **kwargs)
+
+
+def _confirm_credentials_persisted(*, registry: str | None) -> None:
+    if registry:
+        ok = registry_has_stored_credentials(registry)
+        target = registry
+    else:
+        ok = docker_hub_has_stored_credentials()
+        target = "Docker Hub"
+
+    if ok:
+        typer.echo(
+            f"✓ Credentials for {target} saved in {_docker_config_path()} "
+            "(same as a normal `docker login`)."
+        )
+    else:
+        typer.echo(
+            typer.style(
+                f"⚠️  Login succeeded but no credentials were found in {_docker_config_path()}. "
+                "Future deploys may ask again.",
+                fg=typer.colors.YELLOW,
+            )
+        )
 
 
 def ensure_docker_login(image_name: str):
     """
     Ensure Docker auth is set for the target image's registry.
 
-    - For images with an explicit registry (e.g., 'ghcr.io/...', '0c6y...ovh.net/...'):
-        * Reuse credentials from Docker's config when already present
-        * Otherwise run interactive: `docker login <registry>`
-    - For Docker Hub (no explicit registry in image):
-        * Read the Username from `docker info`
-        * If it differs from the expected namespace (first path segment),
-          do `docker logout` then `docker login -u <expected_user>`
+    Reuses credentials already stored by the Docker CLI in ~/.docker/config.json.
+    When login is required, runs `docker login` the same way as manually — credentials
+    are written to config.json (or your configured credsStore / keychain).
 
-    Notes:
-      * `docker info` only shows the Docker Hub username, not per-registry logins.
-      * This function is interactive when credentials are needed.
+    Environment variables (non-interactive, CI-friendly):
+        DOCKERHUB_USERNAME / DOCKER_USERNAME
+        DOCKERHUB_TOKEN / DOCKER_PASSWORD / DOCKER_TOKEN
     """
     registry = _detect_registry_host(image_name)
+    env_credentials = _docker_credentials_from_env()
 
     if registry:
         typer.echo(f"Detected registry: {registry}")
         if registry_has_stored_credentials(registry):
-            typer.echo(f"Using existing Docker credentials for '{registry}'")
+            typer.echo(f"Using cached Docker credentials for '{registry}'")
             return
 
-        typer.echo(f"Logging in to registry '{registry}' …")
+        if env_credentials:
+            user, token = env_credentials
+            typer.echo(f"Logging in to '{registry}' with DOCKER_* env credentials…")
+            _run_docker_login(registry=registry, username=user, password=token)
+            _confirm_credentials_persisted(registry=registry)
+            return
+
+        typer.echo(f"Logging in to registry '{registry}' (credentials will be cached)…")
         try:
-            subprocess.run(
-                ["docker", "login", registry],
-                check=True,
-                text=True,
-                stdin=sys.stdin,  # allow interactive username/password
-            )
+            _run_docker_login(registry=registry)
         except subprocess.CalledProcessError as err:
             typer.echo("❌ Docker registry login failed.")
             raise typer.Exit(1) from err
 
-        typer.echo(f"✓ Logged in to {registry}")
+        _confirm_credentials_persisted(registry=registry)
         return
 
-    # ── Docker Hub (implicit) ────────────────────────────────────────────────
-    expected_user = image_name.split("/", 1)[0]
-    typer.echo("Checking Docker authentication (via `docker info`)…")
-    try:
-        result = subprocess.run(
-            ["docker", "info"],
-            capture_output=True,
-            text=True,
-            check=True,
-            stdin=sys.stdin,
+    # ── Docker Hub (image like 'namespace/repo', no registry host) ───────────
+    namespace = image_name.split("/", 1)[0]
+    if docker_hub_has_stored_credentials():
+        typer.echo(
+            "Using cached Docker Hub credentials "
+            f"(push access to '{namespace}' must be granted to your account)."
         )
-    except subprocess.CalledProcessError as err:
-        typer.echo("Failed to retrieve Docker info. Is Docker running?")
-        raise typer.Exit(1) from err
-
-    current_user = None
-    for line in result.stdout.splitlines():
-        if "Username:" in line:
-            current_user = line.split(":", 1)[1].strip()
-            break
-
-    if current_user == expected_user:
-        typer.echo(f"Docker Hub already logged in as expected user: '{expected_user}'")
         return
 
-    if current_user:
-        typer.echo(f"Logged in as: '{current_user}', but expected: '{expected_user}'")
-    else:
-        typer.echo("No Docker Hub user currently logged in.")
+    if env_credentials:
+        user, token = env_credentials
+        typer.echo("Logging in to Docker Hub with DOCKER_* env credentials…")
+        try:
+            _run_docker_login(username=user, password=token)
+        except subprocess.CalledProcessError as err:
+            typer.echo("❌ Docker Hub login failed.")
+            raise typer.Exit(1) from err
+        _confirm_credentials_persisted(registry=None)
+        return
 
-    typer.echo(f"Re-authenticating on Docker Hub as '{expected_user}'…")
-    # Logout of Docker Hub (no registry arg logs out of Hub)
-    subprocess.run(["docker", "logout"], check=False, text=True)
-
+    typer.echo(
+        f"Logging in to Docker Hub (credentials will be cached in {_docker_config_path()}).\n"
+        f"Use an account with push access to the '{namespace}' namespace."
+    )
     try:
-        subprocess.run(
-            ["docker", "login", "-u", expected_user],
-            check=True,
-            text=True,
-            stdin=sys.stdin,  # interactive password/token
-        )
+        _run_docker_login()
     except subprocess.CalledProcessError as err:
         typer.echo("❌ Docker Hub login failed. Please check your credentials.")
         raise typer.Exit(1) from err
 
-    typer.echo(f"✓ Logged in to Docker Hub as '{expected_user}'")
+    _confirm_credentials_persisted(registry=None)
 
 
 def build_docker_image_only(pipeline_dir: Path, full_image_name: str) -> str:
@@ -241,6 +325,15 @@ def build_docker_image_only(pipeline_dir: Path, full_image_name: str) -> str:
     return full_image_name
 
 
+def tag_docker_image(source_image: str, target_image: str) -> None:
+    """Apply an additional tag to an existing local Docker image."""
+    subprocess.run(
+        ["docker", "tag", source_image, target_image],
+        check=True,
+        text=True,
+    )
+
+
 def push_docker_image_only(full_image_name: str):
     """Push a Docker image to its remote registry.
 
@@ -259,23 +352,40 @@ def build_and_push_docker_image(
 ):
     """Build and push a Docker image for one or more tags.
 
+    Builds the image once, applies additional tags locally, then pushes each tag.
+
     Args:
         pipeline_dir: Directory containing the Dockerfile.
         image_name: Base image name (without tag).
         image_tags: List of tags to build and push.
         force_login: If True, ensure Docker authentication before building.
     """
+    if not image_tags:
+        typer.echo("❌ No image tags provided for build/push.")
+        raise typer.Exit(1)
+
     image_name = _validate_registry_path(image_name)
 
     if force_login:
         ensure_docker_login(image_name=image_name)
 
+    primary_tag = image_tags[0]
+    primary_image = f"{image_name}:{primary_tag}"
+    typer.echo(
+        f"Building Docker image once, then pushing tag(s): {', '.join(image_tags)}"
+    )
+    build_docker_image_only(
+        pipeline_dir=pipeline_dir, full_image_name=primary_image
+    )
+
+    for tag in image_tags[1:]:
+        tagged_image = f"{image_name}:{tag}"
+        typer.echo(f"Tagging {primary_image} as {tagged_image}")
+        tag_docker_image(source_image=primary_image, target_image=tagged_image)
+
     for tag in image_tags:
         full_image_name = f"{image_name}:{tag}"
-        typer.echo(f"Building and pushing image: {full_image_name}")
-        build_docker_image_only(
-            pipeline_dir=pipeline_dir, full_image_name=full_image_name
-        )
+        typer.echo(f"Pushing {full_image_name}...")
         push_docker_image_only(full_image_name=full_image_name)
         typer.echo(f"✅ Docker image '{full_image_name}' pushed successfully.")
 
