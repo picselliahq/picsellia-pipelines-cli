@@ -10,8 +10,10 @@ from picsellia_pipelines_cli.utils.deployer import (
     prompt_docker_image_if_missing,
 )
 from picsellia_pipelines_cli.utils.env_utils import Environment, get_env_config
-from picsellia_pipelines_cli.utils.logging import bullet, kv, section
+from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
+
+ModelVersionDeployResult = tuple[str, str, str]  # (target_label, status, details)
 
 
 def _validate_enum_name(value: str, enum_cls, field_name: str) -> str:
@@ -86,11 +88,14 @@ def deploy_training(
         host=env_config["host"],
         session=env_config["session"]
     )
-    _ensure_model_versions_on_host(
+    default_parameters = pipeline_config.extract_default_parameters()
+    precheck_results = _ensure_model_versions_on_host(
         client=client,
-        cfg=pipeline_config,
         model_targets=model_targets,
+        default_parameters=default_parameters,
+        apply_deployment=False,
     )
+    _log_model_version_results(precheck_results, title="Pre-check results")
 
     section("Docker")
     kv("Image", image_name)
@@ -110,24 +115,47 @@ def deploy_training(
     pipeline_config.save()
 
     # ── Register/Update Model + Version with Docker info ────────────────────
-    section("Model / Version (Update)")
-    bullet(f"→ {env_config['host']}", accent=True)
+    section("📦 Model versions (deploy)")
+    kv("Host", env_config["host"])
+    deploy_results: list[ModelVersionDeployResult] = []
     try:
         client = Client(
             api_token=env_config["api_token"],
             organization_name=env_config["organization_name"],
             host=env_config["host"],
-            session=env_config["session"]
+            session=env_config["session"],
         )
-        _ensure_model_versions_on_host(
+        deploy_results = _ensure_model_versions_on_host(
             client=client,
-            cfg=pipeline_config,
             model_targets=model_targets,
+            default_parameters=default_parameters,
             image_name=image_name,
             image_tag=pipeline_config.get("docker", "image_tag"),
+            apply_deployment=True,
         )
+        _log_model_version_results(deploy_results, title="Deploy results")
     except Exception as e:
         typer.echo(f"Error: {e}", err=True)
+        deploy_results = [
+            (target["origin_name"] + ":" + target["name"], "Error", str(e))
+            for target in model_targets
+        ]
+
+    section("✅ Summary")
+    kv("Pipeline", pipeline_name)
+    kv("Host", env_config["host"])
+    kv("Docker image", f"{image_name}:{pipeline_config.get('docker', 'image_tag')}")
+    kv("Pipeline version", str(new_version))
+    for target_label, status, details in deploy_results:
+        kv(target_label, f"{status} — {details}")
+    typer.echo("")
+    hr()
+    typer.secho(
+        f"Training pipeline '{pipeline_name}' deployed to "
+        f"{len(deploy_results)} model version(s)",
+        fg=typer.colors.GREEN,
+        bold=True,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,107 +193,197 @@ def _normalize_model_target(target: dict, index: int | None = None) -> dict:
     }
 
 
-def _get_model_targets(cfg: PipelineConfig) -> list[dict]:
-    """Extract one or many model version targets from config.
+_MODEL_VERSION_DEPLOY_KEYS = frozenset(
+    {"origin_name", "name", "framework", "inference_type"}
+)
 
-    Supported formats:
-      - Legacy single target:
-            [model_version]
-            origin_name = "MyModel"
-            name = "v1"
-      - Multi-target:
-            [[model_versions]]
-            origin_name = "MyModel"
-            name = "v1"
-            ...
+
+def _model_version_section_is_defined(table: dict) -> bool:
+    """True when [model_version] declares deploy fields (not just init metadata like id)."""
+    return bool(_MODEL_VERSION_DEPLOY_KEYS.intersection(table.keys()))
+
+
+def _dedupe_model_targets(targets: list[dict]) -> list[dict]:
+    """Keep one entry per (origin_name, name); later entries override earlier ones."""
+    by_key: dict[tuple[str, str], dict] = {}
+    order: list[tuple[str, str]] = []
+    for target in targets:
+        key = (target["origin_name"], target["name"])
+        if key not in by_key:
+            order.append(key)
+        by_key[key] = target
+    return [by_key[key] for key in order]
+
+
+def _get_model_targets(cfg: PipelineConfig) -> list[dict]:
+    """Extract model version targets from config.
+
+    Use exactly one of:
+      - [model_version] for a single deploy target
+      - [[model_versions]] for multiple deploy targets (each row must be complete)
     """
     config = cfg.config or {}
     raw_multi = config.get("model_versions")
-    defaults = config.get("model_version") if isinstance(config.get("model_version"), dict) else {}
-    if raw_multi:
+    single = (
+        config.get("model_version")
+        if isinstance(config.get("model_version"), dict)
+        else {}
+    )
+
+    has_multi = bool(raw_multi)
+    has_single = _model_version_section_is_defined(single)
+
+    if has_multi and has_single:
+        typer.echo(
+            "❌ Ambiguous model configuration: use either [model_version] OR "
+            "[[model_versions]], not both.\n"
+            "  • Single target  → [model_version] with origin_name, name, framework, inference_type\n"
+            "  • Many targets   → [[model_versions]] only (repeat full fields on each row)"
+        )
+        raise typer.Exit(code=1)
+
+    if has_multi:
         if not isinstance(raw_multi, list):
             typer.echo(
                 "❌ Invalid config: 'model_versions' must be an array of tables "
                 "(use [[model_versions]] in TOML)."
             )
             raise typer.Exit(code=1)
+
         normalized_targets: list[dict] = []
         for i, target in enumerate(raw_multi):
             if not isinstance(target, dict):
                 typer.echo(f"❌ Invalid model_versions[{i}] entry.")
                 raise typer.Exit(code=1)
-            merged_target = {**defaults, **target}
             normalized_targets.append(
-                _normalize_model_target(target=merged_target, index=i)
+                _normalize_model_target(target=target, index=i)
             )
-        return normalized_targets
+        return _dedupe_model_targets(normalized_targets)
 
-    single_target = config.get("model_version") or {}
-    if single_target:
-        if not isinstance(single_target, dict):
-            typer.echo("❌ Invalid config: 'model_version' must be a table.")
-            raise typer.Exit(code=1)
-        return [_normalize_model_target(target=single_target)]
+    if has_single:
+        return [_normalize_model_target(target=single)]
 
     typer.echo(
         "Missing model configuration.\n"
-        "Please provide either:\n"
-        "- [model_version] (single target)\n"
-        "- [[model_versions]] (multiple targets)"
+        "Define exactly one of:\n"
+        "  [model_version]        — single target\n"
+        "  [[model_versions]]     — multiple targets"
     )
     raise typer.Exit(code=1)
 
 
+def _log_model_version_results(
+    results: list[ModelVersionDeployResult], *, title: str
+) -> None:
+    """Print per-target deploy outcomes in a consistent key–value layout."""
+    if not results:
+        return
+    typer.echo("")
+    typer.echo(typer.style(title, bold=True))
+    for target_label, status, details in results:
+        level = "ok" if status in {"Created", "Updated", "Verified"} else "error"
+        kv("Target", target_label, level=level)
+        kv("Status", status, level=level)
+        kv("Details", details, level=level)
+        typer.echo("")
+
+
 def _ensure_model_versions_on_host(
     client: Client,
-    cfg: PipelineConfig,
     model_targets: list[dict],
+    default_parameters: dict,
     image_name: str | None = None,
     image_tag: str | None = None,
-):
-    """Ensure each configured model version exists and is updated on the target host.
+    *,
+    apply_deployment: bool = False,
+) -> list[ModelVersionDeployResult]:
+    """Ensure each configured model version exists and optionally deploy to it.
 
     Args:
         client: Authenticated Picsellia client.
-        cfg: Pipeline configuration object.
         model_targets: List of normalized targets from config.
-        image_name: Docker image name to attach.
-        image_tag: Docker tag to attach.
+        default_parameters: Pipeline default hyperparameters (extracted once upstream).
+        image_name: Docker image name to attach (deploy phase only).
+        image_tag: Docker tag to attach (deploy phase only).
+        apply_deployment: When False, only verify/create resources without updating
+            existing versions. When True, push docker image + parameters to each target.
+
+    Returns:
+        One (target_label, status, details) tuple per configured target.
     """
-    defaults = cfg.extract_default_parameters()
+    results: list[ModelVersionDeployResult] = []
     docker_flags = ["--gpus all", "--ipc host", "--name training"]
+    base_parameters = default_parameters or {}
+
     for target in model_targets:
         target_label = f"{target['origin_name']}:{target['name']}"
-        created_version = False
+        framework = Framework[target["framework"]]
+        inference_type = InferenceType[target["inference_type"]]
 
         try:
             model = client.get_model(name=target["origin_name"])
         except ResourceNotFoundError:
             model = client.create_model(name=target["origin_name"])
 
+        version_existed = True
         try:
             mv = model.get_version(version=target["name"])
         except ResourceNotFoundError:
+            version_existed = False
             mv = model.create_version(
                 name=target["name"],
-                framework=Framework[target["framework"]],
-                type=InferenceType[target["inference_type"]],
-                docker_image_name=image_name,
-                docker_tag=image_tag,
-                docker_flags=docker_flags,
-                base_parameters=defaults or {},
+                framework=framework,
+                type=inference_type,
+                docker_image_name=image_name if apply_deployment else None,
+                docker_tag=image_tag if apply_deployment else None,
+                docker_flags=docker_flags if apply_deployment else None,
+                base_parameters=base_parameters,
             )
-            created_version = True
-            bullet(f"Created model version {target_label}", accent=False)
 
-        if not created_version:
+        if not apply_deployment:
+            if version_existed:
+                results.append(
+                    (target_label, "Verified", "Model version already exists")
+                )
+            else:
+                results.append(
+                    (
+                        target_label,
+                        "Created",
+                        "Model version created (docker will be set on deploy)",
+                    )
+                )
+            continue
+
+        docker_ref = (
+            f"{image_name}:{image_tag}"
+            if image_name and image_tag
+            else (image_name or "not set")
+        )
+        if version_existed:
             mv.update(
                 name=target["name"],
-                framework=Framework[target["framework"]],
-                type=InferenceType[target["inference_type"]],
+                framework=framework,
+                type=inference_type,
                 docker_image_name=image_name,
                 docker_tag=image_tag,
                 docker_flags=docker_flags,
-                base_parameters=defaults or {},
+                base_parameters=base_parameters,
             )
-            bullet(f"Updated model version {target_label}", accent=False)
+            results.append(
+                (
+                    target_label,
+                    "Updated",
+                    f"{target['framework']}/{target['inference_type']} — {docker_ref}",
+                )
+            )
+        else:
+            results.append(
+                (
+                    target_label,
+                    "Created",
+                    f"{target['framework']}/{target['inference_type']} — {docker_ref}",
+                )
+            )
+
+    return results

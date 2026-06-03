@@ -333,25 +333,35 @@ This command:
 - creates or updates the Picsellia processing or training asset
 - ensures the pipeline is ready to be launched from the UI
 
-For training pipelines, you can target one or many model versions from `config.toml`:
+For training pipelines, define **either** one `[model_version]` **or** several `[[model_versions]]` rows — not both (the CLI will reject ambiguous configs).
+
+**Single target:**
 
 ```toml
-# Legacy single target (still supported)
 [model_version]
 origin_name = "MyModel"
 name = "v1"
 framework = "ONNX"
 inference_type = "OBJECT_DETECTION"
-
-# Multi-target (deploy updates ALL listed versions)
-[[model_versions]]
-name = "v1"
-
-[[model_versions]]
-name = "v2"
 ```
 
-When `[[model_versions]]` is present, `deploy` propagates Docker image/tag and default parameters to every listed model version. Values defined under `[model_version]` are used as defaults for each `[[model_versions]]` entry, so you can override only what differs (for example only `name`).
+**Multiple targets** (each row must include all fields):
+
+```toml
+[[model_versions]]
+origin_name = "MyModel"
+name = "v1"
+framework = "ONNX"
+inference_type = "OBJECT_DETECTION"
+
+[[model_versions]]
+origin_name = "MyModel"
+name = "v2"
+framework = "ONNX"
+inference_type = "OBJECT_DETECTION"
+```
+
+`deploy` propagates Docker image/tag and default parameters to every listed model version.
 
 After deployment, the pipeline becomes usable by your team in the Picsellia interface.
 
