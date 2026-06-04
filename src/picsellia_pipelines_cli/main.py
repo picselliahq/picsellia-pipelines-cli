@@ -22,6 +22,11 @@ from picsellia_pipelines_cli.commands.training.tester import test_training
 from picsellia_pipelines_cli.utils.deployer import Bump
 from picsellia_pipelines_cli.utils.env_utils import Environment
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
+from picsellia_pipelines_cli.utils.pipeline_types import (
+    is_processing_pipeline_type,
+    is_training_pipeline_type,
+    valid_processing_type_values,
+)
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -75,16 +80,19 @@ PROCESSING_TEMPLATES = [
     "data_auto_tagging",
     "model_conversion",
     "model_version",
-    "datalake"
+    "datalake",
 ]
 TRAINING_TEMPLATES = ["yolov8", "simple"]
-PROCESSING_TYPES_MAPPING = {
-    "dataset_version_creation": "DATASET_VERSION_CREATION",
-    "pre_annotation": "PRE_ANNOTATION",
-    "data_auto_tagging": "DATA_AUTO_TAGGING",
-    "model_conversion": "MODEL_CONVERSION",
-    "model_compression": "MODEL_COMPRESSION",
-}
+
+
+def _unknown_pipeline_type_exit(pipeline_name: str, pipeline_type: str) -> None:
+    processing_types = ", ".join(valid_processing_type_values())
+    typer.echo(
+        f"❌ Unknown pipeline type '{pipeline_type}' for '{pipeline_name}'.\n"
+        f"👉 Set metadata.type in config.toml to TRAINING or a ProcessingType "
+        f"({processing_types})."
+    )
+    raise typer.Exit()
 
 
 @app.command(name="init")
@@ -190,21 +198,20 @@ def test(
 ):
     """Run local tests for a pipeline using a run config."""
     pipeline_type = get_pipeline_type(pipeline_name)
-    if pipeline_type == "TRAINING":
+    if is_training_pipeline_type(pipeline_type):
         test_training(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
             reuse_dir=reuse_dir,
         )
-    elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
+    elif is_processing_pipeline_type(pipeline_type):
         test_processing(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
             reuse_dir=reuse_dir,
         )
     else:
-        typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
-        raise typer.Exit()
+        _unknown_pipeline_type_exit(pipeline_name, pipeline_type)
 
 
 @app.command(name="smoke-test")
@@ -223,14 +230,14 @@ def smoke_test(
 ):
     """Run a containerized smoke test for a pipeline."""
     pipeline_type = get_pipeline_type(pipeline_name)
-    if pipeline_type == "TRAINING":
+    if is_training_pipeline_type(pipeline_type):
         smoke_test_training(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
             python_version=python_version,
             reuse_dir=reuse_dir,
         )
-    elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
+    elif is_processing_pipeline_type(pipeline_type):
         smoke_test_processing(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
@@ -239,8 +246,7 @@ def smoke_test(
             reuse_dir=reuse_dir,
         )
     else:
-        typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
-        raise typer.Exit()
+        _unknown_pipeline_type_exit(pipeline_name, pipeline_type)
 
 
 @app.command(name="deploy")
@@ -258,17 +264,16 @@ def deploy(
 ):
     """Deploy a training or processing pipeline version to Picsellia."""
     pipeline_type = get_pipeline_type(pipeline_name=pipeline_name)
-    if pipeline_type == "TRAINING":
+    if is_training_pipeline_type(pipeline_type):
         deploy_training(
             pipeline_name=pipeline_name, organization=organization, env=env, bump=bump
         )
-    elif pipeline_type in PROCESSING_TYPES_MAPPING.values():
+    elif is_processing_pipeline_type(pipeline_type):
         deploy_processing(
             pipeline_name=pipeline_name, organization=organization, env=env, bump=bump
         )
     else:
-        typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
-        raise typer.Exit()
+        _unknown_pipeline_type_exit(pipeline_name, pipeline_type)
 
 
 @app.command(name="sync")
@@ -283,15 +288,14 @@ def sync(
 ):
     """Sync processing pipeline parameters from code to Picsellia."""
     pipeline_type = get_pipeline_type(pipeline_name)
-    if pipeline_type in PROCESSING_TYPES_MAPPING.values():
+    if is_processing_pipeline_type(pipeline_type):
         sync_processing_params(
             pipeline_name=pipeline_name, organization=organization, env=env
         )
-    elif pipeline_type == "TRAINING":
+    elif is_training_pipeline_type(pipeline_type):
         typer.echo("⚠️ Syncing training parameters is not implemented yet.")
     else:
-        typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
-        raise typer.Exit()
+        _unknown_pipeline_type_exit(pipeline_name, pipeline_type)
 
 
 @app.command(name="launch")
@@ -303,19 +307,18 @@ def launch(
 ):
     """Launch a remote run for a training or processing pipeline."""
     pipeline_type = get_pipeline_type(pipeline_name)
-    if pipeline_type in PROCESSING_TYPES_MAPPING.values():
+    if is_processing_pipeline_type(pipeline_type):
         launch_processing(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
         )
-    elif pipeline_type == "TRAINING":
+    elif is_training_pipeline_type(pipeline_type):
         launch_training(
             pipeline_name=pipeline_name,
             run_config_file=run_config_file,
         )
     else:
-        typer.echo(f"❌ Unknown pipeline type for '{pipeline_name}'.")
-        raise typer.Exit()
+        _unknown_pipeline_type_exit(pipeline_name, pipeline_type)
 
 
 if __name__ == "__main__":

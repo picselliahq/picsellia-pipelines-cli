@@ -6,16 +6,10 @@ import toml
 import typer
 from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
+from picsellia.types.enums import ProcessingType
 
+from picsellia_pipelines_cli.utils.pipeline_types import processing_target_id_prompt_label
 from picsellia_pipelines_cli.utils.run_manager import RunManager
-
-TARGET_ID_PROMPT_LABELS: dict[str, str] = {
-    "DATASET_VERSION_CREATION": "Dataset version ID (target)",
-    "PRE_ANNOTATION": "Dataset version ID (target)",
-    "DATA_AUTO_TAGGING": "Datalake ID (target)",
-    "MODEL_CONVERSION": "Model version ID (target)",
-    "MODEL_COMPRESSION": "Model version ID (target)",
-}
 
 INPUT_TYPE_PROMPT_HINTS: dict[str, str] = {
     "TEXT": "text value",
@@ -77,7 +71,7 @@ def ensure_processing_run_config_defaults(
     run_config.setdefault("job", {})
     run_config["job"]["type"] = pipeline_type
 
-    if pipeline_type == "DATA_AUTO_TAGGING":
+    if pipeline_type == ProcessingType.DATA_AUTO_TAGGING.value:
         run_config.setdefault("run_parameters", {})
         run_params = run_config["run_parameters"]
         run_params.setdefault("offset", 0)
@@ -97,7 +91,7 @@ def prompt_processing_run_config(
         "override_outputs": stored_params.get("override_outputs", True),
     }
 
-    target_label = TARGET_ID_PROMPT_LABELS.get(pipeline_type)
+    target_label = processing_target_id_prompt_label(pipeline_type)
     if target_label:
         run_config["target_id"] = typer.prompt(
             typer.style(f"🎯 {target_label}", fg=typer.colors.CYAN),
@@ -111,7 +105,7 @@ def prompt_processing_run_config(
             stored_inputs=stored_inputs,
         )
 
-    if pipeline_type == "DATA_AUTO_TAGGING":
+    if pipeline_type == ProcessingType.DATA_AUTO_TAGGING.value:
         stored_run_params = stored_params.get("run_parameters") or {}
         offset = typer.prompt(
             typer.style("↪ Offset", fg=typer.colors.CYAN),
