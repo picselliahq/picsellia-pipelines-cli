@@ -8,7 +8,18 @@ from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import ProcessingType
 
-from picsellia_pipelines_cli.utils.pipeline_types import processing_target_id_prompt_label
+from picsellia_pipelines_cli.utils.pipeline_types import (
+    ProcessingLaunchTarget,
+    get_processing_launch_target,
+    parse_processing_type,
+    processing_target_id_prompt_label,
+)
+from picsellia_pipelines_cli.utils.processing_launch import (
+    resolve_dataset_version_output_name,
+    resolve_launch_target_id,
+    uses_dataset_version_outputs,
+    uses_model_version_target,
+)
 from picsellia_pipelines_cli.utils.run_manager import RunManager
 
 INPUT_TYPE_PROMPT_HINTS: dict[str, str] = {
@@ -227,6 +238,80 @@ def check_output_dataset_version(
     except Exception as e:
         typer.echo(f"⚠️ Could not resolve dataset metadata: {e}")
         return output_name
+
+
+def apply_processing_override_outputs(
+    client: Client,
+    run_config: dict,
+    pipeline_type: str,
+) -> None:
+    """Delete existing platform outputs when override_outputs is enabled (non-interactive)."""
+    if not bool(run_config.get("override_outputs", False)):
+        return
+
+    try:
+        ptype = parse_processing_type(pipeline_type)
+    except ValueError:
+        return
+
+    launch_target = get_processing_launch_target(ptype)
+
+    if uses_dataset_version_outputs(ptype):
+        in_id = resolve_launch_target_id(
+            run_config=run_config, launch_target=launch_target
+        )
+        out_name = resolve_dataset_version_output_name(run_config=run_config)
+        if not (in_id and out_name):
+            return
+        try:
+            deleted = delete_existing_dataset_version_if_any(
+                client=client,
+                input_dataset_version_id=in_id,
+                output_name=out_name,
+            )
+            if deleted:
+                typer.echo(
+                    typer.style(
+                        f"🧹 Deleted existing output dataset version '{out_name}' (override enabled).",
+                        fg=typer.colors.YELLOW,
+                    )
+                )
+        except Exception as e:
+            typer.echo(
+                typer.style(
+                    f"⚠️ Override skipped for dataset version '{out_name}': {e}",
+                    fg=typer.colors.YELLOW,
+                )
+            )
+
+    if uses_model_version_target(ptype):
+        model_id = resolve_launch_target_id(
+            run_config=run_config,
+            launch_target=ProcessingLaunchTarget.MODEL_VERSION,
+        )
+        file_name = (run_config.get("parameters", {}) or {}).get("output_model_file_name")
+        if not (model_id and file_name):
+            return
+        try:
+            deleted = delete_existing_model_file_if_any(
+                client=client,
+                model_version_id=model_id,
+                file_name=file_name,
+            )
+            if deleted:
+                typer.echo(
+                    typer.style(
+                        f"🧹 Deleted existing model file '{file_name}' (override enabled).",
+                        fg=typer.colors.YELLOW,
+                    )
+                )
+        except Exception as e:
+            typer.echo(
+                typer.style(
+                    f"⚠️ Override skipped for model file '{file_name}': {e}",
+                    fg=typer.colors.YELLOW,
+                )
+            )
 
 
 def delete_existing_model_file_if_any(

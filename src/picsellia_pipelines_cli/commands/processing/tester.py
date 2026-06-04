@@ -1,6 +1,7 @@
 import typer
 
 from picsellia_pipelines_cli.commands.processing.utils.tester import (
+    apply_processing_override_outputs,
     ensure_processing_run_config_defaults,
     enrich_output_metadata_after_run,
     enrich_run_config_with_metadata,
@@ -58,6 +59,9 @@ def test_processing(
 
     section("📥 Inputs")
     client = init_client(env_config=env_config)
+    apply_processing_override_outputs(
+        client=client, run_config=run_config, pipeline_type=pipeline_type
+    )
     enrich_run_config_with_metadata(client=client, run_config=run_config)
     saved_run_config_path = save_and_get_run_config_path(
         run_manager=run_manager, run_dir=run_dir, run_config=run_config

@@ -8,8 +8,7 @@ from picsellia_pipelines_cli.commands.processing.tester import (
     enrich_run_config_with_metadata,
 )
 from picsellia_pipelines_cli.commands.processing.utils.tester import (
-    delete_existing_dataset_version_if_any,
-    delete_existing_model_file_if_any,
+    apply_processing_override_outputs,
     ensure_processing_run_config_defaults,
 )
 from picsellia_pipelines_cli.utils.initializer import init_client
@@ -20,18 +19,10 @@ from picsellia_pipelines_cli.utils.launcher import (
 from picsellia_pipelines_cli.utils.logging import bullet, hr, kv, section
 from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 from picsellia_pipelines_cli.utils.pipeline_types import (
-    ProcessingLaunchTarget,
-    get_processing_launch_target,
     parse_processing_type,
     valid_processing_type_values,
 )
-from picsellia_pipelines_cli.utils.processing_launch import (
-    build_processing_launch_request,
-    resolve_dataset_version_output_name,
-    resolve_launch_target_id,
-    uses_dataset_version_outputs,
-    uses_model_version_target,
-)
+from picsellia_pipelines_cli.utils.processing_launch import build_processing_launch_request
 from picsellia_pipelines_cli.utils.tester import (
     merge_with_default_inputs,
     merge_with_default_parameters,
@@ -90,7 +81,9 @@ def launch_processing(
 
     # ── Inputs / Outputs ──────────────────────────────────────────────
     section("📥 Inputs / 📤 Outputs")
-    _apply_launch_overrides(client=client, run_config=run_config, ptype=ptype)
+    apply_processing_override_outputs(
+        client=client, run_config=run_config, pipeline_type=pipeline_type
+    )
 
     endpoint, payload = build_processing_launch_request(
         processing_id=str(processing.id),
@@ -133,66 +126,3 @@ def launch_processing(
         raise typer.Exit() from e
 
     hr()
-
-
-def _apply_launch_overrides(client, run_config: dict, ptype) -> None:
-    """Apply non-interactive override_outputs cleanup before launch."""
-    if not bool(run_config.get("override_outputs", False)):
-        return
-
-    launch_target = get_processing_launch_target(ptype)
-
-    if uses_dataset_version_outputs(ptype):
-        in_id = resolve_launch_target_id(run_config=run_config, launch_target=launch_target)
-        out_name = resolve_dataset_version_output_name(run_config=run_config)
-        if not (in_id and out_name):
-            return
-        try:
-            deleted = delete_existing_dataset_version_if_any(
-                client=client,
-                input_dataset_version_id=in_id,
-                output_name=out_name,
-            )
-            if deleted:
-                typer.echo(
-                    typer.style(
-                        f"🧹 Deleted existing output dataset version '{out_name}' (override enabled).",
-                        fg=typer.colors.YELLOW,
-                    )
-                )
-        except Exception as e:
-            typer.echo(
-                typer.style(
-                    f"⚠️ Override skipped for dataset version '{out_name}': {e}",
-                    fg=typer.colors.YELLOW,
-                )
-            )
-
-    if uses_model_version_target(ptype):
-        model_id = resolve_launch_target_id(
-            run_config=run_config,
-            launch_target=ProcessingLaunchTarget.MODEL_VERSION,
-        )
-        file_name = (run_config.get("parameters", {}) or {}).get("output_model_file_name")
-        if not (model_id and file_name):
-            return
-        try:
-            deleted = delete_existing_model_file_if_any(
-                client=client,
-                model_version_id=model_id,
-                file_name=file_name,
-            )
-            if deleted:
-                typer.echo(
-                    typer.style(
-                        f"🧹 Deleted existing model file '{file_name}' (override enabled).",
-                        fg=typer.colors.YELLOW,
-                    )
-                )
-        except Exception as e:
-            typer.echo(
-                typer.style(
-                    f"⚠️ Override skipped for model file '{file_name}': {e}",
-                    fg=typer.colors.YELLOW,
-                )
-            )
