@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from shlex import quote
@@ -71,10 +72,68 @@ def _compose_docker_run_cmd(
     return base
 
 
+def _pipeline_log_paths_in_container(pipeline_name: str) -> list[str]:
+    """Remote paths to try when copying pipeline logs from a smoke-test container."""
+    return [
+        "/experiment/training.log",
+        f"/experiment/{pipeline_name}/logs",
+        "/experiment/logs",
+        "/workspace/logs",
+        f"/workspace/{pipeline_name}/logs",
+    ]
+
+
+def _copy_pipeline_logs_from_container(
+    container_name: str, pipeline_name: str
+) -> Path | None:
+    """Best-effort copy of pipeline logs from the container into smoke-test-logs/."""
+    capture_dir = Path("smoke-test-logs")
+    if capture_dir.exists():
+        shutil.rmtree(capture_dir)
+    capture_dir.mkdir(parents=True, exist_ok=True)
+    copied_any = False
+
+    for remote_path in _pipeline_log_paths_in_container(pipeline_name):
+        dest = capture_dir / remote_path.strip("/").replace("/", "_")
+        result = subprocess.run(
+            ["docker", "cp", f"{container_name}:{remote_path}", str(dest)],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode == 0 and dest.exists():
+            copied_any = True
+
+    return capture_dir if copied_any else None
+
+
+def _print_captured_pipeline_logs(capture_dir: Path | None) -> None:
+    """Print log files copied from the container, if any were found."""
+    if capture_dir is None or not capture_dir.exists():
+        return
+
+    log_files = sorted(
+        (f for f in capture_dir.rglob("*") if f.is_file()),
+        key=lambda p: str(p),
+    )
+    if not log_files:
+        return
+
+    typer.echo("\n🧾 Captured pipeline logs:\n" + "-" * 60)
+    for log_file in log_files:
+        rel = log_file.relative_to(capture_dir)
+        typer.echo(f"\n--- {rel} ---")
+        try:
+            print(log_file.read_text())
+        except Exception as e:
+            typer.echo(f"⚠️ Could not read {rel}: {e}")
+    typer.echo("-" * 60 + "\n")
+
+
 def _stream_container_logs_and_detect_error(
     proc: subprocess.Popen, container_name: str
 ) -> tuple[bool, int]:
-    """Stream logs; detect '--ec-- 1'; copy training.log and stop container if seen.
+    """Stream logs; detect '--ec-- 1' and stop the container if seen.
 
     Returns:
         (triggered, returncode)
@@ -93,27 +152,11 @@ def _stream_container_logs_and_detect_error(
             print(line, end="")
             if "--ec-- 1" in line and not triggered:
                 typer.echo(
-                    "\n❌ '--ec-- 1' detected! Something went wrong during training."
+                    "\n❌ '--ec-- 1' detected! Something went wrong during the pipeline run."
                 )
-                typer.echo(
-                    "📥 Copying training logs before stopping the container...\n"
-                )
+                typer.echo("📥 Stopping the container…\n")
                 triggered = True
-
-                # best-effort copy of training.log, prefer capture_output to PIPE
-                subprocess.run(
-                    [
-                        "docker",
-                        "cp",
-                        f"{container_name}:/experiment/training.log",
-                        "training.log",
-                    ],
-                    check=False,
-                    text=True,
-                    capture_output=True,
-                )
                 subprocess.run(["docker", "stop", container_name], check=False)
-                # we break once we've handled the error marker
                 break
     except Exception as e:
         typer.echo(f"❌ Error while monitoring Docker: {e}")
@@ -125,20 +168,6 @@ def _stream_container_logs_and_detect_error(
             proc.kill()
 
     return triggered, proc.returncode or 0
-
-
-def _print_captured_training_log_if_any(error_or_triggered: bool) -> None:
-    """If there was an error, try to print the local training.log content."""
-    if not error_or_triggered:
-        return
-
-    typer.echo("\n🧾 Captured training.log content:\n" + "-" * 60)
-    try:
-        with open("training.log") as f:
-            print(f.read())
-    except Exception as e:
-        typer.echo(f"⚠️ Could not read training.log: {e}")
-    print("-" * 60 + "\n")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -200,7 +229,12 @@ def run_smoke_test_container(
 
     print(f"\nDocker container exited with code: {returncode}")
 
-    _print_captured_training_log_if_any(triggered or returncode != 0)
+    if triggered or returncode != 0:
+        captured_logs = _copy_pipeline_logs_from_container(
+            container_name=container_name,
+            pipeline_name=pipeline_name,
+        )
+        _print_captured_pipeline_logs(captured_logs)
 
     if not triggered and returncode == 0:
         typer.echo("✅ Docker pipeline ran successfully.")

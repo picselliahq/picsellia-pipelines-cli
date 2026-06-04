@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 import toml
 import typer
@@ -8,25 +9,45 @@ from picsellia.exceptions import ResourceNotFoundError
 
 from picsellia_pipelines_cli.utils.run_manager import RunManager
 
+TARGET_ID_PROMPT_LABELS: dict[str, str] = {
+    "DATASET_VERSION_CREATION": "Dataset version ID (target)",
+    "PRE_ANNOTATION": "Dataset version ID (target)",
+    "DATA_AUTO_TAGGING": "Datalake ID (target)",
+    "MODEL_CONVERSION": "Model version ID (target)",
+    "MODEL_COMPRESSION": "Model version ID (target)",
+}
+
+INPUT_TYPE_PROMPT_HINTS: dict[str, str] = {
+    "TEXT": "text value",
+    "DATASET_VERSION": "dataset version ID",
+    "MODEL_VERSION": "model version ID",
+    "DATALAKE": "datalake ID",
+    "BOOLEAN": "true or false",
+    "INTEGER": "integer",
+    "FLOAT": "float",
+}
+
 
 def get_processing_params(
     run_manager: RunManager,
     pipeline_type: str,
     pipeline_name: str,
     config_file: Path | None = None,
+    default_inputs: list[dict[str, Any]] | None = None,
 ) -> dict:
     if config_file and config_file.exists():
         with config_file.open("r") as f:
-            return toml.load(f)
-    else:
-        latest_config_path = run_manager.get_latest_run_config_path()
-        if latest_config_path:
-            with open(latest_config_path) as f:
-                latest_config = toml.load(f)
-        else:
-            latest_config = None
+            return ensure_processing_run_config_defaults(
+                run_config=toml.load(f), pipeline_type=pipeline_type
+            )
 
-    stored_params = {}
+    latest_config_path = run_manager.get_latest_run_config_path()
+    latest_config = None
+    if latest_config_path:
+        with open(latest_config_path) as f:
+            latest_config = toml.load(f)
+
+    stored_params: dict = latest_config or {}
 
     if latest_config:
         print_config_io_summary(latest_config)
@@ -34,138 +55,107 @@ def get_processing_params(
             typer.style("📝 Do you want to reuse this config?", fg=typer.colors.CYAN),
             default=True,
         )
-        stored_params = latest_config
         if reuse:
-            return latest_config
+            return ensure_processing_run_config_defaults(
+                run_config=latest_config, pipeline_type=pipeline_type
+            )
 
-    if pipeline_type == "PRE_ANNOTATION":
-        return prompt_preannotation_params(stored_params=stored_params)
-    elif pipeline_type == "DATA_AUTO_TAGGING":
-        return prompt_data_auto_tagging_params(stored_params=stored_params)
-    elif pipeline_type == "DATASET_VERSION_CREATION":
-        return prompt_dataset_version_creation_params(
-            stored_params=stored_params, pipeline_name=pipeline_name
-        )
-    elif pipeline_type == "MODEL_CONVERSION" or pipeline_type == "MODEL_COMPRESSION":
-        return prompt_model_process_params(
-            stored_params=stored_params, pipeline_type=pipeline_type
-        )
-    else:
-        raise Exception(f"Unknown pipeline_type: {pipeline_type}")
+    run_config = prompt_processing_run_config(
+        stored_params=stored_params,
+        pipeline_type=pipeline_type,
+        default_inputs=default_inputs,
+    )
+    return ensure_processing_run_config_defaults(
+        run_config=run_config, pipeline_type=pipeline_type
+    )
 
 
-def prompt_dataset_version_creation_params(
-    stored_params: dict, pipeline_name: str
+def ensure_processing_run_config_defaults(
+    run_config: dict, pipeline_type: str
 ) -> dict:
-    input = stored_params.get("input", {})
-    output = stored_params.get("output", {})
+    """Align run config with processing-type requirements from cv-engine."""
+    run_config.setdefault("job", {})
+    run_config["job"]["type"] = pipeline_type
 
-    input_dataset = input.get("dataset_version", {})
-    output_dataset = output.get("dataset_version", {})
+    if pipeline_type == "DATA_AUTO_TAGGING":
+        run_config.setdefault("run_parameters", {})
+        run_params = run_config["run_parameters"]
+        run_params.setdefault("offset", 0)
+        run_params.setdefault("limit", 10)
 
-    input_dataset_version_id = typer.prompt(
-        typer.style("📅 Input dataset version ID", fg=typer.colors.CYAN),
-        default=input_dataset.get("id", ""),
-    )
-    target_version_name = typer.prompt(
-        typer.style("📄 Output dataset version name", fg=typer.colors.CYAN),
-        default=output_dataset.get("name", f"processed_{pipeline_name}"),
-    )
-    return {
-        "job": {"type": "DATASET_VERSION_CREATION"},
-        "input": {"dataset_version": {"id": input_dataset_version_id}},
-        "output": {"dataset_version": {"name": target_version_name}},
-    }
+    return run_config
 
 
-def prompt_preannotation_params(stored_params: dict) -> dict:
-    input = stored_params.get("input", {})
-    dataset = input.get("dataset_version", {})
-    model = input.get("model_version", {})
-
-    input_dataset_version_id = typer.prompt(
-        typer.style("📅 Input dataset version ID", fg=typer.colors.CYAN),
-        default=dataset.get("id", ""),
-    )
-    model_version_id = typer.prompt(
-        typer.style("🧠 Model version ID", fg=typer.colors.CYAN),
-        default=model.get("id", ""),
-    )
-
-    return {
-        "job": {"type": "PRE_ANNOTATION"},
-        "input": {
-            "dataset_version": {"id": input_dataset_version_id},
-            "model_version": {"id": model_version_id},
-        },
-    }
-
-
-def prompt_data_auto_tagging_params(stored_params: dict) -> dict:
-    input = stored_params.get("input", {})
-    output = stored_params.get("output", {})
-    parameters = input.get("parameters", {})
-    run_parameters = input.get("run_parameters", {})
-
-    model = input.get("model_version", {})
-    input_datalake = input.get("datalake", {})
-
-    output_datalake = output.get("datalake", {})
-
-    input_datalake_id = typer.prompt(
-        typer.style("📅 Input datalake ID", fg=typer.colors.CYAN),
-        default=input_datalake.get("id", ""),
-    )
-    model_version_id = typer.prompt(
-        typer.style("🧠 Model version ID", fg=typer.colors.CYAN),
-        default=model.get("model_version_id", ""),
-    )
-
-    output_datalake_id = typer.prompt(
-        typer.style("📄 Output datalake ID", fg=typer.colors.CYAN),
-        default=output_datalake.get("id", ""),
-    )
-
-    tags_list = typer.prompt(
-        typer.style("🏷️ Tags to use (comma-separated)", fg=typer.colors.CYAN),
-        default=parameters.get("tags_list", ""),
-    )
-    offset = typer.prompt(
-        typer.style("↪ Offset", fg=typer.colors.CYAN),
-        default=run_parameters.get("offset", "0"),
-    )
-    limit = typer.prompt(
-        typer.style("🔗 Limit", fg=typer.colors.CYAN),
-        default=run_parameters.get("limit", "100"),
-    )
-
-    return {
-        "job": {"type": "DATA_AUTO_TAGGING"},
-        "input": {
-            "datalake": {"id": input_datalake_id},
-            "model_version": {"id": model_version_id},
-        },
-        "output": {"datalake": {"id": output_datalake_id}},
-        "parameters": {"tags_list": tags_list},
-        "run_parameters": {"offset": int(offset), "limit": int(limit)},
-    }
-
-
-def prompt_model_process_params(stored_params: dict, pipeline_type: str) -> dict:
-    input = stored_params.get("input", {})
-    model = input.get("model_version", {})
-
-    model_version_id = typer.prompt(
-        typer.style("🧠 Model version ID", fg=typer.colors.CYAN),
-        default=model.get("id", ""),
-    )
-
-    return {
+def prompt_processing_run_config(
+    stored_params: dict,
+    pipeline_type: str,
+    default_inputs: list[dict[str, Any]] | None,
+) -> dict:
+    """Build a run config by prompting for target_id and declared processing inputs."""
+    run_config: dict[str, Any] = {
         "job": {"type": pipeline_type},
-        "input": {
-            "model_version": {"id": model_version_id},
-        },
+        "override_outputs": stored_params.get("override_outputs", True),
     }
+
+    target_label = TARGET_ID_PROMPT_LABELS.get(pipeline_type)
+    if target_label:
+        run_config["target_id"] = typer.prompt(
+            typer.style(f"🎯 {target_label}", fg=typer.colors.CYAN),
+            default=stored_params.get("target_id", ""),
+        )
+
+    stored_inputs = stored_params.get("inputs") or {}
+    if default_inputs:
+        run_config["inputs"] = prompt_declared_inputs(
+            default_inputs=default_inputs,
+            stored_inputs=stored_inputs,
+        )
+
+    if pipeline_type == "DATA_AUTO_TAGGING":
+        stored_run_params = stored_params.get("run_parameters") or {}
+        offset = typer.prompt(
+            typer.style("↪ Offset", fg=typer.colors.CYAN),
+            default=str(stored_run_params.get("offset", 0)),
+        )
+        limit = typer.prompt(
+            typer.style("🔗 Limit", fg=typer.colors.CYAN),
+            default=str(stored_run_params.get("limit", 10)),
+        )
+        run_config["run_parameters"] = {
+            "offset": int(offset),
+            "limit": int(limit),
+        }
+
+    return run_config
+
+
+def prompt_declared_inputs(
+    default_inputs: list[dict[str, Any]],
+    stored_inputs: dict[str, Any],
+) -> dict[str, str]:
+    """Prompt the user for each input declared in the pipeline's inputs class."""
+    inputs: dict[str, str] = {}
+
+    for inp in default_inputs:
+        name = inp["name"]
+        input_type = inp.get("input_type", "TEXT")
+        required = inp.get("required", True)
+        hint = INPUT_TYPE_PROMPT_HINTS.get(input_type, input_type.lower().replace("_", " "))
+        optional_tag = "" if required else " (optional)"
+        label = f"📥 {name} — {hint}{optional_tag}"
+
+        default_value = stored_inputs.get(name, "")
+        if default_value is None:
+            default_value = ""
+
+        value = typer.prompt(
+            typer.style(label, fg=typer.colors.CYAN),
+            default=str(default_value),
+            show_default=bool(default_value) or not required,
+        )
+        inputs[name] = value
+
+    return inputs
 
 
 def delete_existing_dataset_version_if_any(
@@ -385,12 +375,10 @@ def enrich_output_metadata_after_run(client: Client, run_config: dict):
 
 
 def print_config_io_summary(config: dict):
-    input_section = config.get("input", {})
-    output_section = config.get("output", {})
-
     io_summary = {
-        "input": input_section,
-        "output": output_section,
+        "target_id": config.get("target_id"),
+        "inputs": config.get("inputs", {}),
+        "override_outputs": config.get("override_outputs"),
     }
 
     typer.echo(typer.style("🧾 Reusing previous config:\n", fg=typer.colors.CYAN))
