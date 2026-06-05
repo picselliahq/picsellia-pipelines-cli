@@ -16,5 +16,5 @@ image_tag = "latest"
 [model_version]
 origin_name = "yolov8-template"
 name = "latest"
-framework = "YOLOV8"
+framework = "ONNX"
 inference_type = "OBJECT_DETECTION"
