@@ -12,3 +12,9 @@ parameters_class = "utils/parameters.py:TrainingHyperParameters"
 [docker]
 image_name = "picsellia/yolov8-template"
 image_tag = "latest"
+
+[model_version]
+origin_name = "yolov8-template"
+name = "latest"
+framework = "YOLOV8"
+inference_type = "OBJECT_DETECTION"
