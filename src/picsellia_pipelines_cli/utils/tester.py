@@ -153,6 +153,7 @@ def load_or_init_run_config(
             pipeline_type=pipeline_type,
             pipeline_name=pipeline_name,
             config_file=None,
+            default_inputs=default_inputs,
         )
 
     run_config.setdefault("run", {})

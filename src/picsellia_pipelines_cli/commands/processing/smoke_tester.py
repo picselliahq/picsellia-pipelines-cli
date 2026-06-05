@@ -1,12 +1,10 @@
 from pathlib import Path
 
-from picsellia_pipelines_cli.commands.processing.tester import (
-    check_output_dataset_version,
+from picsellia_pipelines_cli.commands.processing.utils.tester import (
+    apply_processing_override_outputs,
+    ensure_processing_run_config_defaults,
     enrich_run_config_with_metadata,
     get_processing_params,
-)
-from picsellia_pipelines_cli.commands.processing.utils.tester import (
-    check_output_model_file,
 )
 from picsellia_pipelines_cli.utils.deployer import (
     prompt_docker_image_if_missing,
@@ -57,6 +55,9 @@ def smoke_test_processing(
         parameters_name="parameters",
         default_inputs=pipeline_config.extract_default_inputs(),
     )
+    run_config = ensure_processing_run_config_defaults(
+        run_config=run_config, pipeline_type=pipeline_type
+    )
 
     # Environment
     section("🌍 Environment")
@@ -65,29 +66,9 @@ def smoke_test_processing(
     kv("Organization", env_config["organization_name"])
 
     client = init_client(env_config=env_config)
-
-    if pipeline_type == "DATASET_VERSION_CREATION":
-        if "input" in run_config and "output" in run_config:
-            run_config["output"]["dataset_version"]["name"] = check_output_dataset_version(
-                client=client,
-                input_dataset_version_id=run_config["input"]["dataset_version"]["id"],
-                output_name=run_config["output"]["dataset_version"]["name"],
-                override_outputs=bool(run_config.get("override_outputs", False)),
-            )
-
-    if pipeline_type in ["MODEL_CONVERSION", "MODEL_COMPRESSION"]:
-        output_name = (
-                run_config.get("parameters", {}).get("output_model_file_name")
-                or "onnx-model"
-        )
-        if "input" in run_config and "model_version" in run_config["input"]:
-            run_config["parameters"]["output_model_file_name"] = check_output_model_file(
-                client=client,
-                input_model_version_id=run_config["input"]["model_version"]["id"],
-                output_name=output_name,
-                override_outputs=bool(run_config.get("override_outputs", False)),
-            )
-
+    apply_processing_override_outputs(
+        client=client, run_config=run_config, pipeline_type=pipeline_type
+    )
     enrich_run_config_with_metadata(client=client, run_config=run_config)
     saved_run_config_path = save_and_get_run_config_path(
         run_manager=run_manager, run_dir=run_dir, run_config=run_config

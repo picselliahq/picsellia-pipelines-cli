@@ -148,6 +148,10 @@ type = "DATA_AUTO_TAGGING"
 [inputs]
 example_input = "example_value"
 
+[run_parameters]
+offset = 0
+limit = 10
+
 [parameters]
 example_parameter = "default"
 """
@@ -160,7 +164,7 @@ class DatalakeProcessingTemplate(BaseTemplate):
             output_dir=output_dir,
             use_pyproject=use_pyproject,
         )
-        self.pipeline_type = "MODEL_CONVERSION"
+        self.pipeline_type = "DATA_AUTO_TAGGING"
 
     def get_main_files(self) -> dict[str, str]:
         files = {
