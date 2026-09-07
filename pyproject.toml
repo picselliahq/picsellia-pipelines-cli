@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "picsellia>=6.20.0,<7.0.0",
+    "picsellia>=6.35.0,<7.0.0",
     "typer>=0.15.2,<0.16.0",
     "toml>=0.10.2,<1.0",
     "dotenv>=0.9.9,<1.0",

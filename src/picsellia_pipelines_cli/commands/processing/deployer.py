@@ -6,6 +6,7 @@ from picsellia.types.enums import (
     InferenceType,
     ProcessingInputType,
     ProcessingType,
+    ProcessingTargetType
 )
 from requests import Session
 
@@ -24,10 +25,10 @@ from picsellia_pipelines_cli.utils.pipeline_config import PipelineConfig
 
 
 def deploy_processing(
-    pipeline_name: str,
-    env: Environment,
-    organization: str | None = None,
-    bump: Bump | None = None,
+        pipeline_name: str,
+        env: Environment,
+        organization: str | None = None,
+        bump: Bump | None = None,
 ):
     """
     🚀 Deploy a processing pipeline.
@@ -191,7 +192,7 @@ def _infer_docker_flags(cfg: PipelineConfig) -> list | None:
 
 
 def _sync_processing_inputs(
-    processing, default_inputs: list[dict] | None
+        processing, default_inputs: list[dict] | None
 ) -> None:
     """Synchronise the inputs declared in the pipeline class with the platform.
 
@@ -244,11 +245,11 @@ def _sync_processing_inputs(
 
 
 def _register_or_update(
-    cfg: PipelineConfig,
-    api_token: str,
-    organization_name: str,
-    host: str,
-    session: Session,
+        cfg: PipelineConfig,
+        api_token: str,
+        organization_name: str,
+        host: str,
+        session: Session,
 ) -> tuple[str, str | None]:
     """
     Create or update the processing on a given host.
@@ -262,6 +263,7 @@ def _register_or_update(
     name = cfg.get("metadata", "name")
     description = cfg.get("metadata", "description")
     ptype = ProcessingType(cfg.get("metadata", "type"))
+    target = _get_target_from_ptype(ptype)
     default_cpu = int(cfg.get("docker", "cpu"))
     default_gpu = int(cfg.get("docker", "gpu"))
     default_parameters = cfg.extract_default_parameters()
@@ -273,6 +275,7 @@ def _register_or_update(
         name=name,
         description=description,
         type=ptype,
+        target=target,
         default_cpu=default_cpu,
         default_gpu=default_gpu,
         default_parameters=default_parameters,
@@ -300,3 +303,20 @@ def _register_or_update(
         processing.update(**update_kwargs)
         _sync_processing_inputs(processing, default_inputs)
         return "Updated", f"{name} ({docker_image}:{docker_tag})"
+
+
+def _get_target_from_ptype(ptype: ProcessingType) -> ProcessingTargetType:
+    if ptype in [
+        ProcessingType.DATASET_VERSION_CREATION,
+        ProcessingType.AUTO_TAGGING,
+        ProcessingType.AUTO_ANNOTATION,
+        ProcessingType.PRE_ANNOTATION,
+        ProcessingType.DATA_AUGMENTATION
+    ]:
+        return ProcessingTargetType.DATASET_VERSION
+    elif ptype == ProcessingType.DATA_AUTO_TAGGING:
+        return ProcessingTargetType.DATALAKE
+    elif ptype in [ProcessingType.MODEL_COMPRESSION, ProcessingType.MODEL_CONVERSION]:
+        return ProcessingTargetType.MODEL_VERSION
+    else:
+        raise ValueError(f"Unknown processing type: {ptype}")
