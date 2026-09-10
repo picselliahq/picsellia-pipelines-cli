@@ -116,7 +116,10 @@ def init_training(
 
     # interactive path (local)
     model_name, model_version_name, model_url, framework, inference_type = (
-        choose_or_create_model_version(client=client)
+        choose_or_create_model_version(
+            client=client,
+            default_parameters=_extract_default_parameters(config=config),
+        )
     )
     kv("Name", model_name)
     kv("Version", model_version_name)
@@ -235,10 +238,36 @@ def get_template_instance(
             raise typer.Exit(code=1)
 
 
+def _extract_default_parameters(config: PipelineConfig) -> dict:
+    """Read the parameters the freshly scaffolded pipeline declares.
+
+    The parameters class is imported from the pipeline directory, which needs
+    the pipeline dependencies to be importable from the CLI. When they are not,
+    the model version is created without base parameters and gets them on the
+    first `pxl-pipeline deploy`.
+    """
+    try:
+        return config.extract_default_parameters()
+    except Exception as e:
+        bullet(
+            f"Could not read the pipeline parameters ({e}). "
+            "The model version is created without base parameters; "
+            "they will be set on the first deploy.",
+            accent=True,
+        )
+        return {}
+
+
 def choose_or_create_model_version(
     client: Client,
+    default_parameters: dict | None = None,
 ) -> tuple[str, str, str, str, str]:
     """Prompt the user to select or create a model version.
+
+    Args:
+        client: Authenticated Picsellia client.
+        default_parameters: Parameters declared by the pipeline, used as the
+            base parameters of a newly created model version.
 
     Returns:
         Tuple containing:
@@ -328,7 +357,7 @@ def choose_or_create_model_version(
         name=model_version_name,
         framework=Framework[framework_input],
         type=InferenceType[inference_type_input],
-        base_parameters={"epochs": 2, "batch_size": 8, "image_size": 640},
+        base_parameters=default_parameters or {},
     )
 
     return (
