@@ -31,10 +31,10 @@ def {pipeline_name}_pipeline():
     datasets = list_training_datasets()
     # Easily access your parameters from the context
     print(context.hyperparameters.epochs)
-    
+
     # Your code goes here ....
-    
-    
+
+
 if __name__ == "__main__":
     {pipeline_name}_pipeline()
 """
@@ -53,10 +53,10 @@ def list_training_datasets() -> list[DatasetVersion] :
 """
 
 TRAINING_PIPELINE_PARAMETERS = """from picsellia.types.schemas import LogDataType
-from picsellia_cv_engine.core.parameters import HyperParameters
+from picsellia_cv_engine.core.parameters.base_parameters import Parameters
 
 
-class TrainingHyperParameters(HyperParameters):
+class TrainingHyperParameters(Parameters):
     def __init__(self, log_data: LogDataType):
         super().__init__(log_data=log_data)
         self.epochs = self.extract_parameter(["epochs"], expected_type=int, default=3)
