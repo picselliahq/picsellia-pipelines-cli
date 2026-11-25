@@ -363,6 +363,28 @@ inference_type = "OBJECT_DETECTION"
 
 `deploy` propagates Docker image/tag and default parameters to every listed model version.
 
+**Dataset constraints** (optional): declare which dataset versions the training expects, as named groups of aliases. Picsellia uses them to assign dataset versions when an experiment is created from the model version (Model version → Settings → Constraints).
+
+```toml
+[dataset_constraints]
+required = true
+
+[[dataset_constraints.groups]]
+name = "1 dataset"
+description = "One dataset version, split at random into train / val / test."
+aliases = ["train"]
+
+[[dataset_constraints.groups]]
+name = "3 datasets"
+description = "Three dataset versions, each used as it is."
+aliases = ["train", "val", "test"]
+alias_descriptions = { train = "Training images" }  # optional
+```
+
+- When `[dataset_constraints]` is present, `deploy` **replaces** the constraints of every listed model version with it (`groups = []` clears them).
+- When it is absent, `deploy` leaves the constraints set in the UI untouched.
+- The section is validated before the Docker build: each group needs a unique `name` and at least one alias, and aliases must be unique within a group.
+
 After deployment, the pipeline becomes usable by your team in the Picsellia interface.
 
 </details>

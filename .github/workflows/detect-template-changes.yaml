@@ -179,6 +179,9 @@ jobs:
               else:
                   cpu.append(e)
 
-          print("cpu_matrix=" + json.dumps({"include": cpu}))
-          print("gpu_matrix=" + json.dumps({"include": gpu}))
+          # Compact JSON: the jobs compare these outputs to '{"include":[]}'
+          # to skip an empty matrix, which GitHub would otherwise reject.
+          compact = {"separators": (",", ":")}
+          print("cpu_matrix=" + json.dumps({"include": cpu}, **compact))
+          print("gpu_matrix=" + json.dumps({"include": gpu}, **compact))
           PY

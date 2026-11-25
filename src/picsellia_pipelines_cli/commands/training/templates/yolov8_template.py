@@ -130,6 +130,9 @@ dependencies = [
     "picsellia-pipelines-cli",
     "picsellia-cv-engine",
     "ultralytics>=8.3.145",
+    # 4.69.0 was published with cp311 wheels only (no sdist), which breaks
+    # `uv sync` on any other Python version.
+    "fonttools!=4.69.0",
 ]
 """
 

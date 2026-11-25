@@ -3,6 +3,11 @@ from picsellia import Client
 from picsellia.exceptions import ResourceNotFoundError
 from picsellia.types.enums import Framework, InferenceType
 
+from picsellia_pipelines_cli.utils.dataset_constraints import (
+    apply_dataset_constraints,
+    describe_dataset_constraints,
+    parse_dataset_constraints,
+)
 from picsellia_pipelines_cli.utils.deployer import (
     Bump,
     build_and_push_docker_image,
@@ -38,7 +43,8 @@ def deploy_training(
         2. Display pipeline metadata (name, type, description).
         3. Ensure model + version exist on the target host(s).
         4. Build & push Docker image (new version + "latest" or "test").
-        5. Update model version with Docker details and default parameters.
+        5. Update model version with Docker details, default parameters and,
+           when [dataset_constraints] is declared, its dataset version constraints.
 
     Args:
         pipeline_name: The name of the pipeline project to deploy.
@@ -78,6 +84,15 @@ def deploy_training(
             f"{target['origin_name']}:{target['name']} "
             f"[{target['framework']}/{target['inference_type']}]",
         )
+
+    # Validate before building the image so a config error fails fast.
+    dataset_constraints = parse_dataset_constraints(pipeline_config.config)
+    section("🗂️ Dataset constraints")
+    if dataset_constraints is None:
+        kv("Status", "not declared — left unchanged on the platform")
+    else:
+        for label, value in describe_dataset_constraints(dataset_constraints):
+            kv(label, value)
 
     # ── Ensure model/version exist before build ──────────────────────────────
     section("Model / Version (Pre-check)")
@@ -131,6 +146,7 @@ def deploy_training(
             default_parameters=default_parameters,
             image_name=image_name,
             image_tag=pipeline_config.get("docker", "image_tag"),
+            dataset_constraints=dataset_constraints,
             apply_deployment=True,
         )
         _log_model_version_results(deploy_results, title="Deploy results")
@@ -294,6 +310,7 @@ def _ensure_model_versions_on_host(
     default_parameters: dict,
     image_name: str | None = None,
     image_tag: str | None = None,
+    dataset_constraints: dict | None = None,
     *,
     apply_deployment: bool = False,
 ) -> list[ModelVersionDeployResult]:
@@ -305,6 +322,8 @@ def _ensure_model_versions_on_host(
         default_parameters: Pipeline default hyperparameters (extracted once upstream).
         image_name: Docker image name to attach (deploy phase only).
         image_tag: Docker tag to attach (deploy phase only).
+        dataset_constraints: Dataset version constraints payload to set on each
+            version (deploy phase only). None leaves the platform value untouched.
         apply_deployment: When False, only verify/create resources without updating
             existing versions. When True, push docker image + parameters to each target.
 
@@ -361,20 +380,33 @@ def _ensure_model_versions_on_host(
             else (image_name or "not set")
         )
         if version_existed:
+            # The SDK rejects some types on update (e.g. MASK) even when they do
+            # not change, so only send framework/type when they actually differ.
             mv.update(
                 name=target["name"],
-                framework=framework,
-                type=inference_type,
+                framework=framework if mv.framework != framework else None,
+                type=inference_type if mv.type != inference_type else None,
                 docker_image_name=image_name,
                 docker_tag=image_tag,
                 docker_flags=docker_flags,
                 base_parameters=base_parameters,
             )
+
+        constraints_note = ""
+        if dataset_constraints is not None:
+            apply_dataset_constraints(mv, dataset_constraints)
+            constraints_note = (
+                f" — {len(dataset_constraints['constraints_groups'])} "
+                "dataset constraint group(s)"
+            )
+
+        if version_existed:
             results.append(
                 (
                     target_label,
                     "Updated",
-                    f"{target['framework']}/{target['inference_type']} — {docker_ref}",
+                    f"{target['framework']}/{target['inference_type']} — {docker_ref}"
+                    f"{constraints_note}",
                 )
             )
         else:
@@ -382,7 +414,8 @@ def _ensure_model_versions_on_host(
                 (
                     target_label,
                     "Created",
-                    f"{target['framework']}/{target['inference_type']} — {docker_ref}",
+                    f"{target['framework']}/{target['inference_type']} — {docker_ref}"
+                    f"{constraints_note}",
                 )
             )
 
