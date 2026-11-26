@@ -363,6 +363,20 @@ inference_type = "OBJECT_DETECTION"
 
 `deploy` propagates Docker image/tag and default parameters to every listed model version.
 
+**Description:** `deploy` also sets `[metadata] description` from `config.toml` as the description of every listed model version (all targets get the same text). Markdown is supported, so you can document requirements, parameters and outputs there.
+
+```toml
+[metadata]
+description = """
+# My training pipeline
+
+Requirements, parameters, outputs...
+"""
+```
+
+- The description is **replaced at each deploy**: edits made on the platform are overwritten by the next `deploy`.
+- When `description` is missing or empty, `deploy` leaves the description set on the platform untouched.
+
 **Dataset constraints** (optional): declare which dataset versions the training expects, as named groups of aliases. Picsellia uses them to assign dataset versions when an experiment is created from the model version (Model version → Settings → Constraints).
 
 ```toml
