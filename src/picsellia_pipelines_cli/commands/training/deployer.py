@@ -45,6 +45,7 @@ def deploy_training(
         4. Build & push Docker image (new version + "latest" or "test").
         5. Update model version with Docker details, default parameters and,
            when [dataset_constraints] is declared, its dataset version constraints.
+           [metadata] description is set on each model version (replaced at each deploy).
 
     Args:
         pipeline_name: The name of the pipeline project to deploy.
@@ -101,7 +102,7 @@ def deploy_training(
         api_token=env_config["api_token"],
         organization_name=env_config["organization_name"],
         host=env_config["host"],
-        session=env_config["session"]
+        session=env_config["session"],
     )
     default_parameters = pipeline_config.extract_default_parameters()
     precheck_results = _ensure_model_versions_on_host(
@@ -147,6 +148,7 @@ def deploy_training(
             image_name=image_name,
             image_tag=pipeline_config.get("docker", "image_tag"),
             dataset_constraints=dataset_constraints,
+            description=pipeline_config.get("metadata", "description"),
             apply_deployment=True,
         )
         _log_model_version_results(deploy_results, title="Deploy results")
@@ -271,9 +273,7 @@ def _get_model_targets(cfg: PipelineConfig) -> list[dict]:
             if not isinstance(target, dict):
                 typer.echo(f"❌ Invalid model_versions[{i}] entry.")
                 raise typer.Exit(code=1)
-            normalized_targets.append(
-                _normalize_model_target(target=target, index=i)
-            )
+            normalized_targets.append(_normalize_model_target(target=target, index=i))
         return _dedupe_model_targets(normalized_targets)
 
     if has_single:
@@ -311,6 +311,7 @@ def _ensure_model_versions_on_host(
     image_name: str | None = None,
     image_tag: str | None = None,
     dataset_constraints: dict | None = None,
+    description: str | None = None,
     *,
     apply_deployment: bool = False,
 ) -> list[ModelVersionDeployResult]:
@@ -324,6 +325,9 @@ def _ensure_model_versions_on_host(
         image_tag: Docker tag to attach (deploy phase only).
         dataset_constraints: Dataset version constraints payload to set on each
             version (deploy phase only). None leaves the platform value untouched.
+        description: Description to set on each version (deploy phase only). None
+            or empty leaves the platform value untouched. Every target receives the
+            same description.
         apply_deployment: When False, only verify/create resources without updating
             existing versions. When True, push docker image + parameters to each target.
 
@@ -357,6 +361,7 @@ def _ensure_model_versions_on_host(
                 docker_tag=image_tag if apply_deployment else None,
                 docker_flags=docker_flags if apply_deployment else None,
                 base_parameters=base_parameters,
+                description=(description or None) if apply_deployment else None,
             )
 
         if not apply_deployment:
@@ -390,6 +395,7 @@ def _ensure_model_versions_on_host(
                 docker_tag=image_tag,
                 docker_flags=docker_flags,
                 base_parameters=base_parameters,
+                description=description or None,
             )
 
         constraints_note = ""
